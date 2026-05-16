@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bloom · Article kit</title>
+  <link rel="stylesheet" href="../../colors_and_type.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css" />
+  <link rel="stylesheet" href="article.css" />
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="TopBar.jsx"></script>
+  <script type="text/babel" src="Hero.jsx"></script>
+  <script type="text/babel" src="Blocks.jsx"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [progress, setProgress] = useState(0.05);
+
+      useEffect(() => {
+        const onScroll = () => {
+          const h = document.documentElement;
+          const scrolled = h.scrollTop / (h.scrollHeight - h.clientHeight);
+          setProgress(Math.max(0.02, Math.min(1, scrolled)));
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => window.removeEventListener('scroll', onScroll);
+      }, []);
+
+      return (
+        <div className="ak-app">
+          <TopBar progress={progress} />
+
+          <Hero
+            kicker="Field notes · 14 min"
+            title="Why curved shapes feel more alive than sharp ones"
+            dek="A short tour through the soft, pillowy interface aesthetic — what makes it work, and where it falls apart."
+            author="Sandra Glam"
+            date="14 May 2026"
+            readTime="14 min"
+            blob="cluster-warm.svg"
+            tint="lavender"
+          />
+
+          <article className="ak-prose">
+            <p>
+              For most of the last decade, software went hard. Hairline borders, flat color blocks, dense grids. Then it
+              softened — slowly, then all at once. The interfaces we reach for now are <strong>rounder, warmer, and a little
+              embarrassed of right angles</strong>.
+            </p>
+
+            <p>
+              The shift isn't only style. There's something <a href="#">measurably calming</a> about curves. Babies prefer them.
+              Adults rate rounded products as more trustworthy. And we keep building tools that have to live in our pockets — close
+              to the body — so it makes sense that the visual language has started to feel that way too.
+            </p>
+
+            <h2>The three moves that do most of the work</h2>
+
+            <p>
+              You can ship 80% of the look with three decisions. Everything else is rhythm.
+            </p>
+
+            <StatRow stats={[
+              { label: 'Corner radius', value: '24', unit: 'px', sub: 'On every card', tint: 'mint' },
+              { label: 'Shadow blur',   value: '32', unit: 'px', sub: 'Soft, never harsh', tint: 'sky' },
+              { label: 'Pastel tints',  value: '6',  unit: 'hues', sub: 'One per section', tint: 'peach' },
+            ]} />
+
+            <h3>1. Round everything, then round it more</h3>
+
+            <p>
+              The biggest mistake people make is being polite with their corner radii. <code>border-radius: 8px</code> is what a
+              SaaS dashboard from 2019 looks like. You want <code>24px</code> on cards. <code>999px</code> on buttons. Hidden
+              corners on inputs. The corners do the heavy lifting — they are the soft accent that signals everything else.
+            </p>
+
+            <Callout kind="tip" title="A test that works">
+              Hide every text label in your design and squint. If the silhouette still looks friendly, your radii are doing
+              their job. If it looks like a stack of credit cards, raise them.
+            </Callout>
+
+            <h3>2. Replace gray with milk</h3>
+
+            <p>
+              Pure grays are dead. They photograph poorly under any kind of light, and on a screen they read as "this app
+              forgot to commit to anything". Bloom replaces neutral gray with <strong>warm off-white</strong>
+              (<code>#FBFAF7</code>) and uses milky pastels — lavender, peach, mint, sky — as the secondary surface palette.
+            </p>
+
+            <Figure
+              blob="cluster-stack.svg"
+              caption="Stacked claymorphic shapes — the kind of illustration that wants to live in the upper-right of a card."
+            />
+
+            <h3>3. One electric per screen</h3>
+
+            <p>
+              Pastels alone are sleepy. The trick is keeping <em>one</em> high-saturation accent in play — usually lime, hot pink,
+              or iris — and reserving it for the action you most want the user to take. Two electrics on the same screen and the
+              eye doesn't know where to land.
+            </p>
+
+            <PullQuote by="Bloom design notes">
+              Soft pastels are the room. The electric is the door. There can only be one door.
+            </PullQuote>
+
+            <h2>What goes wrong</h2>
+
+            <p>
+              Three failure modes show up over and over. They are easy to spot and easy to fix.
+            </p>
+
+            <ul>
+              <li><strong>Pastels muddy out.</strong> Stacking too many at the same value creates a smear. Vary the value or
+                separate with white space.</li>
+              <li><strong>Shadows go opaque.</strong> A 40% black drop shadow looks like a sticker. Bloom shadows are
+                10–16% ink, blurred wide.</li>
+              <li><strong>3D illustrations get cartoonish.</strong> The clay shapes work when they read as <em>props</em>,
+                not as a scene. Keep them abstract — toruses, capsules, spheres — and never put faces on them.</li>
+            </ul>
+
+            <Callout kind="warning" title="The cardboard-cutout trap">
+              The pillowy look falls apart when the shapes look 2D with a shadow slapped under them. If you can't render
+              proper soft shadows, use radial gradients <em>inside</em> the shape to fake the falloff. The light should look
+              like it's coming from a window.
+            </Callout>
+
+            <h2>Where to take it next</h2>
+
+            <p>
+              Once the foundation lands, the variations get fun. Dark mode is where the rainbow gradient comes in — reserved for
+              progress and dataviz, never decoration. Posters lean into the all-caps display face. Long-form documents pull back,
+              leaning on the pastel section blocks for rhythm.
+            </p>
+
+            <p>
+              The whole system is a few small bets, repeated. Round corners. Warm whites. One bright color at a time.
+              Soft shadows. 3D shapes that look like props. Keep at it and the interfaces start to feel alive in the
+              way the brief asked for.
+            </p>
+
+            <EndCard
+              title="Want the full system?"
+              dek="Tokens, components, slide templates — everything in this article, ready to drop in."
+              primary="Get Bloom"
+              secondary="See the kit"
+            />
+          </article>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+/* Preview-card shared shell. Each preview card links this.
+   Renders the swatch/specimen content edge-to-edge with no framing chrome. */
+@import url('../colors_and_type.css');
+
+html, body {
+  background: var(--paper);
+  font-family: var(--font-body);
+  color: var(--ink);
+  margin: 0;
+  padding: 0;
+}
+
+.card {
+  padding: 20px 22px;
+}
+
+.row { display: flex; align-items: center; gap: 16px; }
+.col { display: flex; flex-direction: column; gap: 12px; }
+.grid { display: grid; gap: 12px; }
+
+.muted { color: var(--smoke); }
+.mono  { font-family: var(--font-mono); font-size: 11px; color: var(--smoke); }
+.label { font-size: 11px; color: var(--smoke); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }

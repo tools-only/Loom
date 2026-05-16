@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Code Review — sample</title>
+</head>
+<body>
+
+<section class="anc-section anc-section--brand"
+         data-anc="review.summary"
+         data-handles="refine,expand,shorten,annotate">
+  <h1>Pull Request #482 — Refactor auth middleware</h1>
+  <p>Replaces the monolithic <code>authenticate()</code> handler with a composable middleware chain: token extraction → validation → session resolution. Improves testability and enables per-route auth policies.</p>
+
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--brand">
+      <div class="kpi-value">7</div>
+      <div class="kpi-label">Files changed</div>
+    </div>
+    <div class="anc-kpi anc-kpi--green">
+      <div class="kpi-value">+312</div>
+      <div class="kpi-label">Insertions</div>
+    </div>
+    <div class="anc-kpi anc-kpi--pink">
+      <div class="kpi-value">-148</div>
+      <div class="kpi-label">Deletions</div>
+    </div>
+    <div class="anc-kpi anc-kpi--amber">
+      <div class="kpi-value">Medium</div>
+      <div class="kpi-label">Risk level</div>
+    </div>
+  </div>
+
+  <div class="anc-pill-row">
+    <span class="anc-pill anc-pill--review">Under Review</span>
+    <span class="anc-pill anc-pill--gen">AI Reviewed</span>
+  </div>
+</section>
+
+<hr class="anc-divider">
+
+<section class="anc-section"
+         data-anc="review.file.auth-middleware"
+         data-handles="refine,branch,annotate,restructure">
+  <h2>src/auth/middleware.ts</h2>
+
+  <div class="anc-section anc-section--slate"
+       data-anc="review.diff.auth-1"
+       data-handles="refine,annotate">
+    <h3>Hunk 1 — token extraction (line 12)</h3>
+    <pre><code>+ export function extractToken(req: Request): string | null {
++   const header = req.headers.authorization;
++   if (!header || !header.startsWith('Bearer ')) return null;
++   return header.slice(7);
++ }
++
+- // old: inline inside authenticate()
+- const token = req.headers.authorization?.replace('Bearer ', '') ?? '';</code></pre>
+  </div>
+
+  <div class="anc-section anc-section--amber"
+       data-anc="review.suggestion.auth-1"
+       data-handles="refine,expand,branch,annotate"
+       data-deps="review.diff.auth-1">
+    <h3>Suggestion</h3>
+    <p>Consider extracting the token-decoding logic into a dedicated helper for testability. The <code>startsWith('Bearer ')</code> check is case-sensitive — should it be case-insensitive per RFC 7235?</p>
+  </div>
+
+  <div class="anc-section anc-section--slate"
+       data-anc="review.diff.auth-2"
+       data-handles="refine,annotate">
+    <h3>Hunk 2 — validation (line 34)</h3>
+    <pre><code>+ async function validateToken(token: string): Promise&lt;TokenPayload&gt; {
++   const decoded = jwt.verify(token, PUBLIC_KEY, { algorithms: ['RS256'] });
++   if (typeof decoded === 'string' || !decoded.sub) {
++     throw new AuthError('invalid token payload');
++   }
++   return decoded as TokenPayload;
++ }</code></pre>
+  </div>
+
+  <div class="anc-section anc-section--green"
+       data-anc="review.suggestion.auth-2"
+       data-handles="refine,expand,branch,annotate"
+       data-deps="review.diff.auth-2">
+    <h3>Praise</h3>
+    <p>Good: explicit algorithm constraint (<code>RS256</code>) prevents algorithm confusion attacks. The early return on <code>!decoded.sub</code> is a clean invariant check.</p>
+  </div>
+</section>
+
+<section class="anc-section"
+         data-anc="review.file.session-store"
+         data-handles="refine,branch,annotate,restructure">
+  <h2>src/auth/session-store.ts</h2>
+
+  <div class="anc-section anc-section--slate"
+       data-anc="review.diff.session-1"
+       data-handles="refine,annotate">
+    <h3>Hunk 1 — store interface refactor (line 8)</h3>
+    <pre><code>  export interface SessionStore {
+-   get(id: string): Promise&lt;Session | null&gt;;
++   get(id: string): Promise&lt;Session | null&gt;;
+    set(id: string, session: Session): Promise&lt;void&gt;;
+-   delete(id: string): Promise&lt;void&gt;;
++   remove(id: string): Promise&lt;void&gt;;
++   touch(id: string): Promise&lt;void&gt;;        // refresh expiresAt
+  }
+-
+- // Removed: expiresAt was tracked on the Session object itself
+- export interface Session {
+-   id: string;
+-   userId: string;
+-   data: Record&lt;string, unknown&gt;;
+-   expiresAt: number;                         // epoch ms
+- }
++ export interface Session {
++   id: string;
++   userId: string;
++   data: Record&lt;string, unknown&gt;;
++ }</code></pre>
+  </div>
+
+  <div class="anc-section anc-section--pink"
+       data-anc="review.suggestion.session-1"
+       data-handles="refine,expand,branch,annotate"
+       data-deps="review.diff.session-1">
+    <h3>Concern</h3>
+    <p>The <code>Session</code> interface dropped the <code>expiresAt</code> field and added a <code>touch()</code> method on the store. This means expiration is now <strong>entirely store-managed</strong>. Confirm: (1) all store implementations (Redis, memory, DB) correctly implement TTL-based expiry, and (2) callers that previously read <code>session.expiresAt</code> have been updated.</p>
+  </div>
+
+  <div class="anc-section anc-section--amber"
+       data-anc="review.suggestion.session-2"
+       data-handles="refine,branch,annotate"
+       data-deps="review.diff.session-1">
+    <h3>Naming note</h3>
+    <p>Renaming <code>delete</code> → <code>remove</code> avoids shadowing the JS keyword, but adds friction for developers familiar with the Map/Set <code>.delete()</code> convention. Consider <code>destroy</code> as a more idiomatic alternative.</p>
+  </div>
+</section>
+
+<section class="anc-section"
+         data-anc="review.file.auth-guard"
+         data-handles="refine,branch,annotate">
+  <h2>src/auth/guard.ts (new file)</h2>
+
+  <div class="anc-section anc-section--slate"
+       data-anc="review.diff.guard-1"
+       data-handles="refine,annotate">
+    <h3>Hunk 1 — route-level auth policy (line 1)</h3>
+    <pre><code>+ type AuthPolicy = 'authenticated' | 'optional' | 'admin' | 'public';
++
++ export function requireAuth(policy: AuthPolicy = 'authenticated') {
++   return async (req: Request, res: Response, next: NextFunction) => {
++     const token = extractToken(req);
++     if (!token && policy !== 'public' && policy !== 'optional') {
++       return res.status(401).json({ error: 'Authorization required' });
++     }
++     if (token) {
++       try {
++         req.user = await validateToken(token);
++       } catch (e) {
++         if (policy === 'authenticated' || policy === 'admin') throw e;
++       }
++     }
++     next();
++   };
++ }</code></pre>
+  </div>
+
+  <div class="anc-section anc-section--brand"
+       data-anc="review.suggestion.guard-1"
+       data-handles="refine,expand,branch,annotate"
+       data-deps="review.diff.guard-1">
+    <h3>Design note — composable middleware</h3>
+    <p>This is the core value-add of the PR. The per-route <code>AuthPolicy</code> enum replaces what was previously hardcoded in a single <code>authenticate()</code> call. Note: the <code>admin</code> policy still needs a role-check (currently only validates token presence). Consider a follow-up PR that adds <code>requireRole('admin')</code> as a separate middleware step for cleaner separation of concerns.</p>
+  </div>
+</section>
+
+</body>
+</html>

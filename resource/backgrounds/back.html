@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High-Fidelity Liquid Glass Hero</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fustat:wght@700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        fustat: ['Fustat', 'sans-serif'],
+                        inter: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Antialiasing for sharp typography */
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+    </style>
+</head>
+<body class="bg-white relative overflow-x-hidden min-h-screen text-gray-900">
+
+    <div class="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div class="absolute -top-[150px] -left-[100px] w-[600px] h-[600px] bg-[#60B1FF] rounded-full filter blur-[120px] opacity-30"></div>
+        <div class="absolute top-[50px] left-[150px] w-[500px] h-[500px] bg-[#319AFF] rounded-full filter blur-[150px] opacity-20"></div>
+    </div>
+
+    <div class="sticky top-[30px] z-50 flex justify-center w-full px-4">
+        <nav class="flex items-center justify-between px-6 py-3 gap-10 backdrop-blur-[50px] bg-[rgba(255,255,255,0.3)] rounded-[16px] border border-[rgba(0,0,0,0.1)] shadow-[inset_0_4px_4px_0_rgba(255,255,255,0.25)] w-fit mx-auto">
+            <div class="text-2xl font-fustat font-bold tracking-tight">Taskly</div>
+            
+            <div class="hidden md:flex items-center gap-8 font-inter font-medium text-[15px] text-gray-800">
+                <a href="#" class="hover:text-black transition-colors">Home</a>
+                <a href="#" class="hover:text-black transition-colors">Features</a>
+                <a href="#" class="hover:text-black transition-colors">Company</a>
+                <a href="#" class="hover:text-black transition-colors">Pricing</a>
+            </div>
+
+            <button class="flex items-center gap-2 bg-white/40 hover:bg-white/60 transition-colors backdrop-blur-md px-5 py-2.5 rounded-xl text-sm font-inter font-medium border border-white/50 shadow-sm text-gray-900">
+                SignUp
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </button>
+        </nav>
+    </div>
+
+    <main class="relative z-10 max-w-[1600px] mx-auto px-6 lg:px-12 pt-24 pb-20 flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-8">
+
+        <div class="flex-1 max-w-2xl flex flex-col items-start gap-8 z-20">
+            
+            <div class="flex items-center gap-3 bg-white/50 backdrop-blur-sm px-4 py-2.5 rounded-full border border-gray-200/60 shadow-sm">
+                <div class="flex gap-0.5">
+                    <svg class="w-4 h-4 text-[#FF801E]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    <svg class="w-4 h-4 text-[#FF801E]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    <svg class="w-4 h-4 text-[#FF801E]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    <svg class="w-4 h-4 text-[#FF801E]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    <svg class="w-4 h-4 text-[#FF801E]" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                </div>
+                <span class="font-inter text-sm font-medium text-gray-700">Rated 4.9/5 by 2700+ customers</span>
+            </div>
+
+            <h1 class="font-fustat font-bold text-[55px] md:text-[75px] leading-[1.05] tracking-[-2px] text-gray-900">
+                Work smarter,<br>achieve faster
+            </h1>
+            <p class="font-inter text-[18px] tracking-[-1px] text-gray-600 leading-relaxed max-w-lg">
+                Effortlessly manage your projects, collaborate with your team, and achieve your goals with our intuitive task management tool.
+            </p>
+
+            <button class="group flex items-center gap-4 bg-[rgba(0,132,255,0.8)] backdrop-blur-[2px] rounded-[16px] text-white px-8 py-4 font-inter font-medium text-lg shadow-[inset_0_4px_4px_0_rgba(255,255,255,0.35)] hover:scale-[1.02] transition-transform duration-300 ease-out">
+                Get Started Now
+                <div class="bg-white/20 rounded-full p-1.5 group-hover:translate-x-1 transition-transform duration-300">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </div>
+            </button>
+        </div>
+
+        <div class="flex-1 w-full max-w-[650px] relative pointer-events-none mix-blend-screen overflow-visible z-10 flex justify-center lg:justify-end">
+            <video 
+                autoPlay 
+                loop 
+                muted 
+                playsInline 
+                class="w-full h-auto scale-125 origin-center object-contain"
+                style="filter: hue-rotate(-55deg) saturate(250%) brightness(1.2) contrast(1.1);"
+            >
+                <source src="https://future.co/images/homepage/glassy-orb/orb-purple.webm" type="video/webm">
+            </video>
+        </div>
+    </main>
+
+    <div class="mt-8 pb-20 w-full flex flex-col items-center gap-10 relative z-10">
+        <p class="font-inter text-[13px] text-gray-400 font-medium tracking-widest uppercase">Trusted by Top-tier product companies</p>
+        <div class="flex flex-wrap justify-center items-center gap-[60px] md:gap-[100px] opacity-40 grayscale px-6 transition-opacity hover:opacity-70 duration-500">
+            <svg class="h-6" viewBox="0 0 100 30" fill="currentColor"><text x="0" y="22" font-size="22" font-family="sans-serif" font-weight="900">ACME</text></svg>
+            <svg class="h-6" viewBox="0 0 120 30" fill="currentColor"><text x="0" y="22" font-size="22" font-family="sans-serif" font-weight="900">GLOBEX</text></svg>
+            <svg class="h-6" viewBox="0 0 100 30" fill="currentColor"><text x="0" y="22" font-size="22" font-family="sans-serif" font-weight="900">SOYLENT</text></svg>
+            <svg class="h-6" viewBox="0 0 100 30" fill="currentColor"><text x="0" y="22" font-size="22" font-family="sans-serif" font-weight="900">INITECH</text></svg>
+            <svg class="h-6" viewBox="0 0 120 30" fill="currentColor"><text x="0" y="22" font-size="22" font-family="sans-serif" font-weight="900">UMBRELLA</text></svg>
+        </div>
+    </div>
+
+</body>
+</html>

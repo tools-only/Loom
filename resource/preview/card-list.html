@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><title>card-list.html</title><link rel="stylesheet" href="_card.css"></head><body><div class="card">
+<style>
+  .lc { background: var(--paper); border-radius: 24px; box-shadow: var(--shadow-sm); overflow: hidden;}
+  .li { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--cloud); cursor: pointer; transition: background 200ms;}
+  .li:hover { background: rgba(122,90,248,0.04);}
+  .li:last-child { border-bottom: 0; }
+  .li .icon { width: 28px; height: 28px; border-radius: 999px; background: var(--pastel-lavender); display:flex; align-items:center; justify-content:center; box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);}
+  .li .icon::after { content:""; width: 12px; height: 12px; border-radius: 6px; background: var(--accent-iris);}
+  .li .name { flex: 1; font-weight: 600; color: var(--ink); font-size: 14px;}
+  .li .sub { font-size: 12px; color: var(--smoke); margin-top: 2px;}
+  .li .arrow { width: 7px; height: 7px; border-top: 2px solid var(--mist); border-right: 2px solid var(--mist); transform: rotate(45deg);}
+</style>
+<div class="label" style="margin-bottom:10px;">List rows · rounded card · iris-tinted hover</div>
+<div class="lc">
+  <div class="li"><div class="icon"></div><div><div class="name">Physical activity</div><div class="sub">2 days ago</div></div><div style="flex:1;"></div><div class="arrow"></div></div>
+  <div class="li"><div class="icon" style="background:var(--pastel-peach);"></div><div><div class="name">Statistics</div><div class="sub">This year: 109 kilometers</div></div><div style="flex:1;"></div><div class="arrow"></div></div>
+  <div class="li"><div class="icon" style="background:var(--pastel-mint);"></div><div><div class="name">Routes</div><div class="sub">7</div></div><div style="flex:1;"></div><div class="arrow"></div></div>
+</div></div></body></html>

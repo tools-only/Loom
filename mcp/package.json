@@ -1,0 +1,12 @@
+{
+  "name": "anchor-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Anchor MCP Server — renders HTML to webview, collects user ops",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "express": "^4.21.0",
+    "ws": "^8.18.0",
+    "zod": "^3.23.0"
+  }
+}

@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anchor — AI-Native 双向交互界面 · 需求与设计文档</title>
+<style>
+  :root {
+    --bg: #fbfaf6;
+    --surface: #ffffff;
+    --text: #1c1c1a;
+    --text-soft: #555550;
+    --text-mute: #888880;
+    --accent: #b45a1f;
+    --accent-soft: #f4e6d6;
+    --border: #e6e2d6;
+    --code-bg: #f3efe4;
+    --highlight: #fff5d6;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.7;
+    font-size: 16px;
+  }
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 56px 32px 96px;
+  }
+  header.doc-head {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 28px;
+    margin-bottom: 40px;
+  }
+  .eyebrow {
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h1 {
+    font-size: 32px;
+    line-height: 1.3;
+    margin: 0 0 12px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    font-size: 17px;
+    color: var(--text-soft);
+    margin: 0;
+  }
+  .meta {
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--text-mute);
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .meta span strong {
+    color: var(--text-soft);
+    font-weight: 600;
+  }
+  nav.toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px 28px;
+    margin-bottom: 48px;
+  }
+  nav.toc h3 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-mute);
+    font-weight: 600;
+  }
+  nav.toc ol {
+    margin: 0;
+    padding-left: 20px;
+    columns: 2;
+    column-gap: 32px;
+    font-size: 14px;
+  }
+  nav.toc a {
+    color: var(--text-soft);
+    text-decoration: none;
+  }
+  nav.toc a:hover { color: var(--accent); }
+  nav.toc li { margin-bottom: 4px; break-inside: avoid; }
+  h2 {
+    font-size: 22px;
+    margin: 56px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent);
+    display: inline-block;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+  }
+  h3 {
+    font-size: 17px;
+    margin: 32px 0 10px;
+    color: var(--text);
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 15px;
+    margin: 20px 0 6px;
+    color: var(--text-soft);
+    font-weight: 600;
+  }
+  p { margin: 12px 0; }
+  ul, ol { padding-left: 24px; }
+  li { margin-bottom: 6px; }
+  code {
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13.5px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 16px 0;
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+    font-size: 13px;
+  }
+  blockquote {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    margin: 16px 0;
+    padding: 14px 20px;
+    color: var(--text);
+    font-size: 15.5px;
+  }
+  blockquote p { margin: 0; }
+  .callout {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-radius: 4px;
+    font-size: 14.5px;
+  }
+  .callout-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14.5px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--code-bg);
+    font-weight: 600;
+  }
+  .diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    margin: 20px 0;
+    text-align: center;
+  }
+  .diagram svg { max-width: 100%; height: auto; }
+  .caption {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-mute);
+    margin-top: 8px;
+  }
+  .pillrow {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+  }
+  .pill {
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin: 16px 0;
+  }
+  .col-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 16px 20px;
+    border-radius: 6px;
+  }
+  .col-card h4 {
+    margin-top: 0;
+    color: var(--accent);
+  }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 56px 0;
+  }
+  .section-num {
+    color: var(--text-mute);
+    font-weight: 500;
+    margin-right: 8px;
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 32px 20px 64px; }
+    h1 { font-size: 26px; }
+    nav.toc ol { columns: 1; }
+    .two-col { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc-head">
+  <div class="eyebrow">Design Document</div>
+  <h1>Anchor — AI-Native 双向交互界面</h1>
+  <p class="subtitle">让 HTML 成为人与 AI 共享的语言:轻量化、实时、可演化的协作底物</p>
+  <div class="meta">
+    <span><strong>版本</strong> v0.1 (草案)</span>
+    <span><strong>形态</strong> 需求分析 + 系统设计</span>
+    <span><strong>实现路径</strong> Claude Code Hook + Bridge + Webview</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <h3>目录</h3>
+  <ol>
+    <li><a href="#part1">第一部分 · 需求分析</a></li>
+    <li><a href="#part2">第二部分 · 总体设计</a></li>
+    <li><a href="#part3">第三部分 · 系统架构</a></li>
+    <li><a href="#part4">第四部分 · 协议设计</a></li>
+    <li><a href="#part5">第五部分 · 通用交互语法</a></li>
+    <li><a href="#part6">第六部分 · 跨任务适配</a></li>
+    <li><a href="#part7">第七部分 · 数据基建价值</a></li>
+    <li><a href="#part8">第八部分 · MVP 实施计划</a></li>
+    <li><a href="#part9">第九部分 · 边界、风险与未来</a></li>
+  </ol>
+</nav>
+
+<!-- ============ Part 1 ============ -->
+<section id="part1">
+<h2><span class="section-num">一</span>需求分析</h2>
+
+<h3>1.1 思考起点</h3>
+<p>项目最初的构想是基于一个观察:Anthropic 提出大模型生成 HTML 比 Markdown 更易于可视化和交互。在此基础上,设想做一个 AI-native 的浏览器,把 AI 封装在浏览器内部,实现两件事:</p>
+<ul>
+  <li>AI 生成的内容直接实时渲染在浏览器页面,这个页面不是传统的静态 page,而是一个支持选择和编辑的活页面</li>
+  <li>用户可以在页面上实时编辑,也可以选中区域唤起 AI 进行局部修改</li>
+</ul>
+
+<h3>1.2 自我审视:三个根本问题</h3>
+
+<h4>问题一 · 不面向未来</h4>
+<p>未来 base model 必然会强大到足以取代传统浏览器的角色。实时渲染一个页面可能只需要一个简单的 Claude Code hook 即可实现。在经典浏览器架构上嵌入 AI,工程繁琐、价值有限,且很快会被更强的 base model 替代。</p>
+
+<h4>问题二 · 不够灵活</h4>
+<p>渲染一个页面是否真的只能通过浏览器?AI 本身能否实现?AI 生成 HTML 是否就是另一种实现?最初的设想被传统软件架构限定了想象空间。</p>
+
+<h4>问题三 · 面向人,而非面向 AI</h4>
+<p>项目真正的价值,不在于"如何让 AI 输出更好看",而在于:</p>
+<blockquote><p>为用户提供 prompt 以外的交互通道(鼠标选择、框选、拖拽等多样化输入),同时为 AI 提供一个易处理的人类输入接口——把"丰富但模糊"的人类输入,翻译成 AI 擅长处理的结构化数据(CLI、命令行、代码、结构化文本)。</p></blockquote>
+
+<h3>1.3 项目定位</h3>
+
+<div class="callout">
+  <div class="callout-label">Core Definition</div>
+  Anchor 是一个轻量化的双向交互界面层。AI 通过它把复杂输出可视化、可读化、可操作化地呈现给用户;用户通过它把鼠标行为、选区、编辑等非 prompt 输入,转化为 AI 易处理的结构化指令。
+</div>
+
+<p><strong>明确不是什么:</strong></p>
+<ul>
+  <li>不是 Dify / Coze 这类 agent 配置或工作流编排工具</li>
+  <li>不是在传统浏览器上叠加 AI 的"AI 浏览器"</li>
+  <li>不是面向开发者的 AI 应用框架</li>
+  <li>不自建渲染引擎、不需要数据库、不引入重型 SDK</li>
+</ul>
+
+<h3>1.4 核心需求与设计原则</h3>
+
+<div class="two-col">
+  <div class="col-card">
+    <h4>R1 · 轻量化</h4>
+    <p>基于 Claude Code hook 等现成机制即可实现。核心只有一个协议、一个桥、一份 HTML 约定。无后端、无数据库、无自研渲染器。</p>
+  </div>
+  <div class="col-card">
+    <h4>R2 · 实时性</h4>
+    <p>AI 生成内容流式渲染,用户看到部分内容时即可交互;局部修改不重生成全部;每次回环响应在秒级。</p>
+  </div>
+  <div class="col-card">
+    <h4>R3 · 双向 Interface</h4>
+    <p><b>A 方向</b>:AI 为用户提供直观、高可读的可视化。<br><b>B 方向</b>:用户的交互行为为 AI 提供细粒度任务推进方向和反馈信号。</p>
+  </div>
+  <div class="col-card">
+    <h4>R4 · 共享底物</h4>
+    <p>A 和 B 必须建立在<b>同一份数据表示</b>上(本方案选 HTML)。用户操作能直接对应到 AI 生成的代码/数据上,没有解释损耗。</p>
+  </div>
+  <div class="col-card">
+    <h4>R5 · 通用性</h4>
+    <p>同一套协议覆盖代码生成、股票分析、auto-research 等不同复杂任务。差异性体现在 widget 层,核心 anchor 协议保持稳定。</p>
+  </div>
+  <div class="col-card">
+    <h4>R6 · 数据反哺</h4>
+    <p>因为 B 把用户行为结构化,每次交互都自动产出高质量数据,可用于 RL/偏好学习/微调专用 patch 模型。</p>
+  </div>
+</div>
+
+</section>
+
+<!-- ============ Part 2 ============ -->
+<section id="part2">
+<h2><span class="section-num">二</span>总体设计</h2>
+
+<h3>2.1 核心洞见</h3>
+
+<blockquote><p><b>HTML 既是 A 的渲染产物,也是 B 的可操作底物。</b></p></blockquote>
+
+<p>这个等价关系一旦建立,整个系统就被压扁了:</p>
+<ul>
+  <li>AI 生成 HTML(带语义 anchor 标注)→ 这是用户看到的界面 (A)</li>
+  <li>用户对 HTML 元素的任何交互,被序列化为"HTML 上的操作"</li>
+  <li>这个操作既能驱动前端渲染反馈,又能直接喂回 AI——因为 AI 本来就是生成这段 HTML 的人,它读得懂 (B)</li>
+</ul>
+
+<p>人和 AI <b>共享 HTML 这一份语言</b>,不需要中间翻译层。这也是为什么不需要重建一份 Typed Graph 内核——HTML + 一组 <code>data-*</code> 约定,本身就是充分的数据模型。</p>
+
+<h3>2.2 双向 Interface 的具体形式</h3>
+
+<h4>A 方向 · AI 制造可读化界面</h4>
+<ul>
+  <li>AI 输出 HTML,内嵌 <code>data-anc="..."</code> 标记每个语义单元</li>
+  <li>内嵌 <code>data-handles="..."</code> 声明该单元支持哪些操作</li>
+  <li>浏览器原生渲染 + 前端 JS 注入浮动控件 = 用户看到的可交互界面</li>
+</ul>
+
+<h4>B 方向 · 界面制造 AI 可读指令</h4>
+<ul>
+  <li>用户的每个鼠标/键盘行为,被 JS 序列化为 JSON op</li>
+  <li>op 引用 HTML 中的 anchor id,等价于一条 CLI 命令</li>
+  <li>桥接层把 op 拼成 prompt 续给 AI,AI 返回 HTML patch</li>
+</ul>
+
+<p>整个系统是一个 <code>HTML ↔ op ↔ HTML</code> 的闭环。</p>
+
+<h3>2.3 数据基建作为副产物</h3>
+<p>每个 session 自然产出可用于训练的数据:</p>
+<ul>
+  <li><code>(html_state, user_op)</code> — 用户行为分布</li>
+  <li><code>(html_state, op_chain, final_state)</code> — RLHF 风格的纠错轨迹</li>
+  <li><code>(state, op, ai_patch)</code> — 条件生成训练对</li>
+  <li>隐式信号:用户反复修改 vs. 一次接受 → 质量打分</li>
+</ul>
+<p>这些数据是<b>自然产生、无需标注</b>的,这是本项目相对其他 AI 应用的独特价值。</p>
+
+</section>
+
+<!-- ============ Part 3 ============ -->
+<section id="part3">
+<h2><span class="section-num">三</span>系统架构</h2>
+
+<h3>3.1 三组件架构</h3>
+
+<div class="diagram">
+<svg viewBox="0 0 700 240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b45a1f"/>
+    </marker>
+  </defs>
+  <!-- boxes -->
+  <rect x="20" y="80" width="180" height="80" rx="6" fill="#fff" stroke="#b45a1f" stroke-width="1.5"/>
+  <text x="110" y="110" text-anchor="middle" font-size="15" font-weight="600" fill="#1c1c1a">Claude Code</text>
+  <text x="110" y="135" text-anchor="middle" font-size="12" fill="#555550">逻辑层 / hook</text>
+
+  <rect x="260" y="80" width="180" height="80" rx="6" fill="#fff" stroke="#b45a1f" stroke-width="1.5"/>
+  <text x="350" y="110" text-anchor="middle" font-size="15" font-weight="600" fill="#1c1c1a">Bridge</text>
+  <text x="350" y="135" text-anchor="middle" font-size="12" fill="#555550">本地桥接进程</text>
+
+  <rect x="500" y="80" width="180" height="80" rx="6" fill="#fff" stroke="#b45a1f" stroke-width="1.5"/>
+  <text x="590" y="110" text-anchor="middle" font-size="15" font-weight="600" fill="#1c1c1a">Webview</text>
+  <text x="590" y="135" text-anchor="middle" font-size="12" fill="#555550">渲染 + 交互捕获</text>
+
+  <!-- arrows top: HTML flow -->
+  <line x1="200" y1="105" x2="260" y2="105" stroke="#b45a1f" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="440" y1="105" x2="500" y2="105" stroke="#b45a1f" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="230" y="95" text-anchor="middle" font-size="11" fill="#b45a1f">HTML</text>
+  <text x="470" y="95" text-anchor="middle" font-size="11" fill="#b45a1f">HTML</text>
+
+  <!-- arrows bottom: op flow -->
+  <line x1="500" y1="140" x2="440" y2="140" stroke="#888880" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="260" y1="140" x2="200" y2="140" stroke="#888880" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="470" y="158" text-anchor="middle" font-size="11" fill="#888880">user op</text>
+  <text x="230" y="158" text-anchor="middle" font-size="11" fill="#888880">prompt</text>
+
+  <!-- caption -->
+  <text x="350" y="210" text-anchor="middle" font-size="12" fill="#555550">单向 HTML 推送(A)与回向 op 上报(B)构成闭环</text>
+</svg>
+</div>
+
+<h3>3.2 组件职责</h3>
+
+<table>
+  <thead><tr><th>组件</th><th>职责</th><th>实现方式建议</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>Claude Code 端</b></td>
+      <td>PostToolUse hook 拦截输出;让 Claude 按 anchor 协议格式化 HTML;接收 Bridge 传回的 op 续作 prompt</td>
+      <td>CC hook 脚本(几十行 Python/JS)</td>
+    </tr>
+    <tr>
+      <td><b>Bridge</b></td>
+      <td>本地小进程,转发 HTML 给 Webview;接收 Webview 上报的 op 并拼成 prompt 续给 Claude</td>
+      <td>Node 或 Python(WebSocket + stdin/stdout)</td>
+    </tr>
+    <tr>
+      <td><b>Webview</b></td>
+      <td>加载 HTML;注入通用 JS 给带 handles 元素加浮动控件;监听用户行为序列化为 op</td>
+      <td>普通浏览器窗口或 Electron 壳</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>3.3 关键属性</h3>
+<div class="pillrow">
+  <span class="pill">无后端</span>
+  <span class="pill">无数据库</span>
+  <span class="pill">无自研渲染器</span>
+  <span class="pill">HTML 即状态</span>
+  <span class="pill">浏览器即渲染器</span>
+  <span class="pill">Claude 即逻辑</span>
+</div>
+<p>桥接层只是搬运工。整套系统的核心代码量预期在几百行级别。</p>
+
+</section>
+
+<!-- ============ Part 4 ============ -->
+<section id="part4">
+<h2><span class="section-num">四</span>协议设计</h2>
+
+<h3>4.1 HTML 端约定(Anchor 协议)</h3>
+
+<p>Claude 生成 HTML 时,按需添加三个 <code>data-*</code> 属性:</p>
+
+<pre><code>&lt;section data-anc="findings"
+         data-handles="expand,refine,lock"
+         data-deps="data-1,data-2"&gt;
+  &lt;h2&gt;主要发现&lt;/h2&gt;
+  &lt;p data-anc="findings.summary"
+     data-handles="refine,shorten,longer"&gt;
+    营收同比增长 23%...
+  &lt;/p&gt;
+&lt;/section&gt;</code></pre>
+
+<ul>
+  <li><code>data-anc</code> — 唯一 id,跨轮次稳定,作为 AI 与用户的共享指针</li>
+  <li><code>data-handles</code> — 该元素支持的操作集合,前端据此渲染浮动控件</li>
+  <li><code>data-deps</code> — 依赖声明,用于级联更新提示和 diff preview</li>
+</ul>
+
+<h3>4.2 用户操作 Op 格式</h3>
+
+<p>任何鼠标/键盘行为都被前端 JS 编码为一个 JSON op:</p>
+
+<pre><code>{
+  "op": "refine",
+  "target": "findings.summary",
+  "args": { "instruction": "更口语化一点" },
+  "context_html": "&lt;p&gt;...原文片段...&lt;/p&gt;",
+  "selection": { "text": "同比增长 23%", "range": [12, 19] }
+}</code></pre>
+
+<p><b>核心 op 集合(MVP 推荐):</b></p>
+
+<table>
+  <thead><tr><th>Op</th><th>语义</th><th>触发示例</th></tr></thead>
+  <tbody>
+    <tr><td><code>refine</code></td><td>对元素局部修改</td><td>点 handle → 输入修改指令</td></tr>
+    <tr><td><code>lock</code></td><td>锁定,后续重生成绕开</td><td>右键菜单 → 锁定</td></tr>
+    <tr><td><code>expand</code></td><td>展开细节</td><td>点折叠按钮</td></tr>
+    <tr><td><code>shorten / longer</code></td><td>调整长度</td><td>拖滑块或点按钮</td></tr>
+    <tr><td><code>edit</code></td><td>用户直接编辑文本</td><td>contenteditable + diff 上报</td></tr>
+    <tr><td><code>annotate</code></td><td>附加批注/约束/示例</td><td>选区 → 右键添加备注</td></tr>
+    <tr><td><code>branch</code></td><td>生成替代方案并排比较</td><td>"再来一版"按钮</td></tr>
+    <tr><td><code>restructure</code></td><td>修改骨架(增删元素)</td><td>拖拽 / 删除区块</td></tr>
+  </tbody>
+</table>
+
+<h3>4.3 一次完整回环示例</h3>
+
+<ol>
+  <li>用户问"分析这只股票"</li>
+  <li>AI 流式生成 HTML,含 <code>&lt;section data-anc="valuation"&gt;</code> 等多个区块</li>
+  <li>Webview 渲染,在每个 section 旁渲染浮动控件</li>
+  <li>用户点 valuation 旁的"重算"按钮,输入"贴现率改 8%"</li>
+  <li>JS 发出 op:<code>{op:"refine", target:"valuation", args:{instruction:"贴现率改 8%"}}</code></li>
+  <li>Bridge 把 op + 当前 HTML 上下文拼成 prompt 续给 Claude</li>
+  <li>Claude 返回 valuation 区块及其依赖区块的新 HTML</li>
+  <li>Bridge 通过 WebSocket 推回,JS 替换对应 DOM 节点</li>
+</ol>
+
+<div class="callout">
+  <div class="callout-label">设计要点</div>
+  整个回路里,<b>用户的鼠标点击经过 JS 编译成 op,等价于一条 CLI 命令</b>。AI 不需要"理解 GUI 意图",它只需要执行一条结构化指令。这就是 R3(双向 interface)落到协议层的具体形式。
+</div>
+
+</section>
+
+<!-- ============ Part 5 ============ -->
+<section id="part5">
+<h2><span class="section-num">五</span>通用交互语法</h2>
+
+<h3>5.1 八个领域无关的原语</h3>
+
+<p>不论代码、股票、研究,任何带 anchor 的节点都支持下列原语:</p>
+
+<table>
+  <thead><tr><th>原语</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td><b>Inspect</b></td><td>展开元素,查看其 lineage、依赖、不确定度</td></tr>
+    <tr><td><b>Refine</b></td><td>对元素做局部修改(自然语言或带参数)</td></tr>
+    <tr><td><b>Lock</b></td><td>锁定元素,后续重生成绕开它</td></tr>
+    <tr><td><b>Annotate</b></td><td>附加约束、批评或示例;批注以可视 pill 形式挂在元素旁</td></tr>
+    <tr><td><b>Branch</b></td><td>对元素生成替代方案,并排比较</td></tr>
+    <tr><td><b>Connect</b></td><td>在两个元素之间手动添加边(声明依赖或对比)</td></tr>
+    <tr><td><b>Restructure</b></td><td>修改骨架本身(增删骨架节点、移动子树)</td></tr>
+    <tr><td><b>Replay</b></td><td>沿 lineage 回到上游某点,从那里重生成下游</td></tr>
+  </tbody>
+</table>
+
+<h3>5.2 类型化 Handles</h3>
+
+<p>每种语义元素再额外提供 type-specific 控件,但触发方式与原语保持一致(节点旁的浮动控件,不需要打字):</p>
+
+<ul>
+  <li><b>代码文件节点</b>:重构、加测试、提取函数、改名</li>
+  <li><b>财务指标节点</b>:敏感度分析、换假设、换时间窗口</li>
+  <li><b>研究假设节点</b>:找反例、找证据、调整置信度</li>
+  <li><b>文本段落节点</b>:换语气、改长度、列出要点</li>
+</ul>
+
+</section>
+
+<!-- ============ Part 6 ============ -->
+<section id="part6">
+<h2><span class="section-num">六</span>跨任务适配</h2>
+
+<p>同一份 anchor 协议在不同复杂任务下的具体落地:</p>
+
+<h3>6.1 代码生成</h3>
+<ul>
+  <li><b>容器</b>:HTML 内嵌 Monaco / CodeMirror 渲染代码</li>
+  <li><b>Anchor 粒度</b>:文件 / 类 / 函数级</li>
+  <li><b>默认视图</b>:项目树视图,新增/修改文件高亮(绿色 = 新增,黄色 = 修改),旁标 diff 摘要</li>
+  <li><b>典型 op</b>:<code>{op:"refine", target:"auth.py#login", args:{instruction:"改成 OAuth2"}}</code></li>
+  <li><b>级联</b>:AI 通过 <code>data-deps</code> 知道 <code>auth.py#login</code> 的依赖,自动重生成相关测试和调用方</li>
+</ul>
+
+<h3>6.2 股票分析</h3>
+<ul>
+  <li><b>容器</b>:仪表盘风格 HTML,KPI 卡 + 图表 + 章节</li>
+  <li><b>Anchor 粒度</b>:公司画像 / 财务 / 估值 / 风险各区块,以及关键指标</li>
+  <li><b>默认视图</b>:多卡片布局 + 关键图表</li>
+  <li><b>典型 op</b>:拖动"贴现率"滑块 → 估值区块及依赖结论实时重算</li>
+  <li><b>锁定</b>:用户 Lock"行业判断"区块,后续改其他参数时此区块保持不变</li>
+</ul>
+
+<h3>6.3 Auto-Research</h3>
+<ul>
+  <li><b>容器</b>:假设地图(树状)+ 证据链(时间线)双视图</li>
+  <li><b>Anchor 粒度</b>:问题 / 假设 / 证据片段 / 反例 / 结论</li>
+  <li><b>默认视图</b>:假设节点带置信度颜色编码</li>
+  <li><b>典型 op</b>:点假设节点 → "找反例",AI 在子树下新增反例节点</li>
+  <li><b>Annotate</b>:用户在某证据上加"质量低,样本太小",对应假设置信度自动降级</li>
+</ul>
+
+<h3>6.4 边界与扩展机制</h3>
+
+<p>HTML 适合"可读性强的结构化输出"。对于纯代码或纯数据型任务,通过约定 <code>data-anc-kind</code> 扩展,前端用专用 widget 渲染——但 <b>anchor id 和 op 协议保持统一</b>:</p>
+
+<pre><code>&lt;div data-anc="auth-module" data-anc-kind="code"&gt;
+  &lt;!-- 前端用 Monaco 渲染 --&gt;
+&lt;/div&gt;
+
+&lt;div data-anc="revenue-trend" data-anc-kind="chart"&gt;
+  &lt;!-- 前端用 ECharts/Recharts 渲染 --&gt;
+&lt;/div&gt;</code></pre>
+
+<p>HTML 是"容器协议",里面可以挂任何 widget(代码编辑器、表格、图表、3D 等),但<b>共享同一套 anchor id 和 op 语法</b>。这是项目通用性的关键。</p>
+
+</section>
+
+<!-- ============ Part 7 ============ -->
+<section id="part7">
+<h2><span class="section-num">七</span>数据基建价值</h2>
+
+<h3>7.1 自动收集的数据形式</h3>
+
+<p>每条用户交互天然产生一条结构化记录:</p>
+
+<pre><code>{
+  "html_before": "...",      // 交互前的 HTML 状态
+  "user_op": {...},          // 用户做了什么
+  "html_after": "...",       // AI 回应后的状态
+  "latency_ms": 1240,
+  "user_kept": true,         // 用户是否保留了这次修改
+  "follow_up_ops": [...]     // 后续连续操作
+}</code></pre>
+
+<p>由此可派生:</p>
+<ul>
+  <li><b>偏好数据</b>:同一 op 下用户在多个候选中选择了哪个</li>
+  <li><b>纠错数据</b>:用户对 AI 输出主动做了什么修改</li>
+  <li><b>行为序列</b>:用户在什么场景下倾向做什么连续操作</li>
+  <li><b>质量信号</b>:连续 refine 三次 vs. 一次接受 → 隐式打分</li>
+</ul>
+
+<h3>7.2 应用方向</h3>
+
+<div class="two-col">
+  <div class="col-card">
+    <h4>UI Patch Model</h4>
+    <p>训练专用小模型:输入 HTML + op,输出 patch。逐步替代部分大模型调用,降本提速。</p>
+  </div>
+  <div class="col-card">
+    <h4>偏好对齐</h4>
+    <p>用 RLHF / DPO 训练对齐用户审美与表达偏好,让 AI 的默认输出更符合期待。</p>
+  </div>
+  <div class="col-card">
+    <h4>行为预测</h4>
+    <p>预测用户下一步操作,预先生成候选,做到"还没点就已经准备好"。</p>
+  </div>
+  <div class="col-card">
+    <h4>领域知识沉淀</h4>
+    <p>不同领域(代码/金融/研究)的高质量交互轨迹,可作为该领域的高价值微调语料。</p>
+  </div>
+</div>
+
+</section>
+
+<!-- ============ Part 8 ============ -->
+<section id="part8">
+<h2><span class="section-num">八</span>MVP 实施计划</h2>
+
+<h3>8.1 两周时间表</h3>
+
+<table>
+  <thead><tr><th>阶段</th><th>内容</th><th>产出</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Day 1-2</td>
+      <td>编写 CC hook,把 Claude 输出转成带 anchor 的 HTML;搭建最简 Webview 验证流式渲染</td>
+      <td>HTML 能流式渲染到浏览器</td>
+    </tr>
+    <tr>
+      <td>Day 3-5</td>
+      <td>Webview 注入通用 JS,给带 <code>data-handles</code> 的元素加浮动控件;打通点击 → console 输出 op</td>
+      <td>Op 格式定型,前端交互捕获就绪</td>
+    </tr>
+    <tr>
+      <td>Day 6-8</td>
+      <td>Bridge 跑起来,完成 <code>refine</code> 一个 op 的全链路:op → prompt → HTML patch → DOM 替换</td>
+      <td>第一个端到端闭环可演示</td>
+    </tr>
+    <tr>
+      <td>Day 9-11</td>
+      <td>加 <code>lock</code> / <code>expand</code> / <code>edit</code> 三个 op;开始记录所有 op 日志</td>
+      <td>核心 op 集合可用;数据集雏形</td>
+    </tr>
+    <tr>
+      <td>Day 12-14</td>
+      <td>选两个 demo 场景跑通:代码任务 + 股票/研究任务,验证协议复用</td>
+      <td>两个场景的可演示 demo</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>8.2 MVP 验证目标</h3>
+
+<ul>
+  <li>HTML anchor 协议能否<b>不修改</b>地复用到两个不同领域</li>
+  <li>典型局部 op 能否在 <b>2-3 秒内</b>完成回路(用户感知"实时")</li>
+  <li>用户行为日志能否形成<b>可用于训练的</b>结构化数据集</li>
+  <li>核心代码量是否控制在<b>千行级别</b>(轻量化目标)</li>
+</ul>
+
+</section>
+
+<!-- ============ Part 9 ============ -->
+<section id="part9">
+<h2><span class="section-num">九</span>边界、风险与未来扩展</h2>
+
+<h3>9.1 适用边界</h3>
+
+<div class="two-col">
+  <div class="col-card">
+    <h4>适合</h4>
+    <p>有结构、可分块、可局部修改的任务:研究报告、数据分析、文档型代码 review、规划与决策类任务、auto-research 流程。</p>
+  </div>
+  <div class="col-card">
+    <h4>不适合</h4>
+    <p>开放式讨论、纯创意闲聊、需要长上下文连贯生成的内容(用普通对话 UI 更合适)。</p>
+  </div>
+</div>
+
+<h3>9.2 主要风险</h3>
+
+<table>
+  <thead><tr><th>风险</th><th>缓解策略</th></tr></thead>
+  <tbody>
+    <tr><td>HTML 协议在某些任务表达力不够</td><td>用 widget 容器化(<code>data-anc-kind</code> 扩展机制)</td></tr>
+    <tr><td>局部重生成破坏全局一致性</td><td>通过 <code>data-deps</code> 声明 + diff preview 让用户预览级联影响后再执行</td></tr>
+    <tr><td>Anchor id 跨轮次稳定性</td><td>由 AI 显式维护;监控 id 漂移率;必要时加入 diff 工具自动迁移</td></tr>
+    <tr><td>用户学习成本(handles 怎么用)</td><td>handles 是渐进式可见的;按需 hover 出现;不强迫用户学</td></tr>
+    <tr><td>被更强 base model 直接取代</td><td>协议本身极简,可作为任何 base model 的输出格式;且数据资产是独立价值</td></tr>
+  </tbody>
+</table>
+
+<h3>9.3 长期方向</h3>
+
+<ul>
+  <li><b>协议标准化</b>:开放 anchor 协议,允许第三方写 widget(代码、图表、3D、视频等)</li>
+  <li><b>专用 patch 模型</b>:用积累的数据训练小模型,替代部分 LLM 调用</li>
+  <li><b>可视化操作历史</b>:把 op 流变成可回放/分支的历史,用户可以"撤销并尝试另一条路径"</li>
+  <li><b>多人协作</b>:多个用户和多个 AI agent 同时在一份 HTML 上工作,光标共享、约束合并</li>
+  <li><b>跨 session 记忆</b>:用户偏好与领域知识从历史数据中自动沉淀,新 session 直接受益</li>
+</ul>
+
+<hr>
+
+<div class="callout">
+  <div class="callout-label">一句话总结</div>
+  Anchor 不发明新轮子。它做的事是:让 HTML 既当窗户又当语言,让 GUI 行为编译成 CLI,让人和 AI 用同一种东西交流;由此把"AI 给人看"和"人给 AI 说"统一成一个闭环,顺带把这个闭环本身变成持续产出数据的 infra。
+</div>
+
+</section>
+
+</div>
+</body>
+</html>

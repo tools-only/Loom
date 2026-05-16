@@ -1,0 +1,13 @@
+{
+  "name": "anchor-bridge",
+  "version": "0.1.0",
+  "description": "Anchor Bridge — relays HTML between Claude Code and Webview",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "ws": "^8.18.0"
+  }
+}

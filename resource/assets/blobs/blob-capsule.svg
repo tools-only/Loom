@@ -1,0 +1,15 @@
+<svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="capg" cx="30%" cy="25%" r="85%">
+      <stop offset="0%" stop-color="#E0F7E7"></stop>
+      <stop offset="55%" stop-color="#95D6A7"></stop>
+      <stop offset="100%" stop-color="#4F9A6A"></stop>
+    </radialGradient>
+    <filter id="softca" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5"></feGaussianBlur>
+    </filter>
+  </defs>
+  <ellipse cx="100" cy="108" rx="78" ry="6" fill="rgba(20,21,43,0.18)" filter="url(#softca)"></ellipse>
+  <rect x="14" y="22" width="172" height="74" rx="37" fill="url(#capg)"></rect>
+  <ellipse cx="60" cy="42" rx="20" ry="7" fill="rgba(255,255,255,0.5)"></ellipse>
+</svg>

@@ -1,0 +1,46 @@
+{
+  "env": {
+    "SHELL": "D:\\Git\\bin\\bash.exe",
+    "CLAUDE_CODE_SHELL": "D:\\Git\\bin\\bash.exe",
+    "MSYS_NO_PATHCONV": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(dir \"D:\\\\ai-native chrome\")",
+      "Bash(npm install *)",
+      "Bash(node *)",
+      "Bash(cmd *)",
+      "Bash(powershell.exe *)",
+      "Bash(cmd.exe *)",
+      "WebSearch",
+      "Bash(netstat -ano)",
+      "Bash(dir \"D:\\\\\\\\ai-native chrome\\\\\\\\bridge\\\\\\\\webview\\\\\\\\\")",
+      "Bash(dir mcp *)",
+      "Bash(dir bridge *)",
+      "Bash(curl *)",
+      "Bash(where node *)",
+      "mcp__anchor__anchor_render",
+      "mcp__anchor__anchor_get_pending_op",
+      "mcp__anchor__anchor_get_html",
+      "mcp__anchor__anchor_emit_event",
+      "mcp__anchor__anchor_replay_session",
+      "Bash(dir /B)",
+      "Bash(echo \"EXIT_CODE=$?\")",
+      "Bash(start *)",
+      "Bash(taskkill /F /FI \"WINDOWTITLE eq start-server\")",
+      "Bash(npx kill-port *)",
+      "Bash(tasklist /FI \"PID eq 55192\")",
+      "Bash(where claude *)",
+      "Bash(powershell *)",
+      "Bash(tasklist /FI \"IMAGENAME eq node.exe\" /FO CSV)",
+      "Bash(taskkill *)",
+      "Bash(ls -la .gitignore .env*)",
+      "Bash(ls -d node_modules)",
+      "Bash(ls prompts/)",
+      "Bash(ls logs/)"
+    ]
+  },
+  "terminal": {
+    "shell": "D:\\Git\\bin\\bash.exe"
+  }
+}

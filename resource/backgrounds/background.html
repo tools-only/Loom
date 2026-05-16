@@ -1,0 +1,336 @@
+<div class="refraction-bg">
+  <div class="blob blob1"></div>
+  <div class="blob blob2"></div>
+  <div class="blob blob3"></div>
+  <div class="light light1"></div>
+  <div class="light light2"></div>
+  <div class="grain"></div>
+</div>
+
+<style>
+:root{
+  --bg-top:#eef5ff;
+  --bg-bottom:#dfeeff;
+
+  --glass:
+    rgba(255,255,255,0.22);
+
+  --border:
+    rgba(255,255,255,0.42);
+
+  --shadow:
+    rgba(110,170,255,0.14);
+}
+
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at top,
+      #f6fbff 0%,
+      var(--bg-top) 35%,
+      var(--bg-bottom) 100%);
+}
+
+/* ========================= */
+/* Main Layer */
+/* ========================= */
+
+.refraction-bg{
+  position:fixed;
+  inset:0;
+  overflow:hidden;
+
+  background:
+    radial-gradient(circle at 18% 20%,
+      rgba(120,190,255,0.22),
+      transparent 34%),
+
+    radial-gradient(circle at 82% 30%,
+      rgba(180,150,255,0.14),
+      transparent 40%),
+
+    radial-gradient(circle at 60% 80%,
+      rgba(120,255,220,0.12),
+      transparent 42%);
+}
+
+/* ========================= */
+/* Glass blobs */
+/* ========================= */
+
+.blob{
+  position:absolute;
+
+  backdrop-filter:
+    blur(90px)
+    saturate(160%);
+
+  -webkit-backdrop-filter:
+    blur(90px)
+    saturate(160%);
+
+  background:var(--glass);
+
+  border:1px solid var(--border);
+
+  box-shadow:
+    inset 0 1px 10px rgba(255,255,255,0.65),
+    inset 0 -12px 30px rgba(255,255,255,0.12),
+    0 30px 80px var(--shadow);
+
+  mix-blend-mode:screen;
+
+  opacity:.92;
+}
+
+/* internal refraction texture */
+
+.blob::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+
+  background:
+    radial-gradient(circle at 30% 30%,
+      rgba(255,255,255,0.78),
+      transparent 28%),
+
+    radial-gradient(circle at 72% 60%,
+      rgba(255,255,255,0.34),
+      transparent 34%),
+
+    linear-gradient(
+      135deg,
+      rgba(255,255,255,0.26),
+      rgba(255,255,255,0.04),
+      rgba(255,255,255,0.18)
+    );
+
+  opacity:.88;
+}
+
+/* ========================= */
+/* Blob placement */
+/* ========================= */
+
+.blob1{
+  width:620px;
+  height:620px;
+
+  left:-140px;
+  top:-180px;
+
+  animation:
+    drift1 28s ease-in-out infinite alternate,
+    opacityFlow1 9s ease-in-out infinite;
+}
+
+.blob2{
+  width:760px;
+  height:760px;
+
+  right:-240px;
+  top:8%;
+
+  animation:
+    drift2 36s ease-in-out infinite alternate,
+    opacityFlow2 11s ease-in-out infinite;
+}
+
+.blob3{
+  width:520px;
+  height:520px;
+
+  left:35%;
+  bottom:-200px;
+
+  animation:
+    drift3 32s ease-in-out infinite alternate,
+    opacityFlow3 10s ease-in-out infinite;
+}
+
+/* ========================= */
+/* Floating light */
+/* ========================= */
+
+.light{
+  position:absolute;
+  border-radius:50%;
+  filter:blur(80px);
+  mix-blend-mode:screen;
+}
+
+.light1{
+  width:420px;
+  height:420px;
+
+  background:
+    rgba(120,190,255,0.22);
+
+  left:10%;
+  top:20%;
+
+  animation:
+    lightMove1 18s ease-in-out infinite alternate;
+}
+
+.light2{
+  width:520px;
+  height:520px;
+
+  background:
+    rgba(170,150,255,0.16);
+
+  right:10%;
+  bottom:5%;
+
+  animation:
+    lightMove2 24s ease-in-out infinite alternate;
+}
+
+/* ========================= */
+/* Grain */
+/* ========================= */
+
+.grain{
+  position:absolute;
+  inset:0;
+
+  opacity:.04;
+
+  background-image:
+    radial-gradient(#000 0.5px, transparent 0.5px);
+
+  background-size:4px 4px;
+
+  mix-blend-mode:overlay;
+
+  pointer-events:none;
+}
+
+/* ========================= */
+/* Motion */
+/* ========================= */
+
+@keyframes drift1{
+  0%{
+    transform:
+      translate(0,0)
+      scale(1)
+      rotate(0deg);
+
+    border-radius:
+      42% 58% 63% 37% /
+      40% 42% 58% 60%;
+  }
+
+  100%{
+    transform:
+      translate(80px,50px)
+      scale(1.08)
+      rotate(10deg);
+
+    border-radius:
+      58% 42% 40% 60% /
+      52% 65% 35% 48%;
+  }
+}
+
+@keyframes drift2{
+  0%{
+    transform:
+      translate(0,0)
+      scale(1);
+
+    border-radius:
+      61% 39% 55% 45% /
+      44% 62% 38% 56%;
+  }
+
+  100%{
+    transform:
+      translate(-110px,70px)
+      scale(1.06);
+
+    border-radius:
+      40% 60% 38% 62% /
+      58% 42% 58% 42%;
+  }
+}
+
+@keyframes drift3{
+  0%{
+    transform:
+      translate(0,0)
+      scale(1);
+
+    border-radius:
+      53% 47% 60% 40% /
+      48% 63% 37% 52%;
+  }
+
+  100%{
+    transform:
+      translate(-60px,-50px)
+      scale(1.1);
+
+    border-radius:
+      37% 63% 44% 56% /
+      65% 45% 55% 35%;
+  }
+}
+
+/* opacity breathing */
+
+@keyframes opacityFlow1{
+  0%{ opacity:.82; }
+  50%{ opacity:.95; }
+  100%{ opacity:.86; }
+}
+
+@keyframes opacityFlow2{
+  0%{ opacity:.78; }
+  50%{ opacity:.93; }
+  100%{ opacity:.80; }
+}
+
+@keyframes opacityFlow3{
+  0%{ opacity:.80; }
+  50%{ opacity:.96; }
+  100%{ opacity:.84; }
+}
+
+/* floating light */
+
+@keyframes lightMove1{
+  from{
+    transform:
+      translate(0,0)
+      scale(1);
+  }
+
+  to{
+    transform:
+      translate(60px,40px)
+      scale(1.08);
+  }
+}
+
+@keyframes lightMove2{
+  from{
+    transform:
+      translate(0,0)
+      scale(1);
+  }
+
+  to{
+    transform:
+      translate(-70px,-50px)
+      scale(1.1);
+  }
+}
+</style>

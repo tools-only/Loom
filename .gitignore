@@ -1,0 +1,7 @@
+node_modules/
+prompts/
+logs/
+.claude/plans/
+.claude/memory/
+output/
+*.env

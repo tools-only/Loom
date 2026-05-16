@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><title>shadows.html</title><link rel="stylesheet" href="_card.css"></head><body><div class="card">
+<style>
+  .shrow { display:grid; grid-template-columns: repeat(5,1fr); gap: 18px; padding: 8px 4px 16px;}
+  .shb { background: var(--paper); border-radius: 20px; height: 78px; display:flex; align-items:flex-end; justify-content:center; padding-bottom: 8px; font-family: var(--font-mono); font-size:10px; color: var(--smoke);}
+  .shb.glow { background: #16172A; color: #A8ABB9;}
+</style>
+<div class="label" style="margin-bottom:10px;">Shadows · soft, layered, never harsh</div>
+<div class="shrow">
+  <div class="shb" style="box-shadow: 0 1px 2px rgba(20,21,43,0.04);">xs</div>
+  <div class="shb" style="box-shadow: 0 2px 8px -2px rgba(20,21,43,0.06), 0 1px 2px rgba(20,21,43,0.04);">sm</div>
+  <div class="shb" style="box-shadow: 0 8px 24px -8px rgba(20,21,43,0.10), 0 2px 6px -2px rgba(20,21,43,0.06);">md</div>
+  <div class="shb" style="box-shadow: 0 20px 48px -16px rgba(20,21,43,0.16), 0 4px 12px -4px rgba(20,21,43,0.08);">lg</div>
+  <div class="shb glow" style="box-shadow: 0 0 32px rgba(122,90,248,0.55);">glow·iris</div>
+</div></div></body></html>

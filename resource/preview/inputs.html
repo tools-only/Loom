@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><title>inputs.html</title><link rel="stylesheet" href="_card.css"></head><body><div class="card">
+<style>
+  .inp { width: 100%; box-sizing: border-box; padding: 14px 18px; border: 1.5px solid var(--cloud); border-radius: 16px; font-family: var(--font-body); font-size: 15px; background: var(--paper); color: var(--ink); transition: border-color 200ms, box-shadow 200ms; }
+  .inp::placeholder { color: var(--mist); }
+  .inp:focus { outline: none; border-color: var(--accent-iris); box-shadow: 0 0 0 4px rgba(122,90,248,0.18);}
+  .inp-row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px;}
+  .search { display:flex; align-items:center; gap:10px; background: var(--bg-2); border: 1.5px solid var(--cloud); padding: 12px 16px; border-radius: 999px; margin-top: 10px;}
+  .search input { border:0; outline:0; background:transparent; flex:1; font-size:15px; font-family: var(--font-body); color: var(--ink);}
+  .search-icon { width:20px; height:20px; border:2px solid var(--smoke); border-radius:999px; position:relative;}
+  .search-icon::after { content:""; position:absolute; bottom:-5px; right:-2px; width:8px; height:2px; border-radius:2px; background: var(--smoke); transform: rotate(45deg);}
+</style>
+<div class="label" style="margin-bottom:10px;">Inputs · 16px radius · iris focus ring</div>
+<div class="inp-row">
+  <input class="inp" placeholder="Your name"/>
+  <input class="inp" placeholder="Email" value="sandra@bloom.app" style="border-color: var(--accent-iris); box-shadow: 0 0 0 4px rgba(122,90,248,0.18);"/>
+</div>
+<div class="search">
+  <span class="search-icon"></span>
+  <input placeholder="Search anything"/>
+</div></div></body></html>

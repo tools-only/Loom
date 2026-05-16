@@ -1,0 +1,393 @@
+/* ============================================================
+   Bloom Design System — design tokens
+   colors, typography, spacing, radii, shadows, motion
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   Fonts — loaded from Google Fonts
+   Substitution flag: no proprietary fonts supplied. If you have
+   .woff2 files, drop them in /fonts and replace these imports.
+   ------------------------------------------------------------ */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ============================================================
+     COLOR — pastel surface palette
+     used for cards, sections, illustration backdrops
+     always milky, never neon
+     ============================================================ */
+  --pastel-lavender: #D4C5F9;
+  --pastel-peach:    #FFC79A;
+  --pastel-mint:     #BDE8C9;
+  --pastel-sky:      #BFDDEE;
+  --pastel-petal:    #F7BFD7;
+  --pastel-butter:   #FFE48A;
+
+  /* deeper "pressed" variants of each pastel — for hover/active on tinted cards */
+  --pastel-lavender-deep: #B9A2EF;
+  --pastel-peach-deep:    #FFB070;
+  --pastel-mint-deep:     #95D6A7;
+  --pastel-sky-deep:      #9DC8DF;
+  --pastel-petal-deep:    #F099BF;
+  --pastel-butter-deep:   #FFD24A;
+
+  /* ============================================================
+     COLOR — electric accent palette
+     used for primary CTAs, progress, focal moments
+     at most ONE electric per screen
+     ============================================================ */
+  --accent-lime:   #C9F542;
+  --accent-pink:   #FF5BA4;
+  --accent-iris:   #7A5AF8;
+  --accent-cyan:   #3DD3F5;
+
+  /* ============================================================
+     COLOR — neutrals (warm, never pure gray)
+     ============================================================ */
+  --ink:    #14152B;   /* primary text, near-black with indigo cast */
+  --smoke:  #5B5C72;   /* secondary text */
+  --mist:   #A8ABB9;   /* tertiary text, placeholders */
+  --cloud:  #E8E9F0;   /* borders, dividers, disabled bg */
+  --paper:  #FBFAF7;   /* default page surface — warm off-white */
+  --pure:   #FFFFFF;   /* reserved for inside very dark sections */
+
+  /* ============================================================
+     COLOR — dark mode
+     ============================================================ */
+  --dark-bg:      #0A0A14;
+  --dark-surface: #16172A;
+  --dark-raised:  #1F2138;
+  --dark-border:  #2A2C44;
+  --dark-text:    #F2F2F7;
+  --dark-text-2:  #A8ABB9;
+
+  /* ============================================================
+     COLOR — semantic
+     ============================================================ */
+  --fg-1: var(--ink);        /* primary text */
+  --fg-2: var(--smoke);      /* secondary text */
+  --fg-3: var(--mist);       /* tertiary / hint */
+  --fg-on-accent: var(--ink); /* text on lime/pink/cyan — yes, ink not white */
+  --fg-on-iris: #FFFFFF;     /* text on iris — exception, needs white */
+
+  --bg-1: var(--paper);      /* page surface */
+  --bg-2: var(--pure);       /* raised card on page */
+  --bg-3: var(--cloud);      /* inset / disabled */
+
+  --border-1: var(--cloud);
+  --border-2: rgba(20, 21, 43, 0.08);
+
+  --link:         var(--accent-iris);
+  --link-hover:   #6243E0;
+
+  --success:      #2BB673;
+  --success-bg:   #DCF5E9;
+  --warning:      #E89320;
+  --warning-bg:   #FFEBC9;
+  --danger:       #E04848;
+  --danger-bg:    #FBD9D9;
+  --info:         var(--accent-iris);
+  --info-bg:      #E7E2FE;
+
+  /* rainbow gradient — reserved for progress bars + dataviz */
+  --gradient-rainbow: linear-gradient(90deg,
+    #7A5AF8 0%,
+    #C36AE2 25%,
+    #FF5BA4 50%,
+    #FF9270 75%,
+    #FFC79A 100%);
+
+  --gradient-paper-warm: radial-gradient(circle at 30% 0%, #FFF6E9 0%, var(--paper) 60%);
+
+  /* ============================================================
+     TYPOGRAPHY — families
+     ============================================================ */
+  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-body:    'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* TYPOGRAPHY — fluid scale (mobile → desktop) */
+  --fs-poster:   clamp(56px, 9vw, 96px);   /* hero ALL-CAPS poster headline */
+  --fs-display:  clamp(40px, 6vw, 64px);   /* slide titles, article hero */
+  --fs-h1:       clamp(32px, 4.5vw, 44px);
+  --fs-h2:       clamp(26px, 3.5vw, 32px);
+  --fs-h3:       22px;
+  --fs-h4:       18px;
+  --fs-body:     16px;
+  --fs-body-lg:  18px;
+  --fs-small:    14px;
+  --fs-caption:  12px;
+
+  /* TYPOGRAPHY — weights */
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semi:     600;
+  --fw-bold:     700;
+  --fw-black:    800;
+
+  /* TYPOGRAPHY — line-heights */
+  --lh-tight:    1.05;   /* posters */
+  --lh-snug:     1.15;   /* h1/h2 */
+  --lh-normal:   1.4;    /* h3/h4 */
+  --lh-prose:    1.65;   /* body */
+  --lh-loose:    1.8;    /* small caption blocks */
+
+  /* TYPOGRAPHY — tracking */
+  --tr-tight:    -0.03em;   /* posters & display */
+  --tr-snug:     -0.015em;  /* h1-h3 */
+  --tr-normal:   0em;
+  --tr-wide:     0.02em;    /* UI labels */
+  --tr-wider:    0.08em;    /* eyebrows / kickers */
+
+  /* ============================================================
+     SPACING — 4px base scale
+     ============================================================ */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  24px;
+  --s-6:  32px;
+  --s-7:  48px;
+  --s-8:  64px;
+  --s-9:  96px;
+
+  /* ============================================================
+     RADIUS — everything is round
+     ============================================================ */
+  --r-xs:    8px;     /* tiny tags */
+  --r-sm:    12px;    /* small chips */
+  --r-md:    16px;    /* inputs */
+  --r-lg:    24px;    /* cards, panels (default) */
+  --r-xl:    32px;    /* hero cards */
+  --r-2xl:   48px;    /* extra large surfaces */
+  --r-pill:  999px;   /* buttons, badges, avatars, nav-dock */
+
+  /* ============================================================
+     SHADOW — soft, layered, never harsh
+     ============================================================ */
+  --shadow-xs:  0 1px 2px rgba(20, 21, 43, 0.04);
+  --shadow-sm:  0 2px 8px -2px rgba(20, 21, 43, 0.06),
+                0 1px 2px rgba(20, 21, 43, 0.04);
+  --shadow-md:  0 8px 24px -8px rgba(20, 21, 43, 0.10),
+                0 2px 6px -2px rgba(20, 21, 43, 0.06);
+  --shadow-lg:  0 20px 48px -16px rgba(20, 21, 43, 0.16),
+                0 4px 12px -4px rgba(20, 21, 43, 0.08);
+  --shadow-xl:  0 32px 72px -24px rgba(20, 21, 43, 0.22),
+                0 8px 20px -8px rgba(20, 21, 43, 0.12);
+
+  /* inner highlight — gives pastel cards their "pillow" lit-from-above feel */
+  --shadow-inset-soft: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  /* inner bottom shadow — for pressed/inset surfaces */
+  --shadow-inset-pressed: inset 0 2px 4px rgba(20, 21, 43, 0.08);
+
+  /* glow for electric accents on dark mode */
+  --glow-iris: 0 0 32px rgba(122, 90, 248, 0.4);
+  --glow-lime: 0 0 32px rgba(201, 245, 66, 0.5);
+  --glow-pink: 0 0 32px rgba(255, 91, 164, 0.4);
+
+  /* ============================================================
+     MOTION — soft "settle" curve, spring-like
+     ============================================================ */
+  --ease-out:   cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in:    cubic-bezier(0.6, 0, 0.8, 0.4);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --dur-fast:    160ms;
+  --dur-base:    200ms;
+  --dur-medium:  280ms;
+  --dur-slow:    480ms;
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  --container-prose:     720px;
+  --container-content:   960px;
+  --container-dashboard: 1200px;
+
+  --focus-ring: 0 0 0 2px var(--paper), 0 0 0 4px rgba(122, 90, 248, 0.5);
+}
+
+/* ============================================================
+   Dark mode — opt-in via [data-theme="dark"]
+   ============================================================ */
+[data-theme="dark"] {
+  --fg-1: var(--dark-text);
+  --fg-2: var(--dark-text-2);
+  --fg-3: #6E7088;
+  --bg-1: var(--dark-bg);
+  --bg-2: var(--dark-surface);
+  --bg-3: var(--dark-raised);
+  --border-1: var(--dark-border);
+  --border-2: rgba(255, 255, 255, 0.08);
+  --shadow-sm: 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 20px 48px -16px rgba(0, 0, 0, 0.7);
+  --shadow-inset-soft: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* ============================================================
+   Base reset + element styles
+   These give an HTML page sensible Bloom defaults out of the box.
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-1);
+  color: var(--fg-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============================================================
+   Semantic typography
+   Use these directly: <h1>, <h2>, <p>, <code>, etc.
+   ============================================================ */
+h1, .h1 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: var(--fs-h1);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-snug);
+  margin: 0 0 var(--s-4) 0;
+  text-wrap: balance;
+}
+
+h2, .h2 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h2);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-snug);
+  margin: var(--s-6) 0 var(--s-3) 0;
+  text-wrap: balance;
+}
+
+h3, .h3 {
+  font-family: var(--font-body);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h3);
+  line-height: var(--lh-normal);
+  letter-spacing: var(--tr-snug);
+  margin: var(--s-5) 0 var(--s-2) 0;
+}
+
+h4, .h4 {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semi);
+  font-size: var(--fs-h4);
+  line-height: var(--lh-normal);
+  margin: var(--s-4) 0 var(--s-2) 0;
+}
+
+p {
+  margin: 0 0 var(--s-4) 0;
+  line-height: var(--lh-prose);
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+a:hover { color: var(--link-hover); }
+
+small, .caption {
+  font-size: var(--fs-caption);
+  color: var(--fg-2);
+  letter-spacing: var(--tr-wide);
+}
+
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+code {
+  background: var(--bg-3);
+  padding: 2px 6px;
+  border-radius: var(--r-xs);
+  color: var(--ink);
+}
+
+pre {
+  background: var(--ink);
+  color: var(--paper);
+  padding: var(--s-5);
+  border-radius: var(--r-lg);
+  overflow-x: auto;
+  line-height: 1.6;
+}
+pre code { background: transparent; padding: 0; color: inherit; }
+
+blockquote {
+  margin: var(--s-6) 0;
+  padding: var(--s-4) var(--s-5);
+  border-left: 4px solid var(--accent-iris);
+  background: var(--info-bg);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  font-style: italic;
+  color: var(--ink);
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background: var(--border-1);
+  margin: var(--s-6) 0;
+}
+
+ul, ol {
+  padding-left: var(--s-5);
+  margin: 0 0 var(--s-4) 0;
+}
+li { margin-bottom: var(--s-2); line-height: var(--lh-prose); }
+
+/* ============================================================
+   Utility — POSTER headline (the COLLECT REWARDS treatment)
+   ============================================================ */
+.poster {
+  font-family: var(--font-display);
+  font-weight: var(--fw-black);
+  font-size: var(--fs-poster);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tr-tight);
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   Utility — eyebrow / kicker label
+   ============================================================ */
+.eyebrow {
+  font-family: var(--font-body);
+  font-weight: var(--fw-semi);
+  font-size: var(--fs-caption);
+  letter-spacing: var(--tr-wider);
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+
+/* ============================================================
+   Focus ring — visible by default, never removed
+   ============================================================ */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--r-md);
+}
+
+/* ============================================================
+   Selection
+   ============================================================ */
+::selection {
+  background: var(--accent-lime);
+  color: var(--ink);
+}

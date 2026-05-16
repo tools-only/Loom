@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><title>buttons.html</title><link rel="stylesheet" href="_card.css"></head><body><div class="card">
+<style>
+  .brow { display:flex; gap:10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px;}
+  .btn { border: 0; cursor: pointer; font-family: var(--font-body); font-weight: 700; padding: 12px 22px; border-radius: 999px; font-size: 15px; display: inline-flex; align-items: center; gap: 8px; transition: transform 200ms cubic-bezier(0.32,0.72,0,1), box-shadow 200ms;}
+  .btn:hover { transform: translateY(-1px); }
+  .btn-primary { background: var(--accent-lime); color: var(--ink); box-shadow: 0 8px 24px -8px rgba(201,245,66,0.6), inset 0 1px 0 rgba(255,255,255,0.5);}
+  .btn-iris { background: var(--accent-iris); color: #fff; box-shadow: 0 8px 24px -8px rgba(122,90,248,0.6);}
+  .btn-ink { background: var(--ink); color: var(--paper);}
+  .btn-ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--ink);}
+  .btn-soft { background: var(--cloud); color: var(--ink);}
+  .btn-sm { padding: 8px 14px; font-size: 13px;}
+</style>
+<div class="label" style="margin-bottom:10px;">Buttons · all pill-radius</div>
+<div class="brow">
+  <button class="btn btn-primary">Start plan</button>
+  <button class="btn btn-iris">Open report</button>
+  <button class="btn btn-ink">Continue</button>
+  <button class="btn btn-ghost">Cancel</button>
+  <button class="btn btn-soft">Skip</button>
+  <button class="btn btn-primary btn-sm">Add</button>
+</div></div></body></html>

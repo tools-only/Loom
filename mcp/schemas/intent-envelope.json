@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://anchor/intent-envelope/v1",
+  "title": "IntentEnvelope",
+  "type": "object",
+  "required": ["intent", "provenance", "schema_version"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+
+    "intent": {
+      "type": "object",
+      "required": ["op", "target_kind"],
+      "properties": {
+        "op": {
+          "enum": [
+            "refine", "expand", "shorten", "longer", "edit", "lock",
+            "annotate", "branch", "restructure", "ask", "custom"
+          ]
+        },
+        "instruction": { "type": "string", "maxLength": 4000 },
+        "target_kind": { "enum": ["anchor", "selection", "global"] },
+        "target_ref":  { "type": "string" }
+      }
+    },
+
+    "selection": {
+      "type": ["object", "null"],
+      "properties": {
+        "text":            { "type": "string" },
+        "start_offset":    { "type": "integer", "minimum": 0 },
+        "end_offset":      { "type": "integer", "minimum": 0 },
+        "ancestor_anchor": { "type": ["string", "null"] },
+        "dom_path":        { "type": "string" }
+      }
+    },
+
+    "context_bundle": {
+      "type": "object",
+      "properties": {
+        "memory_ids":         { "type": "array", "items": { "type": "string" } },
+        "skill_ids":          { "type": "array", "items": { "type": "string" } },
+        "subagent_ids":       { "type": "array", "items": { "type": "string" } },
+        "resource_ids":       { "type": "array", "items": { "type": "string" } },
+        "scope_hint":         { "enum": ["minimal", "standard", "wide"] },
+        "transient_override": { "type": "boolean" }
+      }
+    },
+
+    "render_state": {
+      "type": "object",
+      "properties": {
+        "anchor_tree":   { "type": "array", "items": { "type": "string" } },
+        "dom_signature": { "type": "string" },
+        "viewport": {
+          "type": "object",
+          "properties": {
+            "scroll_top":      { "type": "integer" },
+            "visible_anchors": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+
+    "provenance": {
+      "type": "object",
+      "required": ["session_id", "event_id", "timestamp"],
+      "properties": {
+        "session_id":      { "type": "string" },
+        "event_id":        { "type": "string" },
+        "parent_event_id": { "type": ["string", "null"] },
+        "timestamp":       { "type": "string", "format": "date-time" },
+        "client_version":  { "type": "string" }
+      }
+    }
+  }
+}

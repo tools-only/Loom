@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bloom · Dashboard kit</title>
+  <link rel="stylesheet" href="../../colors_and_type.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css" />
+  <link rel="stylesheet" href="dashboard.css" />
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="Sidebar.jsx"></script>
+  <script type="text/babel" src="Panels.jsx"></script>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    function App() {
+      const [nav, setNav] = useState('overview');
+      const [query, setQuery] = useState('');
+      const [period, setPeriod] = useState('week');
+
+      const kpis = [
+        { label: 'Documents',  value: '128',  delta: '+12',  deltaDir: 'up',   tint: 'mint'   },
+        { label: 'Avg. read',  value: '4.6',  unit: 'min',   delta: '+0.3', deltaDir: 'up',   tint: 'peach' },
+        { label: 'Sources',    value: '24',                  delta: '-2',   deltaDir: 'down', tint: 'sky'    },
+        { label: 'Engagement', value: '92',   unit: '%',     delta: '+4',   deltaDir: 'up',   tint: 'butter' },
+      ];
+
+      const barData = [
+        { label: 'Mon', value: 28 },
+        { label: 'Tue', value: 42 },
+        { label: 'Wed', value: 36 },
+        { label: 'Thu', value: 58 },
+        { label: 'Fri', value: 72 },
+        { label: 'Sat', value: 48 },
+        { label: 'Sun', value: 64 },
+      ];
+
+      const activity = [
+        { icon: 'ph-sparkle',      name: 'Weekly metrics report generated', sub: 'By Bloom agent · 14 sources',     meta: '2m ago' },
+        { icon: 'ph-pencil-simple', name: 'Sandra edited "Q2 narrative"',    sub: 'Section 3 · 4 paragraphs',         meta: '14m ago' },
+        { icon: 'ph-database',     name: 'Stripe source synced',            sub: '1,204 new rows',                   meta: '1h ago' },
+        { icon: 'ph-file-text',    name: 'Onboarding doc published',        sub: 'Visible to whole team',            meta: 'Yesterday' },
+        { icon: 'ph-check-circle', name: 'Compliance review approved',      sub: 'Auto-approved by policy',          meta: '2 days ago' },
+      ];
+
+      const donutSlices = [
+        { label: 'Articles',   value: 58, color: '#7A5AF8' },
+        { label: 'Reports',    value: 32, color: '#FF5BA4' },
+        { label: 'Dashboards', value: 24, color: '#3DD3F5' },
+        { label: 'Briefs',     value: 14, color: '#C9F542' },
+      ];
+
+      return (
+        <div className="dk-app">
+          <Sidebar active={nav} onNav={setNav} />
+
+          <main className="dk-main">
+            <Header
+              eyebrow="Wednesday, 14 May 2026"
+              title="Hello, Sandra"
+              query={query}
+              onQuery={setQuery}
+            />
+
+            <div className="dk-hero-row">
+              <section className="dk-hero">
+                <div>
+                  <div className="dk-hero-eyebrow">Today's brief</div>
+                  <h2 className="dk-hero-title">Engagement is up — drafts are piling up.</h2>
+                </div>
+                <div className="dk-hero-actions">
+                  <button className="dk-btn lime">Open brief</button>
+                  <button className="dk-btn primary">See drafts</button>
+                </div>
+                <div className="dk-hero-blob"><img src="../../assets/blobs/cluster-warm.svg" alt="" /></div>
+              </section>
+
+              <section className="dk-sidecard">
+                <div className="dk-sidecard-eyebrow">Documents this week</div>
+                <div className="dk-sidecard-value">128<span className="pct">+12%</span></div>
+                <div className="dk-sidecard-sub">vs. last week · 116 docs</div>
+                <div className="dk-sidecard-sparkline">
+                  {[24,28,22,40,36,52,46,58,64,72,68,78].map((h, i) => (
+                    <span key={i} style={{ height: `${h}%` }}></span>
+                  ))}
+                </div>
+              </section>
+            </div>
+
+            <KPIGrid items={kpis} />
+
+            <div className="dk-panel-row">
+              <section className="dk-panel">
+                <div className="dk-panel-head">
+                  <h3 className="dk-panel-title">Documents generated</h3>
+                  <div className="dk-tabs">
+                    {['week','month','year'].map(p => (
+                      <button
+                        key={p}
+                        className={`dk-tab ${period === p ? 'active' : ''}`}
+                        onClick={() => setPeriod(p)}
+                      >
+                        {p[0].toUpperCase() + p.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <BarChart data={barData} />
+              </section>
+
+              <section className="dk-panel">
+                <div className="dk-panel-head">
+                  <h3 className="dk-panel-title">By type</h3>
+                  <span className="dk-panel-sub">128 total</span>
+                </div>
+                <Donut slices={donutSlices} total={128} label="docs" />
+              </section>
+            </div>
+
+            <div className="dk-panel-row">
+              <section className="dk-panel">
+                <div className="dk-panel-head">
+                  <h3 className="dk-panel-title">Recent activity</h3>
+                  <span className="dk-panel-sub">Last 7 days</span>
+                </div>
+                <ActivityList rows={activity} />
+              </section>
+
+              <RainbowProgress
+                value={0.68}
+                title="Plan completion"
+                tags={['Free', 'Pro', 'Studio']}
+              />
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
