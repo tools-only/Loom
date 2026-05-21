@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loom Demo — AI 产业链市场分析 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Bloom Design Tokens ─────────────────────────────── */
+:root {
+  --pastel-lavender:#D4C5F9;--pastel-peach:#FFC79A;--pastel-mint:#BDE8C9;
+  --pastel-sky:#BFDDEE;--pastel-petal:#F7BFD7;--pastel-butter:#FFE48A;
+  --accent-lime:#C9F542;--accent-pink:#FF5BA4;--accent-iris:#7A5AF8;--accent-cyan:#3DD3F5;
+  --ink:#14152B;--smoke:#5B5C72;--mist:#A8ABB9;--cloud:#E8E9F0;--paper:#FBFAF7;--pure:#FFFFFF;
+  --fg-1:var(--ink);--fg-2:var(--smoke);--fg-3:var(--mist);--fg-on-iris:#FFFFFF;
+  --bg-1:var(--paper);--bg-2:var(--pure);--bg-3:var(--cloud);
+  --border-1:var(--cloud);--border-2:rgba(20,21,43,0.08);
+  --link:var(--accent-iris);--link-hover:#6243E0;
+  --success:#2BB673;--success-bg:#DCF5E9;--warning:#E89320;--warning-bg:#FFEBC9;
+  --danger:#E04848;--danger-bg:#FBD9D9;--info:var(--accent-iris);--info-bg:#E7E2FE;
+  --font-display:'Bricolage Grotesque',ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --font-body:'Plus Jakarta Sans',ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --fs-h1:clamp(32px,4.5vw,44px);--fs-h2:clamp(26px,3.5vw,32px);--fs-h3:22px;--fs-h4:18px;
+  --fs-body:16px;--fs-small:14px;--fs-caption:12px;
+  --fw-regular:400;--fw-medium:500;--fw-semi:600;--fw-bold:700;--fw-black:800;
+  --lh-snug:1.15;--lh-normal:1.4;--lh-prose:1.65;
+  --tr-snug:-0.015em;--tr-wide:0.02em;--tr-wider:0.08em;
+  --s-1:4px;--s-2:8px;--s-3:12px;--s-4:16px;--s-5:24px;--s-6:32px;--s-7:48px;--s-8:64px;
+  --r-xs:8px;--r-sm:12px;--r-md:16px;--r-lg:24px;--r-xl:32px;--r-pill:999px;
+  --shadow-xs:0 1px 2px rgba(20,21,43,0.04);
+  --shadow-sm:0 2px 8px -2px rgba(20,21,43,0.06),0 1px 2px rgba(20,21,43,0.04);
+  --shadow-md:0 8px 24px -8px rgba(20,21,43,0.10),0 2px 6px -2px rgba(20,21,43,0.06);
+  --shadow-lg:0 20px 48px -16px rgba(20,21,43,0.16),0 4px 12px -4px rgba(20,21,43,0.08);
+  --shadow-inset-soft:inset 0 1px 0 rgba(255,255,255,0.6);
+  --ease-out:cubic-bezier(0.32,0.72,0,1);--ease-bounce:cubic-bezier(0.34,1.56,0.64,1);
+  --dur-fast:160ms;--dur-base:200ms;--dur-medium:280ms;
+}
+/* ── Reset ───────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:16px;-webkit-font-smoothing:antialiased;}
+body{
+  font-family:var(--font-body);font-size:var(--fs-body);line-height:var(--lh-prose);
+  color:var(--fg-1);min-height:100vh;overflow-x:hidden;
+  background:radial-gradient(circle at top,#f6fbff 0%,#eef5ff 35%,#dfeeff 100%);
+  background-attachment:fixed;
+}
+::selection{background:var(--accent-lime);color:var(--ink);}
+/* ── Typography ──────────────────────────────────────── */
+h1,.h1{font-family:var(--font-display);font-weight:var(--fw-black);font-size:var(--fs-h1);line-height:var(--lh-snug);letter-spacing:var(--tr-snug);margin:0 0 var(--s-4);text-wrap:balance;}
+h2,.h2{font-family:var(--font-display);font-weight:var(--fw-bold);font-size:var(--fs-h2);line-height:var(--lh-snug);letter-spacing:var(--tr-snug);margin:var(--s-6) 0 var(--s-3);text-wrap:balance;}
+h3,.h3{font-family:var(--font-body);font-weight:var(--fw-bold);font-size:var(--fs-h3);line-height:var(--lh-normal);letter-spacing:var(--tr-snug);margin:var(--s-5) 0 var(--s-2);}
+h4,.h4{font-family:var(--font-body);font-weight:var(--fw-semi);font-size:var(--fs-h4);line-height:var(--lh-normal);text-transform:uppercase;letter-spacing:var(--tr-wider);color:var(--fg-2);margin:var(--s-4) 0 var(--s-2);}
+p{margin:0 0 var(--s-4);line-height:var(--lh-prose);text-wrap:pretty;}
+p:last-child{margin-bottom:0;}
+ul,ol{padding-left:1.4em;margin-bottom:var(--s-4);}
+li{margin-bottom:var(--s-2);line-height:var(--lh-prose);}
+strong{font-weight:var(--fw-semi);color:var(--ink);}
+table{width:100%;border-collapse:collapse;margin:1em 0;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border-1);}
+th{background:var(--bg-3);font-weight:var(--fw-semi);font-size:var(--fs-caption);text-transform:uppercase;letter-spacing:var(--tr-wider);color:var(--fg-2);padding:10px 16px;text-align:left;}
+td{padding:10px 16px;border-top:1px solid var(--border-1);font-size:0.9rem;}
+tr:hover td{background:rgba(122,90,248,0.04);}
+/* ── Demo Banner ─────────────────────────────────────── */
+.demo-bar{
+  position:sticky;top:0;z-index:1000;
+  display:flex;align-items:center;gap:14px;
+  padding:10px 28px;
+  background:rgba(255,255,255,0.88);
+  border-bottom:1px solid rgba(0,0,0,0.07);
+  backdrop-filter:blur(16px) saturate(160%);
+  -webkit-backdrop-filter:blur(16px) saturate(160%);
+}
+.demo-logo{width:32px;height:32px;flex-shrink:0;}
+.demo-brand{font-family:var(--font-display);font-weight:var(--fw-black);font-size:18px;letter-spacing:-0.02em;color:var(--ink);}
+.demo-badge{
+  padding:3px 10px;border-radius:var(--r-pill);
+  background:rgba(232,147,32,0.14);border:1px solid rgba(232,147,32,0.35);
+  color:#8B5E0A;font-size:11px;font-weight:var(--fw-bold);letter-spacing:0.06em;text-transform:uppercase;
+}
+.demo-hint{font-size:13px;color:var(--fg-2);margin-left:4px;}
+.demo-hint span{color:var(--accent-iris);font-weight:var(--fw-semi);}
+.demo-github{
+  margin-left:auto;display:flex;align-items:center;gap:6px;
+  font-size:13px;font-weight:var(--fw-semi);color:var(--fg-2);
+  text-decoration:none;padding:6px 14px;border-radius:var(--r-pill);
+  border:1px solid var(--border-1);background:rgba(255,255,255,0.7);
+  transition:all var(--dur-base) var(--ease-out);
+}
+.demo-github:hover{color:var(--ink);background:#fff;border-color:rgba(0,0,0,0.15);transform:translateY(-1px);}
+.demo-github svg{flex-shrink:0;}
+/* ── Main Stage ──────────────────────────────────────── */
+#stage{padding:36px 40px 80px;max-width:1240px;margin:0 auto;}
+/* ── Section Cards ───────────────────────────────────── */
+.anc-section{
+  background:var(--bg-2);border:1px solid var(--border-2);border-radius:var(--r-lg);
+  padding:28px;margin-bottom:20px;
+  box-shadow:var(--shadow-sm),var(--shadow-inset-soft);
+  transition:box-shadow var(--dur-medium) var(--ease-out),transform var(--dur-medium) var(--ease-out);
+  position:relative;
+}
+.anc-section:hover{box-shadow:var(--shadow-md),var(--shadow-inset-soft);transform:translateY(-1px);}
+.anc-section .anc-section{background:var(--bg-1);box-shadow:var(--shadow-inset-soft);}
+.anc-section .anc-section:hover{box-shadow:var(--shadow-sm),var(--shadow-inset-soft);}
+.anc-section--gc{border-radius:20px;padding:32px 28px;box-shadow:0 8px 32px rgba(0,0,0,0.08);transition:transform 0.35s cubic-bezier(0.16,1,0.3,1),box-shadow 0.35s ease;overflow:hidden;position:relative;border:none;}
+.anc-section--gc:hover{transform:translateY(-4px);box-shadow:0 14px 44px rgba(0,0,0,0.13);}
+.anc-section--warm,.anc-section--cool,.anc-section--aurora,.anc-section--ocean,.anc-section--berry,.anc-section--arctic,.anc-section--flame{background:rgba(255,255,255,0.95);border:1px solid var(--border-2);}
+/* ── KPI Cards ───────────────────────────────────────── */
+.anc-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin:16px 0;}
+.anc-kpi{padding:24px 22px;border-radius:20px;display:flex;flex-direction:column;justify-content:space-between;min-height:140px;box-shadow:0 8px 32px rgba(0,0,0,0.08);cursor:default;transition:transform 0.35s cubic-bezier(0.16,1,0.3,1),box-shadow 0.35s ease;overflow:hidden;position:relative;}
+.anc-kpi:hover{transform:translateY(-4px);box-shadow:0 14px 44px rgba(0,0,0,0.13);}
+.anc-kpi .kpi-top{display:flex;justify-content:space-between;align-items:flex-start;}
+.anc-kpi .kpi-icon{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.5);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,0.45);flex-shrink:0;}
+.anc-kpi .kpi-label-top{font-size:15px;font-weight:600;color:rgba(0,0,0,0.68);line-height:1.4;max-width:150px;}
+.anc-kpi .kpi-bottom{display:flex;align-items:baseline;gap:8px;}
+.anc-kpi .kpi-value{font-family:var(--font-display);font-weight:700;font-size:42px;letter-spacing:-0.03em;line-height:1;color:rgba(0,0,0,0.72);}
+.anc-kpi .kpi-unit{font-size:13px;font-weight:500;color:rgba(0,0,0,0.35);}
+.anc-kpi>.kpi-label{font-size:var(--fs-caption);font-weight:var(--fw-semi);color:var(--fg-2);text-transform:uppercase;letter-spacing:var(--tr-wider);margin-top:4px;}
+.anc-kpi>.kpi-value{font-family:var(--font-display);font-weight:700;font-size:42px;letter-spacing:-0.03em;line-height:1;color:rgba(0,0,0,0.72);}
+.anc-kpi--center{text-align:center;align-items:center;}
+.anc-kpi--center .kpi-bottom{flex-direction:column;align-items:center;gap:4px;}
+.anc-kpi--center .kpi-value{font-size:48px;}
+/* KPI gradient themes */
+.anc-kpi--warm{background:radial-gradient(circle at 0% 100%,#d4724e 0%,rgba(212,114,78,0.45) 18%,transparent 38%),radial-gradient(circle at 100% 0%,#a878c8 0%,rgba(168,120,200,0.45) 18%,transparent 38%),radial-gradient(circle at 50% 50%,#ffffff 0%,#ffffff 20%,rgba(255,255,255,0.97) 42%,rgba(255,255,255,0.7) 62%,transparent 82%),linear-gradient(135deg,#ecc4b0 0%,#f8ede8 20%,#ffffff 38% 62%,#f0e8f4 80%,#d4bce0 100%);}
+.anc-kpi--cool{background:radial-gradient(circle at 0% 100%,#38a8ae 0%,rgba(56,168,174,0.45) 18%,transparent 38%),radial-gradient(circle at 100% 0%,#5a92d8 0%,rgba(90,146,216,0.45) 18%,transparent 38%),radial-gradient(circle at 50% 50%,#ffffff 0%,#ffffff 20%,rgba(255,255,255,0.97) 42%,rgba(255,255,255,0.7) 62%,transparent 82%),linear-gradient(135deg,#b0dede 0%,#e8f4f4 20%,#ffffff 38% 62%,#e8eef8 80%,#b8cce8 100%);}
+.anc-kpi--aurora{background:radial-gradient(circle at 0% 100%,#4a5fd0 0%,rgba(74,95,208,0.45) 18%,transparent 38%),radial-gradient(circle at 100% 0%,#3aaf7a 0%,rgba(58,175,122,0.45) 18%,transparent 38%),radial-gradient(circle at 50% 50%,#ffffff 0%,#ffffff 20%,rgba(255,255,255,0.97) 42%,rgba(255,255,255,0.7) 62%,transparent 82%),linear-gradient(135deg,#bfc8ee 0%,#e8ecf8 20%,#ffffff 38% 62%,#e4f2ec 80%,#b0dac8 100%);}
+.anc-kpi--ocean{background:radial-gradient(circle at 0% 100%,#2870b8 0%,rgba(40,112,184,0.45) 18%,transparent 38%),radial-gradient(circle at 100% 0%,#e0808a 0%,rgba(224,128,138,0.45) 18%,transparent 38%),radial-gradient(circle at 50% 50%,#ffffff 0%,#ffffff 20%,rgba(255,255,255,0.97) 42%,rgba(255,255,255,0.7) 62%,transparent 82%),linear-gradient(135deg,#aecce8 0%,#e4eff6 20%,#ffffff 38% 62%,#f6eaec 80%,#e8c0c4 100%);}
+.anc-kpi--berry{background:radial-gradient(circle at 0% 100%,#7040b0 0%,rgba(112,64,176,0.45) 18%,transparent 38%),radial-gradient(circle at 100% 0%,#c0405a 0%,rgba(192,64,90,0.45) 18%,transparent 38%),radial-gradient(circle at 50% 50%,#ffffff 0%,#ffffff 20%,rgba(255,255,255,0.97) 42%,rgba(255,255,255,0.7) 62%,transparent 82%),linear-gradient(135deg,#cbb8e4 0%,#ece4f4 20%,#ffffff 38% 62%,#f4e4e8 80%,#e0b8c4 100%);}
+.anc-kpi--arctic{background:radial-gradient(circle at 0% 100%,#3078c8 0%,rgba(48,120,200,0.45) 18%,transparent 38%),radial-gradient(circle at 100% 0%,#40b8a0 0%,rgba(64,184,160,0.45) 18%,transparent 38%),radial-gradient(circle at 50% 50%,#ffffff 0%,#ffffff 20%,rgba(255,255,255,0.97) 42%,rgba(255,255,255,0.7) 62%,transparent 82%),linear-gradient(135deg,#b0cce8 0%,#e4eff6 20%,#ffffff 38% 62%,#e4f4f0 80%,#b0dcd0 100%);}
+.anc-kpi--flame{background:radial-gradient(circle at 0% 100%,#d86030 0%,rgba(216,96,48,0.45) 18%,transparent 38%),radial-gradient(circle at 100% 0%,#c83868 0%,rgba(200,56,104,0.45) 18%,transparent 38%),radial-gradient(circle at 50% 50%,#ffffff 0%,#ffffff 20%,rgba(255,255,255,0.97) 42%,rgba(255,255,255,0.7) 62%,transparent 82%),linear-gradient(135deg,#ecc8a8 0%,#f6e8e0 20%,#ffffff 38% 62%,#f4e0e8 80%,#e4b0c4 100%);}
+/* ── Pills ───────────────────────────────────────────── */
+.anc-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:var(--r-pill);font-size:var(--fs-caption);font-weight:var(--fw-bold);letter-spacing:var(--tr-wider);text-transform:uppercase;white-space:nowrap;user-select:none;box-shadow:var(--shadow-inset-soft);}
+.anc-pill::before{content:'';width:6px;height:6px;border-radius:var(--r-pill);flex-shrink:0;}
+.anc-pill--lock{background:var(--bg-3);color:var(--smoke);}
+.anc-pill--lock::before{background:var(--mist);}
+.anc-pill--edit{background:var(--warning-bg);color:var(--warning);}
+.anc-pill--edit::before{background:var(--warning);}
+.anc-pill--gen{background:var(--info-bg);color:var(--accent-iris);}
+.anc-pill--gen::before{background:var(--accent-iris);animation:pill-pulse 1.8s ease-in-out infinite;}
+.anc-pill--active{background:var(--success-bg);color:var(--success);}
+.anc-pill--active::before{background:var(--success);animation:pill-pulse 2s ease-in-out infinite;}
+.anc-pill--draft{background:var(--pastel-petal);color:var(--ink);}
+.anc-pill--draft::before{background:var(--accent-pink);}
+.anc-pill--review{background:var(--pastel-sky);color:var(--ink);}
+.anc-pill--review::before{background:var(--accent-cyan);}
+.anc-pill--done{background:var(--pastel-lavender);color:var(--ink);}
+.anc-pill--done::before{background:var(--accent-iris);}
+.anc-pill--warn{background:var(--warning-bg);color:var(--ink);}
+.anc-pill--warn::before{background:var(--warning);}
+.anc-pill--flame{background:#FEF0E8;color:#9A3510;}
+.anc-pill--flame::before{background:#d86030;}
+.anc-pill--aurora{background:#E8ECFE;color:#2A3A9A;}
+.anc-pill--aurora::before{background:#4a5fd0;}
+@keyframes pill-pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.anc-pill-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
+/* ── Divider ─────────────────────────────────────────── */
+.anc-divider{border:none;height:1px;background:var(--border-1);margin:var(--s-5) 0;}
+/* ── Chart placeholder ───────────────────────────────── */
+.anc-chart{background:var(--bg-2);border:1px solid var(--border-1);border-radius:var(--r-lg);padding:20px;margin:16px 0;min-height:120px;display:flex;align-items:center;justify-content:center;color:var(--fg-3);font-size:var(--fs-small);}
+/* ── Grid ────────────────────────────────────────────── */
+.anc-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:16px 0;}
+.anc-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:16px 0;}
+.anc-grid-2-1{display:grid;grid-template-columns:2fr 1fr;gap:20px;margin:16px 0;}
+/* ── Interactive hover handle system ─────────────────── */
+[data-anc]{position:relative;transition:outline 0.12s;}
+[data-anc]:hover{outline:1.5px dashed rgba(122,90,248,0.28);outline-offset:4px;border-radius:6px;}
+.anc-handle-tip{
+  display:none;position:absolute;top:-32px;right:0;
+  background:rgba(20,21,43,0.82);color:#fff;
+  font-size:11px;font-weight:500;padding:4px 10px;border-radius:8px;
+  white-space:nowrap;pointer-events:none;z-index:999;
+  backdrop-filter:blur(6px);
+  animation:tip-in 0.14s var(--ease-out);
+}
+@keyframes tip-in{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+[data-anc]:hover .anc-handle-tip{display:block;}
+/* ── Responsive ──────────────────────────────────────── */
+@media(max-width:768px){
+  #stage{padding:20px 14px 60px;}
+  .anc-grid-2,.anc-grid-3,.anc-grid-2-1{grid-template-columns:1fr;}
+  .anc-kpi-grid{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:480px){
+  .demo-hint{display:none;}
+  .anc-kpi-grid{grid-template-columns:1fr;}
+  .anc-kpi{min-height:120px;padding:18px;}
+  .anc-kpi .kpi-value{font-size:36px;}
+}
+</style>
+</head>
+<body>
+
+<!-- Demo Bar -->
+<header class="demo-bar">
+  <svg class="demo-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="b-iris" cx="35%" cy="30%" r="80%">
+        <stop offset="0%" stop-color="#D5C9FE"/><stop offset="60%" stop-color="#7A5AF8"/><stop offset="100%" stop-color="#4A2EC0"/>
+      </radialGradient>
+      <radialGradient id="b-lime" cx="35%" cy="30%" r="80%">
+        <stop offset="0%" stop-color="#EBFCB0"/><stop offset="60%" stop-color="#C9F542"/><stop offset="100%" stop-color="#86B81F"/>
+      </radialGradient>
+      <radialGradient id="b-petal" cx="35%" cy="30%" r="80%">
+        <stop offset="0%" stop-color="#FFD8E8"/><stop offset="60%" stop-color="#FF5BA4"/><stop offset="100%" stop-color="#C42A75"/>
+      </radialGradient>
+    </defs>
+    <circle cx="22" cy="36" r="18" fill="url(#b-iris)"/>
+    <circle cx="42" cy="28" r="16" fill="url(#b-lime)"/>
+    <circle cx="38" cy="44" r="14" fill="url(#b-petal)"/>
+  </svg>
+  <span class="demo-brand">Loom</span>
+  <span class="demo-badge">Demo</span>
+  <span class="demo-hint">AI 生成报告样例 · <span>悬停卡片</span>可预览交互操作</span>
+  <a class="demo-github" href="https://github.com/tools-only/Loom" target="_blank" rel="noopener">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.604-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.268 2.75 1.026A9.578 9.578 0 0 1 12 6.836a9.59 9.59 0 0 1 2.504.337c1.909-1.294 2.747-1.026 2.747-1.026.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.579.688.481C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/></svg>
+    GitHub
+  </a>
+</header>
+
+<main id="stage">
+
+<section class="anc-section anc-section--gc"
+         data-anc="market.overview"
+         data-handles="refine,expand,shorten,annotate">
+  <div class="anc-handle-tip">✦ refine · expand · shorten · annotate</div>
+  <h1>AI 产业链市场全景 — 2026Q1</h1>
+  <p>全球 AI 市场总规模突破 <strong>$1.2万亿</strong>，年复合增长率 <strong>31.4%</strong>。产业链呈现明显的"上游集中、下游爆发"格局，算力基础设施仍是最大单一市场，但应用层增速最快。</p>
+
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--warm">
+      <div class="kpi-top">
+        <div class="kpi-label-top">全球<br>市场规模</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+      </div>
+      <div class="kpi-bottom"><div class="kpi-value">$1.2T</div><div class="kpi-unit">2026Q1</div></div>
+    </div>
+    <div class="anc-kpi anc-kpi--cool">
+      <div class="kpi-top">
+        <div class="kpi-label-top">年复合<br>增长率</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+      </div>
+      <div class="kpi-bottom"><div class="kpi-value">31.4%</div><div class="kpi-unit">CAGR</div></div>
+    </div>
+    <div class="anc-kpi anc-kpi--aurora">
+      <div class="kpi-top">
+        <div class="kpi-label-top">上游<br>算力基础设施</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="2" x2="9" y2="4"/><line x1="15" y1="2" x2="15" y2="4"/></svg></div>
+      </div>
+      <div class="kpi-bottom"><div class="kpi-value">$485B</div><div class="kpi-unit">市场规模</div></div>
+    </div>
+    <div class="anc-kpi anc-kpi--flame">
+      <div class="kpi-top">
+        <div class="kpi-label-top">下游<br>应用服务</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+      </div>
+      <div class="kpi-bottom"><div class="kpi-value">$368B</div><div class="kpi-unit">市场规模</div></div>
+    </div>
+  </div>
+
+  <div class="anc-pill-row">
+    <span class="anc-pill anc-pill--active">2026 Q1 数据</span>
+    <span class="anc-pill anc-pill--gen">AI 生成报告</span>
+    <span class="anc-pill anc-pill--review">持续更新</span>
+  </div>
+</section>
+
+<hr class="anc-divider">
+
+<section class="anc-section anc-section--gc"
+         data-anc="market.structure"
+         data-handles="refine,expand,branch,annotate,restructure">
+  <div class="anc-handle-tip">✦ refine · expand · branch · restructure</div>
+  <h2>全球产业链路概览</h2>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--aurora">
+      <div class="kpi-top"><div class="kpi-label-top">北美<br>设计与模型</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20"/><path d="M2 12h20"/></svg></div></div>
+      <div class="kpi-bottom"><div class="kpi-value">$520B</div><div class="kpi-unit">芯片设计+模型+云</div></div>
+    </div>
+    <div class="anc-kpi anc-kpi--flame">
+      <div class="kpi-top"><div class="kpi-label-top">亚太<br>制造核心</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg></div></div>
+      <div class="kpi-bottom"><div class="kpi-value">$210B</div><div class="kpi-unit">晶圆制造+封测+HBM</div></div>
+    </div>
+    <div class="anc-kpi anc-kpi--ocean">
+      <div class="kpi-top"><div class="kpi-label-top">中国大陆<br>自主生态</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div></div>
+      <div class="kpi-bottom"><div class="kpi-value">$185B</div><div class="kpi-unit">芯片+应用+自主替代</div></div>
+    </div>
+    <div class="anc-kpi anc-kpi--arctic">
+      <div class="kpi-top"><div class="kpi-label-top">欧洲<br>设备与监管</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg></div></div>
+      <div class="kpi-bottom"><div class="kpi-value">$85B</div><div class="kpi-unit">光刻设备+汽车AI+合规</div></div>
+    </div>
+  </div>
+  <p>全球 AI 产业链呈现"<strong>北美设计、亚太制造、中国应用、欧洲规范</strong>"的四极格局。芯片设计（北美 58%）与晶圆制造（台积电 3nm 独占）高度集中，但应用层呈现多极化趋势。</p>
+  <table>
+    <thead><tr><th>区域</th><th>核心环节</th><th>关键企业</th><th>战略优势</th><th>主要瓶颈</th></tr></thead>
+    <tbody>
+      <tr><td><strong>北美</strong></td><td>芯片设计、基础模型、云基础设施</td><td>NVIDIA、AMD、OpenAI、Anthropic、Google</td><td>设计人才密度、资本深度、模型生态领先 12-18 月</td><td>制造外包依赖台积电、电力约束加剧</td></tr>
+      <tr><td><strong>亚太（台韩日）</strong></td><td>先进制程制造、HBM 存储、半导体材料</td><td>TSMC、Samsung、SK Hynix、东京电子</td><td>3nm 以下制程垄断、HBM3e 全球 95% 产能</td><td>地缘风险集中、日本复兴尚需验证</td></tr>
+      <tr><td><strong>中国大陆</strong></td><td>自主芯片、AI 应用、数据资源</td><td>华为昇腾、百度、阿里云、DeepSeek</td><td>全球最大数据池、应用场景丰富</td><td>先进制程受限 (7nm+)、EDA 工具链待完善</td></tr>
+      <tr><td><strong>欧洲</strong></td><td>半导体设备、汽车 AI、监管标准</td><td>ASML、意法半导体、Mistral AI</td><td>EUV 光刻全球垄断、EU AI Act 标准输出</td><td>芯片设计能力弱、AI 投资规模不足北美 1/10</td></tr>
+      <tr><td><strong>中东 &amp; 其他</strong></td><td>主权基金投资、数据中心枢纽</td><td>MGX、G42、穆巴达拉</td><td>资本充沛、能源成本低</td><td>本土技术生态薄、依赖技术引进</td></tr>
+    </tbody>
+  </table>
+  <div class="anc-pill-row">
+    <span class="anc-pill anc-pill--active">北美 58% 主导设计</span>
+    <span class="anc-pill anc-pill--warn">台积电制造 90%+ 先进制程</span>
+    <span class="anc-pill anc-pill--gen">中国自主替代 +48% YoY</span>
+  </div>
+</section>
+
+<hr class="anc-divider">
+
+<section class="anc-section anc-section--gc" data-anc="market.upstream" data-handles="refine,expand,branch,restructure">
+  <div class="anc-handle-tip">✦ refine · expand · branch · restructure</div>
+  <h2>上游 — 算力 &amp; 基础设施</h2>
+  <p>市场规模 <strong>$485B</strong>，年增速 <strong>37%</strong>，是产业链中资本密集度最高的环节。</p>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--aurora"><div class="kpi-top"><div class="kpi-label-top">上游<br>总规模</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg></div></div><div class="kpi-bottom"><div class="kpi-value">$485B</div><div class="kpi-unit">市场规模</div></div></div>
+    <div class="anc-kpi anc-kpi--aurora"><div class="kpi-top"><div class="kpi-label-top">年增速<br>YoY</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div></div><div class="kpi-bottom"><div class="kpi-value">37%</div><div class="kpi-unit">同比增长</div></div></div>
+    <div class="anc-kpi anc-kpi--flame"><div class="kpi-top"><div class="kpi-label-top">NVIDIA<br>市场份额</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div></div><div class="kpi-bottom"><div class="kpi-value">62%</div><div class="kpi-unit">GPU 市场</div></div></div>
+    <div class="anc-kpi anc-kpi--flame"><div class="kpi-top"><div class="kpi-label-top">季度<br>资本开支</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div></div><div class="kpi-bottom"><div class="kpi-value">$32B</div><div class="kpi-unit">Top 4 云厂商</div></div></div>
+  </div>
+
+  <section class="anc-section" data-anc="market.upstream.chips" data-handles="refine,expand,branch,annotate">
+    <div class="anc-handle-tip">✦ refine · expand · branch · annotate</div>
+    <h3>1.1 AI 芯片 — GPU 持续主导，ASIC 加速渗透</h3>
+    <table>
+      <thead><tr><th>厂商</th><th>旗舰产品</th><th>工艺</th><th>2026Q1 营收</th><th>同比增速</th></tr></thead>
+      <tbody>
+        <tr><td>NVIDIA</td><td>B300 / GB300</td><td>3nm</td><td>$78.2B</td><td>+42%</td></tr>
+        <tr><td>AMD</td><td>MI400X</td><td>3nm</td><td>$8.1B</td><td>+38%</td></tr>
+        <tr><td>Intel</td><td>Gaudi 4</td><td>5nm</td><td>$2.4B</td><td>+15%</td></tr>
+        <tr><td>华为</td><td>昇腾 920C</td><td>5nm</td><td>$4.2B</td><td>+55%</td></tr>
+        <tr><td>Google</td><td>TPU v6</td><td>4nm</td><td>(内部部署)</td><td>—</td></tr>
+        <tr><td>AWS</td><td>Trainium 2</td><td>4nm</td><td>(内部+租赁)</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <div class="anc-pill-row">
+      <span class="anc-pill anc-pill--warn">NVIDIA 毛利率 76.5%</span>
+      <span class="anc-pill anc-pill--active">ASIC 渗透率 18% → 2028E 35%</span>
+    </div>
+  </section>
+
+  <div class="anc-grid-2">
+    <section class="anc-section" data-anc="market.upstream.cloud" data-handles="refine,expand,branch,annotate">
+      <div class="anc-handle-tip">✦ refine · expand · annotate</div>
+      <h3>1.2 云计算 &amp; 数据中心</h3>
+      <p>全球 AI 数据中心总容量突破 <strong>85GW</strong>，同比增长 65%。Top 4 云厂商单季资本开支 <strong>$32B</strong>，其中 70%+ 投向 AI 基础设施。</p>
+      <div class="anc-kpi-grid">
+        <div class="anc-kpi anc-kpi--ocean anc-kpi--center"><div class="kpi-value">85GW</div><div class="kpi-label">全球 AI DC 容量</div></div>
+        <div class="anc-kpi anc-kpi--flame anc-kpi--center"><div class="kpi-value">$32B</div><div class="kpi-label">Top4 云厂商 CapEx</div></div>
+        <div class="anc-kpi anc-kpi--aurora anc-kpi--center"><div class="kpi-value">40%</div><div class="kpi-label">推理占比</div></div>
+      </div>
+    </section>
+    <section class="anc-section" data-anc="market.upstream.energy" data-handles="refine,expand,branch,annotate">
+      <div class="anc-handle-tip">✦ refine · expand · annotate</div>
+      <h3>1.3 电力 &amp; 散热</h3>
+      <p>AI 数据中心电力需求 2026 年预计达 <strong>320TWh</strong>，液冷渗透率从 15% 快速上升至 <strong>42%</strong>，SMR 核电融资环比增长 <strong>120%</strong>。</p>
+      <div class="anc-pill-row">
+        <span class="anc-pill anc-pill--warn">电力需求 320TWh</span>
+        <span class="anc-pill anc-pill--active">液冷渗透 42%</span>
+        <span class="anc-pill anc-pill--gen">SMR 融资 +120%</span>
+        <span class="anc-pill anc-pill--active">核能占比 18%</span>
+      </div>
+    </section>
+  </div>
+</section>
+
+<hr class="anc-divider">
+
+<section class="anc-section anc-section--gc" data-anc="market.midstream" data-handles="refine,expand,branch,restructure">
+  <div class="anc-handle-tip">✦ refine · expand · branch · restructure</div>
+  <h2>中游 — 模型 &amp; 平台</h2>
+  <p>市场规模 <strong>$338B</strong>，年增速 <strong>28%</strong>。基础模型三强格局确立但竞争激烈，平台层成为利润高地。</p>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--flame"><div class="kpi-top"><div class="kpi-label-top">中游<br>总规模</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div></div><div class="kpi-bottom"><div class="kpi-value">$338B</div><div class="kpi-unit">市场规模</div></div></div>
+    <div class="anc-kpi anc-kpi--aurora"><div class="kpi-top"><div class="kpi-label-top">年增速<br>YoY</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div></div><div class="kpi-bottom"><div class="kpi-value">28%</div><div class="kpi-unit">同比增长</div></div></div>
+    <div class="anc-kpi anc-kpi--berry anc-kpi--center"><div class="kpi-value">Top 3</div><div class="kpi-label">OpenAI / Anthropic / Google</div></div>
+  </div>
+
+  <section class="anc-section" data-anc="market.midstream.foundation" data-handles="refine,expand,branch,annotate">
+    <div class="anc-handle-tip">✦ refine · expand · branch · annotate</div>
+    <h3>2.1 基础模型矩阵 — 六大模态全景</h3>
+    <table>
+      <thead><tr><th>模型</th><th>开发商</th><th>参数规模</th><th>上下文窗口</th><th>API 定价 / 1M tokens</th><th>核心优势</th></tr></thead>
+      <tbody>
+        <tr><td>Claude Opus 4.7</td><td>Anthropic</td><td>~2T (MoE)</td><td>1M</td><td>$15 / $75</td><td>安全性、推理能力、Agent</td></tr>
+        <tr><td>GPT-5.1</td><td>OpenAI</td><td>~3T (MoE)</td><td>500K</td><td>$12 / $60</td><td>生态、多模态、插件</td></tr>
+        <tr><td>Gemini Ultra 3</td><td>Google</td><td>~4T (MoE)</td><td>2M</td><td>$10 / $50</td><td>上下文窗口、搜索整合</td></tr>
+        <tr><td>DeepSeek V4</td><td>DeepSeek</td><td>685B (MoE)</td><td>1M</td><td>$0.5 / $2</td><td>极致性价比、开源权重</td></tr>
+        <tr><td>Llama 5 405B</td><td>Meta (开源)</td><td>405B</td><td>256K</td><td>免费 / 自部署</td><td>开源生态、社区微调</td></tr>
+        <tr><td>Qwen 3</td><td>阿里 (开源)</td><td>280B</td><td>256K</td><td>免费 / 自部署</td><td>中文能力、多模态</td></tr>
+      </tbody>
+    </table>
+    <div class="anc-pill-row">
+      <span class="anc-pill anc-pill--active">MoE 主流化 90%+</span>
+      <span class="anc-pill anc-pill--gen">开源差距缩至 6-12 月</span>
+      <span class="anc-pill anc-pill--warn">1M+ 上下文成标配</span>
+    </div>
+  </section>
+
+  <section class="anc-section" data-anc="market.midstream.code" data-handles="refine,expand,branch,annotate">
+    <div class="anc-handle-tip">✦ refine · expand · annotate</div>
+    <h3>2.2 代码模型 — Agent 化元年</h3>
+    <p>AI 编码工具企业部署率达 <strong>52%</strong>，平均 ROI 4.5x。SWE-bench 分数飙升至 <strong>72%</strong>。</p>
+    <table>
+      <thead><tr><th>模型 / 产品</th><th>开发商</th><th>SWE-bench</th><th>核心亮点</th></tr></thead>
+      <tbody>
+        <tr><td>Claude Code (Opus 4.7)</td><td>Anthropic</td><td>72%</td><td>自主 Agent、终端原生、全仓库理解</td></tr>
+        <tr><td>Devin 2</td><td>Cognition AI</td><td>65%</td><td>端到端 PR、自动调试、浏览器交互</td></tr>
+        <tr><td>GitHub Copilot X</td><td>GitHub / OpenAI</td><td>58%</td><td>VS Code 深度集成、PR 自动生成</td></tr>
+        <tr><td>Cursor Agent</td><td>Anysphere</td><td>55%</td><td>全文件重构、Shadow Workspace</td></tr>
+      </tbody>
+    </table>
+    <div class="anc-pill-row">
+      <span class="anc-pill anc-pill--flame">企业部署率 52%</span>
+      <span class="anc-pill anc-pill--aurora">ROI 4.5x</span>
+      <span class="anc-pill anc-pill--gen">SWE-bench 72% 新高</span>
+    </div>
+  </section>
+</section>
+
+<hr class="anc-divider">
+
+<section class="anc-section anc-section--gc" data-anc="market.downstream" data-handles="refine,expand,branch,restructure">
+  <div class="anc-handle-tip">✦ refine · expand · branch · restructure</div>
+  <h2>下游 — 应用 &amp; 服务</h2>
+  <p>市场规模 <strong>$368B</strong>，年增速 <strong>45%</strong>，是增速最快的环节。AI 正从 Copilot 模式向 Agent 模式跨越。</p>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--aurora"><div class="kpi-top"><div class="kpi-label-top">下游<br>总规模</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/></svg></div></div><div class="kpi-bottom"><div class="kpi-value">$368B</div><div class="kpi-unit">市场规模</div></div></div>
+    <div class="anc-kpi anc-kpi--cool"><div class="kpi-top"><div class="kpi-label-top">年增速<br>最快环节</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg></div></div><div class="kpi-bottom"><div class="kpi-value">45%</div><div class="kpi-unit">YoY 增速</div></div></div>
+    <div class="anc-kpi anc-kpi--flame"><div class="kpi-top"><div class="kpi-label-top">企业部署<br>平均 ROI</div><div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div></div><div class="kpi-bottom"><div class="kpi-value">3.2x</div><div class="kpi-unit">投资回报</div></div></div>
+  </div>
+
+  <div class="anc-grid-2">
+    <section class="anc-section" data-anc="market.downstream.consumer" data-handles="refine,expand,branch,annotate">
+      <div class="anc-handle-tip">✦ refine · expand · annotate</div>
+      <h3>3.1 消费级 AI — 超级入口之争</h3>
+      <p>ChatGPT 月活突破 <strong>8.5 亿</strong>，Claude 月活达 <strong>4.2 亿</strong>。AI 生成内容在社交媒体中的占比突破 <strong>22%</strong>。</p>
+      <div class="anc-kpi-grid">
+        <div class="anc-kpi anc-kpi--berry anc-kpi--center"><div class="kpi-value">8.5亿</div><div class="kpi-label">ChatGPT MAU</div></div>
+        <div class="anc-kpi anc-kpi--ocean anc-kpi--center"><div class="kpi-value">4.2亿</div><div class="kpi-label">Claude MAU</div></div>
+        <div class="anc-kpi anc-kpi--flame anc-kpi--center"><div class="kpi-value">22%</div><div class="kpi-label">AIGC 内容占比</div></div>
+      </div>
+    </section>
+    <section class="anc-section" data-anc="market.downstream.agents" data-handles="refine,expand,branch,annotate">
+      <div class="anc-handle-tip">✦ refine · expand · annotate</div>
+      <h3>3.2 AI Agent — 2026 年最重要赛道</h3>
+      <p>企业 Agent 部署率从 2024 年的 8% 跃升至 <strong>34%</strong>，预计 2028 年达到 72%。</p>
+      <table>
+        <thead><tr><th>Agent 类型</th><th>成熟度</th><th>部署率</th><th>典型 ROI</th></tr></thead>
+        <tbody>
+          <tr><td>Coding Agent</td><td>高</td><td>52%</td><td>4.5x</td></tr>
+          <tr><td>Support Agent</td><td>高</td><td>38%</td><td>3.2x</td></tr>
+          <tr><td>Data Agent</td><td>中</td><td>28%</td><td>3.8x</td></tr>
+          <tr><td>Sales Agent</td><td>中</td><td>22%</td><td>2.9x</td></tr>
+          <tr><td>Ops Agent</td><td>中</td><td>18%</td><td>3.1x</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</section>
+
+<hr class="anc-divider">
+
+<section class="anc-section anc-section--gc" data-anc="market.investment" data-handles="refine,expand,branch,restructure">
+  <div class="anc-handle-tip">✦ refine · expand · branch</div>
+  <h2>投资趋势 &amp; 风险因素</h2>
+  <div class="anc-grid-2">
+    <section class="anc-section" data-anc="market.investment.vc" data-handles="refine,expand,annotate">
+      <div class="anc-handle-tip">✦ refine · expand · annotate</div>
+      <h3>4.1 一级市场</h3>
+      <p>2026Q1 全球 AI 私募融资总额 <strong>$68B</strong>，占全部科技融资的 <strong>42%</strong>。平均估值/营收倍数从 28x 回落至 <strong>18x</strong>，回归理性。</p>
+      <div class="anc-kpi-grid">
+        <div class="anc-kpi anc-kpi--warm anc-kpi--center"><div class="kpi-value">$68B</div><div class="kpi-label">Q1 AI 私募融资</div></div>
+        <div class="anc-kpi anc-kpi--flame anc-kpi--center"><div class="kpi-value">42%</div><div class="kpi-label">占科技融资比</div></div>
+        <div class="anc-kpi anc-kpi--aurora anc-kpi--center"><div class="kpi-value">18x</div><div class="kpi-label">估值/营收倍数</div></div>
+      </div>
+    </section>
+    <section class="anc-section" data-anc="market.investment.risk" data-handles="refine,expand,branch,annotate">
+      <div class="anc-handle-tip">✦ refine · expand · annotate</div>
+      <h3>4.2 核心风险</h3>
+      <table>
+        <thead><tr><th>风险因素</th><th>严重程度</th><th>影响环节</th><th>趋势</th></tr></thead>
+        <tbody>
+          <tr><td>GPU 供应瓶颈</td><td>高</td><td>上游 → 全链</td><td>2026H2 预计缓解</td></tr>
+          <tr><td>电力/能源约束</td><td>极高</td><td>上游基础设施</td><td>恶化中</td></tr>
+          <tr><td>监管不确定性</td><td>高</td><td>下游应用</td><td>EU AI Act 生效</td></tr>
+          <tr><td>模型同质化</td><td>中</td><td>中游</td><td>加剧中</td></tr>
+          <tr><td>数据版权争议</td><td>中</td><td>全链</td><td>判例积累中</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</section>
+
+<hr class="anc-divider">
+
+<section class="anc-section anc-section--gc anc-section--arctic" data-anc="market.outlook" data-handles="refine,expand,branch,annotate,restructure">
+  <div class="anc-handle-tip">✦ refine · expand · branch · restructure</div>
+  <h2>2026–2028 展望</h2>
+  <ol>
+    <li><strong>算力民主化</strong>：ASIC + 开源模型将推理成本打至 2024 年的 1/10，长尾应用场景爆发</li>
+    <li><strong>Agent 原生企业</strong>：首批 100% Agent 运营的独角兽出现，人均产出达到 SaaS 时代的 10x</li>
+    <li><strong>端侧 AI 成熟</strong>：AI PC / AI 手机渗透率超 60%，混合推理（端+云）成为标准架构</li>
+    <li><strong>AI 劳动力化</strong>：AI Agent 被统计为生产要素，在国民经济核算中被单独列项</li>
+    <li><strong>能源即算力</strong>：数据中心选址由电力可用性决定，SMR 成为标配</li>
+  </ol>
+  <div class="anc-pill-row">
+    <span class="anc-pill anc-pill--gen">前瞻分析</span>
+    <span class="anc-pill anc-pill--draft">Q2 更新待定</span>
+  </div>
+</section>
+
+</main>
+</body>
+</html>
