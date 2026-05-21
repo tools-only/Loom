@@ -1,7 +1,5 @@
 # Loom — AI-Native Workspace
-**Think it. Live it.**
-
-[[Demo]](https://tools-only.github.io/Loom/demo.html)
+**Think it. Live it.** [[Demo]](https://tools-only.github.io/Loom/demo.html)
 
 Loom is an AI-native desktop workspace where HTML is the shared language between user and AI. Describe anything — dashboards, reports, prototypes — and watch it take shape. Click any element to refine, expand, or branch.
 
