@@ -14,7 +14,7 @@
         "op": {
           "enum": [
             "refine", "expand", "shorten", "longer", "edit", "lock",
-            "annotate", "branch", "restructure", "ask", "custom"
+            "annotate", "branch", "restructure", "ask", "custom", "initial_render"
           ]
         },
         "instruction": { "type": "string", "maxLength": 4000 },
@@ -42,7 +42,9 @@
         "subagent_ids":       { "type": "array", "items": { "type": "string" } },
         "resource_ids":       { "type": "array", "items": { "type": "string" } },
         "scope_hint":         { "enum": ["minimal", "standard", "wide"] },
-        "transient_override": { "type": "boolean" }
+        "transient_override": { "type": "boolean" },
+        "subagent_id":        { "type": ["string", "null"] },
+        "context_mode":       { "type": ["string", "null"], "enum": ["full", "summarized", "none", null] }
       }
     },
 
@@ -50,7 +52,27 @@
       "type": "object",
       "properties": {
         "anchor_tree":   { "type": "array", "items": { "type": "string" } },
+        "anchor_index": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "handles": { "type": "array", "items": { "type": "string" } },
+              "deps":    { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
         "dom_signature": { "type": "string" },
+        "relevant_subtree": {
+          "type": "object",
+          "properties": {
+            "target_ref":   { "type": "string" },
+            "target_html":  { "type": "string" },
+            "forward_deps": { "type": "object", "additionalProperties": { "type": "string" } },
+            "reverse_deps": { "type": "object", "additionalProperties": { "type": "string" } }
+          },
+          "required": ["target_ref", "target_html"]
+        },
         "viewport": {
           "type": "object",
           "properties": {

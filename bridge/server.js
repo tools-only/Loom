@@ -13,6 +13,7 @@ const PROMPTS_DIR = path.join(__dirname, '..', 'prompts');
 const LOGS_DIR = path.join(__dirname, '..', 'logs');
 const CURRENT_HTML = path.join(OUTPUT_DIR, 'current.html');
 const PENDING_PROMPT = path.join(PROMPTS_DIR, 'pending.md');
+const PENDING_OP_JSON = path.join(PROMPTS_DIR, 'pending-op.json');
 const OPS_LOG = path.join(LOGS_DIR, 'ops.jsonl');
 
 [OUTPUT_DIR, PROMPTS_DIR, LOGS_DIR].forEach(d => {
@@ -62,10 +63,23 @@ app.post('/op', (req, res) => {
 
   const promptText = formatOpAsPrompt(op);
   fs.writeFileSync(PENDING_PROMPT, promptText, 'utf8');
+  fs.writeFileSync(PENDING_OP_JSON, JSON.stringify(op), 'utf8');
   logOp(op);
   notifyPendingOpChanged();
 
   res.json({ ok: true, prompt_written: true });
+});
+
+// ── HTTP: health check (for MCP leader/follower detection) ────────────
+app.get('/health', (req, res) => res.json({ ok: true, role: 'leader', port: PORT }));
+
+// ── HTTP: receive agent_event from MCP follower ───────────────────────
+app.post('/event', (req, res) => {
+  const event = req.body && (req.body.event || req.body);
+  if (!event || !event.kind) return res.status(400).json({ error: 'missing event.kind' });
+  broadcast({ type: 'agent_event', event });
+  console.log(`[bridge] agent_event: ${event.kind}`);
+  res.json({ ok: true });
 });
 
 // ── HTTP: get current HTML ───────────────────────────────────────────
@@ -92,10 +106,19 @@ wss.on('connection', (ws) => {
 
         const promptText = formatOpAsPrompt(msg.op);
         fs.writeFileSync(PENDING_PROMPT, promptText, 'utf8');
+        fs.writeFileSync(PENDING_OP_JSON, JSON.stringify(msg.op), 'utf8');
         logOp(msg.op);
         notifyPendingOpChanged();
 
         ws.send(JSON.stringify({ type: 'ack', message: 'Op received' }));
+      } else if (msg.type === 'envelope') {
+        console.log(`[bridge] envelope via WS: ${msg.envelope?.intent?.op} -> ${msg.envelope?.intent?.target_ref}`);
+        pendingOp = msg.envelope;
+        const promptText = formatEnvelopeAsPrompt(msg.envelope);
+        fs.writeFileSync(PENDING_PROMPT, promptText, 'utf8');
+        fs.writeFileSync(PENDING_OP_JSON, JSON.stringify(msg.envelope), 'utf8');
+        notifyPendingOpChanged();
+        ws.send(JSON.stringify({ type: 'ack', message: 'Envelope received' }));
       } else if (msg.type === 'ping') {
         ws.send(JSON.stringify({ type: 'pong' }));
       }
@@ -141,6 +164,50 @@ ${currentHtml}
 
 Call \`anchor_render\` with the complete updated HTML now.
 `;
+}
+
+function formatEnvelopeAsPrompt(envelope) {
+  const intent = envelope.intent || {};
+  const sel = envelope.selection;
+  const bundle = envelope.context_bundle || {};
+  const rs = envelope.render_state || {};
+  const MAX_HTML = 15000;
+
+  let out = '## Anchor User Action (IntentEnvelope v1.0)\n\n';
+  out += '### Intent\n';
+  out += `- **Op**: \`${intent.op || '(unknown)'}\`\n`;
+  out += `- **Target kind**: \`${intent.target_kind || '(unknown)'}\`\n`;
+  out += `- **Target ref**: \`${intent.target_ref || '(none)'}\`\n`;
+  if (intent.instruction) out += `- **Instruction**: ${intent.instruction}\n`;
+  out += '\n';
+
+  if (sel && sel.text) {
+    out += '### Selection\n';
+    out += `- **Text**: "${sel.text.substring(0, 200)}"${sel.text.length > 200 ? '…' : ''}\n`;
+    if (sel.ancestor_anchor) out += `- **Ancestor anchor**: \`${sel.ancestor_anchor}\`\n`;
+    out += '\n';
+  }
+
+  const mem = bundle.memory_ids || [];
+  const skl = bundle.skill_ids || [];
+  if (mem.length || skl.length) {
+    out += '### Context Bundle\n';
+    if (mem.length) out += '- **Memory**: ' + mem.map(id => '`' + id + '`').join(', ') + '\n';
+    if (skl.length) out += '- **Skills**: ' + skl.map(id => '`' + id + '`').join(', ') + '\n';
+    out += '\n';
+  }
+
+  out += '### Current HTML\n';
+  out += '```html\n';
+  out += currentHtml.substring(0, MAX_HTML);
+  if (currentHtml.length > MAX_HTML) out += '\n… (truncated)';
+  out += '\n```\n\n';
+
+  out += '### Instructions\n';
+  out += '- Apply the op ONLY to the target element(s). Preserve all `data-anc`, `data-handles`, `data-deps` attributes.\n';
+  out += '- When done, call `anchor_render` with the COMPLETE updated HTML.\n';
+
+  return out;
 }
 
 function logOp(op) {
@@ -248,6 +315,18 @@ function handleMCP(msg) {
           name: 'anchor_get_html',
           description: 'Get the currently rendered HTML from the webview.',
           inputSchema: { type: 'object', properties: {} }
+        },
+        {
+          name: 'anchor_emit_event',
+          description: 'Emit an intermediate agent event (thinking/tool_call/partial_render/decision/complete/error) to the webview timeline panel. Use during op processing to surface progress.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              type: { type: 'string', enum: ['thinking','tool_call','partial_render','decision','complete','error'] },
+              payload: { type: 'object' }
+            },
+            required: ['type']
+          }
         }
       ]}
     });
@@ -325,6 +404,24 @@ function handleToolCall(id, params) {
 
   if (name === 'anchor_get_html') {
     sendMCP({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: currentHtml || '(empty)' }] } });
+    return;
+  }
+
+  if (name === 'anchor_emit_event') {
+    const { type, payload } = args || {};
+    if (!type) {
+      sendMCP({ jsonrpc: '2.0', id, error: { code: -32602, message: 'type required' } });
+      return;
+    }
+    const event = {
+      event_id: 'evt_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8),
+      timestamp: new Date().toISOString(),
+      kind: 'agent.' + type,
+      payload: payload || {}
+    };
+    broadcast({ type: 'agent_event', event });
+    console.log(`[bridge] anchor_emit_event: ${type}`);
+    sendMCP({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: 'emitted ' + event.event_id }] } });
     return;
   }
 

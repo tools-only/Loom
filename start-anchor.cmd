@@ -6,5 +6,6 @@ echo.
 echo NOTE: The MCP server auto-starts with Claude Code.
 echo       Only run this script if you need a standalone instance.
 echo.
+set ANCHOR_USE_AUTOEXEC=1
 node mcp\server.cjs
 pause

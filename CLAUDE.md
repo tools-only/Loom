@@ -6,32 +6,68 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Anchor is a bidirectional interaction loop where HTML is the shared language between user and AI.
 
-### Primary Path: MCP Server (auto-starts with Claude Code)
+### Service + Shim architecture
 
-The **MCP server** (`mcp/server.cjs`) is registered in `.claude/mcp.json` and auto-starts when Claude Code opens this project. It provides:
+The Anchor stack has two separate processes:
 
-- **Tool `anchor_render(html)`** — push complete HTML to webview at http://localhost:3000. Also writes `output/current.html` as a side effect and records to session.
-- **Tool `anchor_get_pending_op()`** — get and clear the pending user op from the webview. Returns `{pending:true, op, current_html}` or `{pending:false}`.
-- **Tool `anchor_get_html()`** — get the currently rendered HTML.
-- **Tool `anchor_emit_event(type, payload)`** — emit intermediate agent events (thinking / tool_call / partial_render / decision / complete / error) to the webview timeline panel.
-- **Tool `anchor_replay_session(session_id, up_to_event_id?)`** — read back events from a recorded session.
-- **Resource `anchor://pending-op`** — subscribable; server sends `notifications/resources/updated` when user interacts.
+| Process | File | Lifecycle | Role |
+|---------|------|-----------|------|
+| **Anchor Service** | `mcp/server.cjs` | Started **once** by the user; persists across CC sessions | HTTP + WebSocket server (port 3000), webview, state, sessions |
+| **MCP Shim** | `mcp/shim.cjs` | Auto-started by CC on every session open | Thin stdio JSON-RPC bridge; connects to service via **persistent WebSocket** (`/ws/agent`); receives op pushes, sends render/patch commands |
 
-The loop: `Claude calls anchor_render(html) → MCP broadcasts to webview → user clicks handle → MCP stores op, notifies subscribers → Stop hook detects pending.md → Claude calls anchor_get_pending_op() → Claude processes op → calls anchor_render(new HTML) → repeat`
+**How to start the service (do this once per machine boot):**
+
+```bat
+scripts\start-anchor.bat
+```
+
+For auto-start at login: run `scripts\setup-startup.ps1` (uses PM2 if installed, otherwise Task Scheduler).
+
+**For Claude Code — Option C auto-spawn architecture:**
+
+> **DO NOT** maintain a permanent loop or call `anchor_await_op` proactively.
+> **DO NOT** probe ports or check node_modules at session start.
+> If a tool call returns *"Anchor service not running"*, ask the user to run `scripts\start-anchor.bat`.
+>
+> The Anchor service **auto-spawns CC** (`claude -p`) when a browser op arrives. If you are a spawned processor (the `-p` prompt begins with `[ANCHOR SINGLE-PASS OP PROCESSOR]`), follow that prompt exactly: call `anchor_get_pending_op()` in a loop until `{pending:false}`, then exit. Do not call `anchor_await_op`.
+>
+> The **main interactive CC session** is for user-directed commands only (e.g., `anchor_render` to push initial HTML). It does not handle browser ops — the service spawns a dedicated CC subprocess for those.
+
+**Communication model (push, not poll):**
+
+```
+Browser ──op/envelope──► Service (daemon)
+                              │ push via /ws/agent WebSocket
+                              ▼
+                         MCP Shim ──stdio JSON-RPC──► CC Agent
+                              ▲
+                         anchor_patch / anchor_render (WS commands)
+```
+
+The service **pushes** ops to the shim the moment they arrive. `anchor_await_op` resolves instantly when an op is pushed; no HTTP long-polling.
+
+**Available MCP tools** (provided by the shim, executed by the service):
+
+- **`anchor_render(html)`** — push complete HTML to webview; also writes `output/current.html`
+- **`anchor_await_op(timeout_ms?)`** — receives the next op via WS push; returns `{pending:true, ops:[...]}` or `{pending:false, timeout:true}`
+- **`anchor_patch({patches:[{anchor_id, html_fragment}]})`** — patch specific anchor nodes in-place
+- **`anchor_get_pending_op()`** — drain one op from local buffer (prefer `anchor_await_op`)
+- **`anchor_get_html()`** — get currently rendered HTML
+- **`anchor_emit_event(type, payload)`** — emit timeline event (thinking/decision/complete/error)
+- **`anchor_replay_session(session_id, up_to_event_id?)`** — read session event log
 
 ### Fallback: Hooks + Bridge
 
-For backward compatibility, `bridge/server.js` can also be run manually (`cd bridge && node server.js`). Hooks in `hooks/anchor-hook.cjs` (PostToolUse + Stop) forward HTML and feed back ops via file-system. The MCP server handles the same HTTP/WS protocol on port 3000.
+For backward compatibility, `bridge/server.js` can also be run manually (`cd bridge && node server.js`). Hooks in `hooks/anchor-hook.cjs` forward HTML and feed back ops via file-system.
 
-## Commands
+## Setup
 
 ```bash
-# Install dependencies (first time)
+# Install dependencies (first time only)
 cd bridge && npm install
 
-# The MCP server auto-starts with Claude Code — no manual step needed.
-# If running bridge manually:
-cd bridge && node server.js
+# Start the Anchor service (once per machine boot)
+scripts\start-anchor.bat
 ```
 
 Then open http://localhost:3000 in a browser.
@@ -230,41 +266,77 @@ Use standard HTML tags — the CSS styles them globally: `h1`–`h4`, `p`, `ul`,
 5. Use `anc-pill` + `anc-pill-row` to display status metadata
 6. Use `var(--*)` CSS tokens from Bloom — never hard-code colors, radii, or shadows
 
-## Workflow (MCP)
+## Workflow (MCP) — Option C: Auto-Spawn Architecture
 
-The MCP server auto-starts with Claude Code. The loop runs in this same agent thread:
+**Architecture separation**: The Anchor service (`mcp/server.cjs`) is the persistent web daemon. When a browser op arrives, the daemon **automatically spawns a CC subprocess** (`claude -p`) to process it. No permanent loop or Stop hook is needed.
 
 ```
-Claude calls anchor_render(html) → MCP broadcasts to webview → browser renders
-  → User interacts (clicks handles in browser)
-  → MCP stores pending op, writes prompts/pending.md
-  → User returns here, sends any message
-  → Stop hook detects pending.md, blocks with prompt
-  → Claude calls anchor_get_pending_op() → gets op + current HTML
-  → Claude processes op, calls anchor_render(updated HTML) → loop
+[Anchor daemon — always running]
+  Browser op → pendingOps[] → spawnCCProcessor()
+                                    ↓
+                              claude -p <prompt>  (subprocess)
+                                    ↓
+                              shim connects as ANCHOR_AGENT_ID=__proc__
+                                    ↓
+                              daemon drains all pending ops to shim
+                                    ↓
+                              CC: anchor_get_pending_op() loop → anchor_patch()
+                                    ↓
+                              {pending:false} → CC exits → shim disconnects
+
+[Main interactive CC session — optional]
+  For user CLI commands only: anchor_render(html) to push initial pages.
+  Does NOT handle browser ops — the daemon spawns dedicated processors.
 ```
 
-**No manual server start. Everything runs in this agent thread.**
+**User interaction model:**
+- **执行** on a single cell → op sent immediately → daemon spawns CC → op processed
+- **暂存** (stage) → op stored in browser only; nothing sent to server yet
+- **Execute All** → all staged ops sent as one batch → daemon drains all to spawned CC
 
-To begin: open http://localhost:3000, then ask Claude to generate an Anchor page.
+**If spawned as processor** (`-p` prompt begins with `[ANCHOR SINGLE-PASS OP PROCESSOR]`):
+```
+loop:
+  anchor_get_pending_op()
+    → {pending:true, op}: process op → anchor_patch() → continue loop
+    → {pending:false}: exit immediately — do NOT call anchor_await_op
+```
+
+To disable auto-spawn: `curl -X POST http://localhost:3000/loop/disable`
 
 ## MCP Tools
 
-Always use these MCP tools when working with Anchor:
-
 | Tool | When to use |
 |------|-------------|
-| `anchor_render(html)` | Push HTML to webview. ALWAYS use this instead of writing to `output/current.html` directly. |
-| `anchor_get_pending_op()` | After a Stop hook block, call to get the pending user interaction (op, target, instruction). Clears the pending op on read. |
-| `anchor_get_html()` | Get the currently rendered HTML from the webview. |
+| `anchor_render(html)` | **Initial render or full rebuild only.** Do NOT use during op processing. |
+| `anchor_get_pending_op()` | **Primary tool for spawned processor.** Drains one op at a time. Loop until `{pending:false}`. |
+| `anchor_patch({patches:[...]})` | **Op processing result.** Replaces specific anchor nodes by outerHTML. Each patch: `{anchor_id, html_fragment}`. |
+| `anchor_get_html()` | Fetch full HTML when needed for heavy ops (branch/restructure). |
+| `anchor_await_op(timeout_ms?)` | **Optional / advanced.** Only use if explicitly needed; spawned processors should NOT call this. |
+| `anchor_emit_event(type, payload)` | **Optional** — emit `decision`, `partial_render`, `tool_call`, or `error` events to the timeline. |
 
-## Processing Pending Ops
+## Processing Pending Ops (Spawned Processor)
 
-When the Stop hook blocks with an Anchor prompt:
+When spawned as processor (prompt begins with `[ANCHOR SINGLE-PASS OP PROCESSOR]`):
 
-1. Call `anchor_get_pending_op()` — get the op with target, instruction, and current HTML
-2. Apply the requested change ONLY to the target element and its data-deps
-3. Call `anchor_render(updated_html)` with the COMPLETE updated HTML
+1. **Call `anchor_get_pending_op()`**
+2. **If `{pending:false}`**: stop — all ops processed.
+3. **If `{pending:true, op}`**:
+   - `op.intent.op` — operation type (refine / expand / shorten / edit / initial_render / etc.)
+   - `op.intent.target_ref` — anchor id of the target element
+   - `op.intent.instruction` — what the user wants done
+   - `op.render_state.relevant_subtree.target_html` — current outerHTML of the target
+   - For `initial_render`: generate full Anchor HTML page → `anchor_render(html)`
+   - For all others: generate modified outerHTML → `anchor_patch({patches:[{anchor_id, html_fragment}]})`
+4. **Go to step 1**
+
+For ops with `op.context_bundle.subagent_id` set: call `Agent(subagent_type=..., prompt=...)` and apply the result via `anchor_patch`.
+
+The MCP server auto-emits `thinking` and `complete` timeline events. Call `anchor_emit_event` only for `decision`, `partial_render`, `tool_call`, or `error`.
+
+**NEVER call `anchor_render` during op processing.** That tool is for initial render / full rebuilds only.
+
+**Subagent dispatch**: only when `op.context_bundle.subagent_id` is set. Default path is direct main-thread patch. Both paths end with `anchor_await_op(timeout_ms: 60000)` to resume the polling loop.
 
 If the user explicitly asks to "process pending" or "check prompts", call `anchor_get_pending_op()` directly.
 
@@ -282,12 +354,12 @@ When processing a pending user op, call `anchor_emit_event` at key milestones to
 | `tool_call` | Before/after each read or search tool | `{tool: "Read", status: "start", input_summary: "reading financials section"}` / `{tool: "Read", status: "end", result_summary: "read 340 lines"}` |
 | `decision` | When making a significant content choice | `{choice: "use 8.5% WACC", alternatives: ["9%", "8%", "10%"], reason: "user explicitly requested 8.5%"}` |
 | `partial_render` | If producing an intermediate draft worth previewing | `{html_fragment: "<section>...</section>", target_anchor: "valuation"}` |
-| `complete` | After `anchor_render` succeeds | `{success: true, summary: "updated DCF with 8.5% WACC, cascaded changes to summary KPI"}` |
+| `complete` | After `anchor_patch` succeeds | `{target_anchor: "valuation", summary: "updated DCF with 8.5% WACC, cascaded changes to summary KPI"}` |
 | `error` | If processing fails | `{message: "could not locate target anchor", retriable: true}` |
 
-**Minimum expected**: `thinking` at start, `complete` at end. The timeline panel collapses each user-envelope round into a group.
+**Auto-emitted by server**: `thinking` (when await_op resolves) and `complete` (when patch broadcasts). CC only needs to call `anchor_emit_event` for `decision`, `partial_render`, `tool_call`, or `error`.
 
-Process flow: `anchor_get_pending_op()` → `anchor_emit_event(thinking, …)` → read/search as needed (emit `tool_call` events) → `anchor_emit_event(decision, …)` if branching → `anchor_render(new_html)` → `anchor_emit_event(complete, …)`.
+Process flow: `anchor_await_op()` → generate patch from `relevant_subtree` → `anchor_patch(…)` → `anchor_await_op()`.
 
 ## Cross-Task Usage
 

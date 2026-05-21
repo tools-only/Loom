@@ -2,7 +2,7 @@
   "mcpServers": {
     "anchor": {
       "command": "node",
-      "args": ["mcp/server.cjs"],
+      "args": ["mcp/shim.cjs"],
       "cwd": "D:\\ai-native chrome"
     }
   }
