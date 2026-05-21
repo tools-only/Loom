@@ -30,7 +30,37 @@
     <span class="processing-target"></span>
   </span>
   <span class="toolbar-info" id="info"></span>
+  <button class="toolbar-shutdown" id="anchor-shutdown" title="Shutdown Anchor services" type="button">
+    <i class="ph-bold ph-power"></i>
+  </button>
 </header>
+
+<section id="anchor-home" class="anchor-home">
+  <div class="home-inner">
+    <div class="home-kicker">Loom · AI Workspace</div>
+    <h1>Think it. Live it.</h1>
+    <div class="home-prompt">
+      <i class="ph-bold ph-magnifying-glass"></i>
+      <input id="anchor-prompt-input" class="anchor-prompt-input home-prompt-input" type="text" placeholder="Describe a dashboard, report, app page, or research canvas...">
+      <button id="anchor-prompt-submit" class="btn btn--brand home-prompt-submit" type="button">
+        <i class="ph-bold ph-arrow-right"></i>
+      </button>
+    </div>
+  </div>
+</section>
+
+<div class="workspace-hover-zone"></div>
+<aside id="anchor-workspace-panel" class="workspace-panel">
+  <div class="workspace-header">
+    <span>Workspace</span>
+    <div class="workspace-actions">
+      <button id="workspace-link-folder" class="workspace-icon-btn" type="button" title="Link local folder"><i class="ph-bold ph-link"></i></button>
+      <button id="workspace-new-folder" class="workspace-icon-btn" type="button" title="New folder"><i class="ph-bold ph-folder-plus"></i></button>
+      <button id="workspace-new-file" class="workspace-icon-btn" type="button" title="New file"><i class="ph-bold ph-file-plus"></i></button>
+    </div>
+  </div>
+  <div id="workspace-tree" class="workspace-tree"></div>
+</aside>
 
 <!-- Floating trigger tabs (right edge, stacked) -->
 <div class="anc-panel-trigger" id="trigger-context" title="Context">
