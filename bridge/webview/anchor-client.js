@@ -56,6 +56,106 @@ const Anchor = {
     this._initShutdown();
     this._initHomeNav();
     this._initPromptBar();
+    this._initHomeSuggestions();
+    this._initHashRouting();
+  },
+
+  _initHashRouting() {
+    window.addEventListener('hashchange', () => this._handleHashChange());
+    const hash = window.location.hash.slice(1);
+    if (hash && ['market','position','target','sentiment'].includes(hash)) {
+      this._loadBlogDomain(hash);
+    }
+  },
+
+  _handleHashChange() {
+    const hash = window.location.hash.slice(1);
+    if (['market','position','target','sentiment'].includes(hash)) {
+      this._loadBlogDomain(hash);
+    } else if (!hash) {
+      this.currentHtml = '';
+      this.container.innerHTML = '';
+      this._syncHomeVisibility();
+    }
+  },
+
+  async _loadBlogDomain(domain) {
+    try {
+      const data = await fetch('/api/inbox/' + domain).then(r => r.json());
+      const counts = data.meta || {};
+      const items = data.items || [];
+      this._renderBlogPage(domain, items, counts);
+      this._syncHomeVisibility();
+      this._updateToolbarTabs(domain);
+    } catch (e) {
+      console.error('[_loadBlogDomain]', e);
+    }
+  },
+
+  _renderBlogPage(domain, items, counts) {
+    const META = {
+      market:    { icon: '📊', label: '市场情报', color: 'aurora' },
+      position:  { icon: '💼', label: '仓位管理', color: 'cool'   },
+      target:    { icon: '🎯', label: '标的跟踪', color: 'warm'   },
+      sentiment: { icon: '🌡️', label: '市场情绪', color: 'flame'  }
+    };
+    const meta = META[domain] || META.market;
+    const count = counts[domain] || 0;
+
+    const sourceTag = (src) => {
+      if (!src) return '';
+      if (src.startsWith('feed:')) src = src.slice(5);
+      const short = src.split(':')[0].split('-').map(w => w[0] && w[0].toUpperCase()).join('');
+      return '<span class="blog-source-tag">' + _escHtml(short) + '</span>';
+    };
+
+    const itemsHtml = items.length === 0
+      ? '<div class="blog-empty">暂无推送内容 · 等待 Connector 拉取数据</div>'
+      : items.map(it => {
+        const time = it.ts ? new Date(it.ts).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+        return `<article class="blog-item" data-id="${_escHtml(it.id)}">
+          <div class="blog-item-meta">
+            ${sourceTag(it.source)}
+            <span class="blog-item-time">${time}</span>
+          </div>
+          <h3 class="blog-item-title">${_escHtml(it.title)}</h3>
+          ${it.summary ? '<p class="blog-item-summary">'+_escHtml(it.summary)+'</p>' : ''}
+          ${it.payload?.url ? '<a class="blog-item-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">原文链接 ↗</a>' : ''}
+        </article>`;
+      }).join('\n');
+
+    const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>${meta.label}</title></head>
+<body>
+<div class="blog-page blog-page--${domain}">
+  <header class="blog-header blog-header--${meta.color}">
+    <div class="blog-header-inner">
+      <span class="blog-domain-icon">${meta.icon}</span>
+      <div>
+        <h1 class="blog-domain-title">${meta.label}</h1>
+        <p class="blog-domain-count">共 <strong>${count}</strong> 条推送 · ${items.length} 条已加载</p>
+      </div>
+    </div>
+  </header>
+  <main class="blog-content">
+    ${itemsHtml}
+  </main>
+</div>
+</body>
+</html>`;
+
+    this.currentHtml = html;
+    this.container.innerHTML = '';
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    document.getElementById('anchor-content').appendChild(template.content.cloneNode(true));
+  },
+
+  _updateToolbarTabs(activeDomain) {
+    document.querySelectorAll('.domain-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.domain === activeDomain);
+    });
   },
 
   _initPromptBar() {
@@ -68,6 +168,17 @@ const Anchor = {
     };
     btn.addEventListener('click', submit);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  },
+
+  _initHomeSuggestions() {
+    const input = document.getElementById('anchor-prompt-input');
+    if (!input) return;
+    document.querySelectorAll('.home-suggestions button[data-prompt]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        input.value = btn.getAttribute('data-prompt') || '';
+        input.focus();
+      });
+    });
   },
 
   submitPrompt(text) {
@@ -124,6 +235,16 @@ const Anchor = {
     };
     logo?.addEventListener('click', goHome);
     brand?.addEventListener('click', goHome);
+
+    // Toolbar domain tabs — hash routing
+    document.querySelectorAll('.domain-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const d = tab.dataset.domain;
+        if (d) {
+          window.location.hash = d;
+        }
+      });
+    });
   },
 
   _initSidePanelToggles() {
@@ -138,10 +259,12 @@ const Anchor = {
     // Floating trigger tabs — click to expand, mouseleave to collapse
     this._initFloatingTrigger('trigger-context', 'anchor-context-panel');
     this._initFloatingTrigger('trigger-timeline', 'anchor-timeline-panel');
+    this._initFloatingTrigger('trigger-inbox', 'anchor-inbox-panel');
 
     // Resize handles
     this._initPanelResize('anchor-context-panel');
     this._initPanelResize('anchor-timeline-panel');
+    this._initPanelResize('anchor-inbox-panel');
   },
 
   _initFloatingTrigger(triggerId, panelId) {
@@ -327,6 +450,9 @@ const Anchor = {
         this.toast(msg.message || 'Anchor service shutting down');
         break;
       case 'pong':
+        break;
+      case 'inbox_updated':
+        if (window.InboxPanel) InboxPanel.applyServerCounts(msg.counts);
         break;
     }
   },
@@ -1019,12 +1145,27 @@ const Anchor = {
       bundle.context_mode = effectiveCfg.context_mode || 'none';
     }
     bundle.file_id = (window.WorkspacePanel && WorkspacePanel.currentFileId) || this.currentFileId || null;
+
+    // Trading domain extension — detect target anchor's domain
+    var domain = null;
+    var targetEl = target_ref ? document.querySelector('[data-anc="' + target_ref.replace(/"/g, '\\"') + '"]') : null;
+    if (targetEl && targetEl.getAttribute('data-domain') === 'trading.private') {
+      domain = {
+        namespace: 'trading.private',
+        action: this._inferTradingAction(op, targetEl),
+        trading_session_id: targetEl.closest('[data-trading-session-id]')?.getAttribute('data-trading-session-id') || null,
+        claim_id: targetEl.getAttribute('data-claim-id') || null,
+        finding_id: targetEl.getAttribute('data-finding-id') || null
+      };
+    }
+
     return {
       schema_version: '1.0',
       intent: { op, target_kind, target_ref, instruction },
       selection: selection || null,
       context_bundle: bundle,
       render_state: renderState,
+      domain: domain,
       provenance: {
         session_id: this.sessionId,
         event_id: eventId,
@@ -1033,6 +1174,42 @@ const Anchor = {
         client_version: '0.1.0'
       }
     };
+  },
+
+  _inferTradingAction(op, el) {
+    var anc = el.getAttribute('data-anc') || '';
+    // Map Anchor op + target anchor to trading domain action
+    if (op === 'edit') {
+      if (anc === 'trade.intent' || anc.startsWith('trade.intent.')) return 'DECLARE_REASONING';
+      if (anc === 'reasoning.raw') return 'DECLARE_REASONING';
+      if (anc.startsWith('position.outcome')) return 'EXECUTE_TRADE';
+      if (anc === 'postmortem') return 'POSTMORTEM';
+      return 'EDIT';
+    }
+    if (op === 'annotate') {
+      if (anc.startsWith('claim.')) return 'UPDATE_CLAIM';
+      if (anc.startsWith('thread.')) return 'ADD_FINDING';
+      if (anc.startsWith('finding.')) return 'REACT_TO_FINDING';
+      if (anc.startsWith('reaction.')) return 'REACT_TO_FINDING';
+      if (anc === 'reactions') return 'REACT_TO_FINDING';
+      return 'ANNOTATE';
+    }
+    if (op === 'refine') {
+      if (anc.startsWith('claim.')) return 'UPDATE_CLAIM';
+      return 'REFINE';
+    }
+    if (op === 'expand') {
+      if (anc === 'claims') return 'EXTRACT_CLAIMS';
+      if (anc === 'tracking') return 'SPAWN_TRACKER';
+      return 'EXPAND';
+    }
+    if (op === 'branch') {
+      if (anc.startsWith('thread.')) return 'SPAWN_TRACKER';
+      return 'BRANCH';
+    }
+    if (op === 'ask') return 'QUERY';
+    if (op === 'restructure') return 'RESTRUCTURE';
+    return 'CUSTOM';
   },
 
   _snapshotRenderState() {
@@ -1586,6 +1763,7 @@ window.WorkspacePanel = {
     document.getElementById('workspace-new-file')?.addEventListener('click', () => this.createFileInteractive());
     document.getElementById('workspace-new-folder')?.addEventListener('click', () => this.createFolderInteractive());
     document.getElementById('workspace-link-folder')?.addEventListener('click', () => this.linkFolderInteractive());
+    document.getElementById('workspace-new-trading-file')?.addEventListener('click', () => this.createTradingFileInteractive());
     this._linkedFolderContents = new Map();
     this.load();
   },
@@ -1648,7 +1826,6 @@ window.WorkspacePanel = {
           row.addEventListener('click', () => this._toggleFolder(row, node.id));
         }
         this.treeEl.appendChild(row);
-        if (node.type === 'folder') renderChildren(node.id, depth + 1);
       });
     };
     renderChildren(null, 0);
@@ -1657,7 +1834,39 @@ window.WorkspacePanel = {
   _toggleFolder(row, nodeId) {
     const existing = row.querySelector('.folder-children');
     if (existing) { existing.remove(); row.classList.remove('is-expanded'); return; }
-    // Re-render children at full depth (simple toggle for regular folders)
+    const nodes = this.workspace?.nodes || [];
+    const byParent = new Map();
+    nodes.forEach(n => {
+      const parent = n.parent_id || '__root__';
+      if (!byParent.has(parent)) byParent.set(parent, []);
+      byParent.get(parent).push(n);
+    });
+    const children = (byParent.get(nodeId) || []).slice().sort((a, b) => {
+      if (a.type !== b.type) return (a.type === 'folder' || a.type === 'linked-folder') ? -1 : 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+    if (children.length === 0) return;
+    const container = document.createElement('div');
+    container.className = 'folder-children';
+    children.forEach(node => {
+      const isLinkedFolder = node.type === 'linked-folder';
+      const iconClass = isLinkedFolder ? 'ph-link' : node.type === 'folder' ? 'ph-folder' : 'ph-file-html';
+      const childRow = document.createElement('button');
+      childRow.type = 'button';
+      childRow.className = 'workspace-node workspace-node--' + node.type + (node.id === this.currentFileId ? ' is-active' : '');
+      childRow.style.paddingLeft = (10 + (parseInt(row.style.paddingLeft) || 10) + 14) + 'px';
+      childRow.innerHTML = `<i class="ph-bold ${iconClass}"></i><span></span>`;
+      childRow.querySelector('span').textContent = node.name || node.id;
+      if (node.type === 'file') {
+        childRow.addEventListener('click', () => this.openFile(node.id));
+      } else if (isLinkedFolder) {
+        childRow.addEventListener('click', () => this._toggleLinkedFolder(childRow, node));
+      } else if (node.type === 'folder') {
+        childRow.addEventListener('click', () => this._toggleFolder(childRow, node.id));
+      }
+      container.appendChild(childRow);
+    });
+    row.insertAdjacentElement('afterend', container);
     row.classList.add('is-expanded');
   },
 
@@ -1716,20 +1925,21 @@ window.WorkspacePanel = {
 
   async _openLinkedFile(filePath, fileName) {
     try {
-      const res = await fetch('/workspace/linked-folder/file?path=' + encodeURIComponent(filePath));
+      const res = await fetch('/workspace/linked-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: filePath, name: fileName })
+      });
       const data = await res.json();
-      if (!data.ok) return;
-      const fileId = 'linked_' + Date.now();
-      const ts = new Date().toISOString();
-      if (!this.workspace.files) this.workspace.files = {};
-      this.workspace.files[fileId] = {
-        id: fileId, title: fileName, html: data.content,
-        linked_path: filePath, created_at: ts, updated_at: ts
-      };
-      this.currentFileId = fileId;
-      if (this.anchor) this.anchor.currentFileId = fileId;
-      this.applyFile(this.workspace.files[fileId]);
-    } catch (e) { console.error('[WorkspacePanel] failed to open linked file:', e); }
+      if (!data.ok) throw new Error(data.error || 'Failed to open linked file');
+      this.workspace = data.workspace;
+      this.currentFileId = data.file.id;
+      if (this.anchor) this.anchor.currentFileId = this.currentFileId;
+      this.renderTree();
+      this.applyFile(data.file);
+    } catch (e) {
+      this.anchor?.toast('Failed to open linked file: ' + (e.message || 'Unknown error'));
+    }
   },
 
   async linkFolderInteractive() {
@@ -1782,22 +1992,53 @@ window.WorkspacePanel = {
   async createFileInteractive() {
     const name = prompt('File name', 'Untitled');
     if (!name) return;
-    const file = await this.createFileFromPrompt(name);
-    this.applyFile(file);
+    try {
+      const file = await this.createFileFromPrompt(name);
+      this.applyFile(file);
+    } catch (e) {
+      this.anchor?.toast('Failed to create file: ' + (e.message || 'Unknown error'));
+    }
+  },
+
+  async createTradingFileInteractive() {
+    const name = prompt('Trading file name', 'Trading Analysis');
+    if (!name) return;
+    try {
+      const res = await fetch('/workspace/file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, domain: 'trading.private', prompt: name })
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Failed to create trading file');
+      this.workspace = data.workspace;
+      this.currentFileId = data.file.id;
+      if (this.anchor) this.anchor.currentFileId = this.currentFileId;
+      this.renderTree();
+      if (window.HistoryPanel) HistoryPanel.setFile(data.file);
+      document.getElementById('anchor-home')?.classList.add('is-hidden');
+      document.getElementById('anchor-shell')?.classList.add('has-content');
+      this.applyFile(data.file);
+    } catch (e) {
+      this.anchor?.toast('Failed to create trading file: ' + (e.message || 'Unknown error'));
+    }
   },
 
   async createFolderInteractive() {
     const name = prompt('Folder name', 'New folder');
     if (!name) return;
-    const res = await fetch('/workspace/folder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
-    });
-    const data = await res.json();
-    if (data.ok) {
+    try {
+      const res = await fetch('/workspace/folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Folder creation failed');
       this.workspace = data.workspace;
       this.renderTree();
+    } catch (e) {
+      this.anchor?.toast('Failed to create folder: ' + (e.message || 'Unknown error'));
     }
   },
 
@@ -2768,5 +3009,149 @@ window.HistoryPanel = {
 };
 
 // ────────────────────────────────────────────────────────────────────
+// Inbox Panel
+// ────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', function() { Anchor.init(); });
+const InboxPanel = {
+  _panel: null,
+  _list: null,
+  _activeDomain: '',
+  _items: [],
+
+  init() {
+    this._panel = document.getElementById('anchor-inbox-panel');
+    this._list  = document.getElementById('inbox-list');
+    if (!this._panel) return;
+
+    // tab clicks
+    document.getElementById('inbox-domain-tabs').addEventListener('click', (e) => {
+      const tab = e.target.closest('.inbox-tab');
+      if (!tab) return;
+      document.querySelectorAll('.inbox-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      this._activeDomain = tab.dataset.domain || '';
+      this._renderList();
+    });
+
+    // read-all
+    this._panel.querySelector('.inbox-read-all').addEventListener('click', () => {
+      fetch('/inbox/read-all', { method: 'POST' }).then(() => {
+        this._items.forEach(it => { it.read = true; });
+        this._renderList();
+        this.applyServerCounts({ market: 0, position: 0, target: 0, sentiment: 0, total: 0 });
+      }).catch(() => {});
+    });
+
+    // item click → mark read + open domain
+    this._list.addEventListener('click', (e) => {
+      const item = e.target.closest('.inbox-item');
+      if (!item) return;
+      const id = item.dataset.id;
+      const domain = item.dataset.domain;
+      fetch('/inbox/' + id + '/read', { method: 'POST' }).catch(() => {});
+      const found = this._items.find(it => it.id === id);
+      if (found) { found.read = true; this._renderList(); }
+      if (domain) _openDomain(domain);
+    });
+
+    this._fetchCounts();
+    this._fetchItems();
+  },
+
+  applyServerCounts(counts) {
+    const total = counts.total || 0;
+    const badge = document.getElementById('inbox-trigger-badge');
+    if (badge) {
+      badge.textContent = total;
+      badge.hidden = total === 0;
+    }
+    ['market', 'position', 'target', 'sentiment'].forEach(d => {
+      const el = document.getElementById('itab-' + d);
+      if (el) {
+        const n = counts[d] || 0;
+        el.textContent = n > 0 ? n : '';
+      }
+      const domBadge = document.getElementById('badge-' + d);
+      if (domBadge) {
+        const n = counts[d] || 0;
+        domBadge.textContent = n;
+        domBadge.hidden = n === 0;
+      }
+    });
+    if (total > 0) this._fetchItems();
+  },
+
+  _fetchCounts() {
+    fetch('/inbox/counts').then(r => r.json()).then(counts => {
+      this.applyServerCounts(counts);
+    }).catch(() => {});
+  },
+
+  _fetchItems() {
+    const url = this._activeDomain ? '/inbox?domain=' + this._activeDomain : '/inbox';
+    fetch(url).then(r => r.json()).then(data => {
+      this._items = data.items || data || [];
+      this._renderList();
+    }).catch(() => {});
+  },
+
+  _renderList() {
+    if (!this._list) return;
+    const filtered = this._activeDomain
+      ? this._items.filter(it => it.domain === this._activeDomain)
+      : this._items;
+
+    if (filtered.length === 0) {
+      this._list.innerHTML = '<div class="inbox-empty">暂无消息</div>';
+      return;
+    }
+
+    this._list.innerHTML = filtered.map(it => {
+      const readCls = it.read ? 'inbox-item--read' : 'inbox-item--unread';
+      const time = it.ts ? new Date(it.ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
+      return `<div class="inbox-item ${readCls}" data-id="${_escHtml(it.id)}" data-domain="${_escHtml(it.domain || '')}">
+        <div class="inbox-item-header">
+          <span class="inbox-item-dot"></span>
+          <span class="inbox-item-title">${_escHtml(it.title)}</span>
+          <span class="inbox-item-time">${time}</span>
+        </div>
+        ${it.summary ? `<div class="inbox-item-summary">${_escHtml(it.summary)}</div>` : ''}
+        <div class="inbox-item-source">${_escHtml(it.source || '')}</div>
+      </div>`;
+    }).join('');
+  }
+};
+
+// ────────────────────────────────────────────────────────────────────
+// Domain card wiring
+// ────────────────────────────────────────────────────────────────────
+
+function _initDomainCards() {
+  document.querySelectorAll('.home-domain-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const domain = card.dataset.domain;
+      if (domain) _openDomain(domain);
+    });
+  });
+}
+
+function _openDomain(domain) {
+  // Server broadcasts HTML via WebSocket; we just trigger the endpoint
+  fetch('/workspace/domain/' + encodeURIComponent(domain)).catch(() => {});
+}
+
+function _escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ────────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', function() {
+  Anchor.init();
+  InboxPanel.init();
+  _initDomainCards();
+});

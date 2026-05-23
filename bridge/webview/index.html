@@ -10,7 +10,7 @@
 </head>
 <body>
 
-<!-- Animated glass background -->
+<!-- Ambient workspace background -->
 <div class="refraction-bg">
   <div class="blob blob1"></div>
   <div class="blob blob2"></div>
@@ -23,6 +23,12 @@
 <header id="anchor-toolbar">
   <img class="toolbar-logo" src="assets/logo-mark.svg" alt="Bloom" width="32" height="32">
   <span class="toolbar-brand">Loom</span>
+  <nav class="toolbar-domain-tabs" id="toolbar-domain-tabs" aria-label="Domain navigation">
+    <button class="domain-tab" data-domain="market" title="市场情报">📊<span>市场</span></button>
+    <button class="domain-tab" data-domain="position" title="仓位管理">💼<span>仓位</span></button>
+    <button class="domain-tab" data-domain="target" title="标的跟踪">🎯<span>标的</span></button>
+    <button class="domain-tab" data-domain="sentiment" title="市场情绪">🌡️<span>情绪</span></button>
+  </nav>
   <span class="toolbar-status" id="status">connecting...</span>
   <span class="toolbar-processing" id="processing" style="display:none">
     <span class="processing-dot"></span>
@@ -37,13 +43,34 @@
 
 <section id="anchor-home" class="anchor-home">
   <div class="home-inner">
-    <div class="home-kicker">Loom · AI Workspace</div>
-    <h1>Think it. Live it.</h1>
+    <div class="home-kicker">Loom · AI-Native Workspace</div>
+    <h1>Think it.<span>Live it.</span></h1>
+    <p class="home-tagline">Turn a rough idea into a working canvas. Reports, dashboards, prototypes, and agent-native workflows all begin here.</p>
     <div class="home-prompt">
       <i class="ph-bold ph-magnifying-glass"></i>
       <input id="anchor-prompt-input" class="anchor-prompt-input home-prompt-input" type="text" placeholder="Describe a dashboard, report, app page, or research canvas...">
       <button id="anchor-prompt-submit" class="btn btn--brand home-prompt-submit" type="button">
         <i class="ph-bold ph-arrow-right"></i>
+      </button>
+    </div>
+    <div class="home-domain-grid" aria-label="Domain entries">
+      <button class="home-domain-card" type="button" data-domain="market">
+        <span class="domain-card-icon">📊</span>
+        <span class="domain-card-badge" id="badge-market" hidden>0</span>
+        <span class="domain-card-title">市场情报</span>
+        <span class="domain-card-meta" id="meta-market">Market Intelligence</span>
+      </button>
+      <button class="home-domain-card" type="button" data-domain="position">
+        <span class="domain-card-icon">💼</span>
+        <span class="domain-card-badge" id="badge-position" hidden>0</span>
+        <span class="domain-card-title">仓位管理</span>
+        <span class="domain-card-meta" id="meta-position">Position Management</span>
+      </button>
+      <button class="home-domain-card" type="button" data-domain="target">
+        <span class="domain-card-icon">🎯</span>
+        <span class="domain-card-badge" id="badge-target" hidden>0</span>
+        <span class="domain-card-title">标的跟踪</span>
+        <span class="domain-card-meta" id="meta-target">Target Tracking</span>
       </button>
     </div>
   </div>
@@ -57,6 +84,7 @@
       <button id="workspace-link-folder" class="workspace-icon-btn" type="button" title="Link local folder"><i class="ph-bold ph-link"></i></button>
       <button id="workspace-new-folder" class="workspace-icon-btn" type="button" title="New folder"><i class="ph-bold ph-folder-plus"></i></button>
       <button id="workspace-new-file" class="workspace-icon-btn" type="button" title="New file"><i class="ph-bold ph-file-plus"></i></button>
+      <button id="workspace-new-trading-file" class="workspace-icon-btn workspace-icon-btn--trading" type="button" title="New trading file"><i class="ph-bold ph-chart-line-up"></i></button>
     </div>
   </div>
   <div id="workspace-tree" class="workspace-tree"></div>
@@ -64,10 +92,14 @@
 
 <!-- Floating trigger tabs (right edge, stacked) -->
 <div class="anc-panel-trigger" id="trigger-context" title="Context">
-  ● Context
+  <i class="ph-bold ph-stack"></i><span>Context</span>
 </div>
 <div class="anc-panel-trigger" id="trigger-timeline" title="Timeline">
-  ● Timeline
+  <i class="ph-bold ph-pulse"></i><span>Timeline</span>
+</div>
+<div class="anc-panel-trigger" id="trigger-inbox" title="Inbox">
+  <i class="ph-bold ph-tray"></i><span>Inbox</span>
+  <span class="inbox-trigger-badge" id="inbox-trigger-badge" hidden>0</span>
 </div>
 
 <!-- Context configuration panel (floating overlay, right side) -->
@@ -120,6 +152,25 @@
   </div>
 </aside>
 
+<!-- Inbox panel (floating overlay, right side) -->
+<aside id="anchor-inbox-panel" class="anc-side-panel collapsed">
+  <div class="side-panel-header">
+    <span class="side-panel-title">Inbox</span>
+    <button class="inbox-read-all btn btn--sm btn--ghost" type="button">全部已读</button>
+    <button class="side-panel-toggle" data-target="anchor-inbox-panel">×</button>
+  </div>
+  <div class="side-panel-body">
+    <div id="inbox-domain-tabs" class="inbox-tabs">
+      <button class="inbox-tab active" data-domain="">全部</button>
+      <button class="inbox-tab" data-domain="market">市场 <span class="inbox-tab-badge" id="itab-market"></span></button>
+      <button class="inbox-tab" data-domain="position">仓位 <span class="inbox-tab-badge" id="itab-position"></span></button>
+      <button class="inbox-tab" data-domain="target">标的 <span class="inbox-tab-badge" id="itab-target"></span></button>
+      <button class="inbox-tab" data-domain="sentiment">情绪 <span class="inbox-tab-badge" id="itab-sentiment"></span></button>
+    </div>
+    <div id="inbox-list" class="inbox-list"></div>
+  </div>
+</aside>
+
 <div id="anchor-shell">
 
   <!-- Center: rendered anchor content -->
@@ -131,10 +182,10 @@
 
 <!-- Phase 3 — Floating selection toolbar (positioned dynamically) -->
 <div id="anchor-floating-toolbar" class="anc-floating-toolbar hidden">
-  <button class="btn btn--sm" data-op="refine">✦ Refine</button>
-  <button class="btn btn--sm" data-op="annotate">✎ Annotate</button>
-  <button class="btn btn--sm" data-op="branch">⑂ Branch</button>
-  <button class="btn btn--sm" data-op="ask">? Ask</button>
+  <button class="btn btn--sm" data-op="refine"><i class="ph-bold ph-sparkle"></i> Refine</button>
+  <button class="btn btn--sm" data-op="annotate"><i class="ph-bold ph-note-pencil"></i> Annotate</button>
+  <button class="btn btn--sm" data-op="branch"><i class="ph-bold ph-git-branch"></i> Branch</button>
+  <button class="btn btn--sm" data-op="ask"><i class="ph-bold ph-question"></i> Ask</button>
 </div>
 
 <script src="anchor-client.js"></script>
@@ -142,7 +193,7 @@
 <!-- Global Execute All button -->
 <div id="anchor-execute-all" class="hidden">
   <button class="btn btn--brand execute-all-btn">
-    <span class="execute-icon">▶</span>
+    <span class="execute-icon"><i class="ph-bold ph-play"></i></span>
     <span class="execute-label">Execute All</span>
   </button>
   <span class="execute-badge">0</span>

@@ -506,6 +506,15 @@ app.get('/inbox/counts', (req, res) => {
   res.json({ ok: true, counts: inbox.unreadCounts() });
 });
 
+app.get('/api/inbox/:domain', (req, res) => {
+  const domain = req.params.domain;
+  if (!inbox.DOMAINS.includes(domain)) {
+    return res.status(400).json({ error: 'unknown domain', domains: inbox.DOMAINS });
+  }
+  const items = inbox.list({ domain });
+  res.json({ ok: true, domain, items, meta: inbox.unreadCounts() });
+});
+
 app.post('/inbox/read-all', (req, res) => {
   inbox.markAllRead(req.body?.domain || null);
   broadcastBrowserMessage({ type: 'inbox_updated', counts: inbox.unreadCounts() });
