@@ -259,12 +259,10 @@ const Anchor = {
     // Floating trigger tabs — click to expand, mouseleave to collapse
     this._initFloatingTrigger('trigger-context', 'anchor-context-panel');
     this._initFloatingTrigger('trigger-timeline', 'anchor-timeline-panel');
-    this._initFloatingTrigger('trigger-inbox', 'anchor-inbox-panel');
 
     // Resize handles
     this._initPanelResize('anchor-context-panel');
     this._initPanelResize('anchor-timeline-panel');
-    this._initPanelResize('anchor-inbox-panel');
   },
 
   _initFloatingTrigger(triggerId, panelId) {

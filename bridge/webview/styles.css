@@ -1399,6 +1399,28 @@ tr:hover td { background: rgba(122,90,248,0.04); }
   bottom: 20px;
 }
 
+/* Inbox panel — below timeline, shares right-edge column */
+#anchor-inbox-panel {
+  position: fixed;
+  right: 12px;
+  z-index: 1998;
+  width: 330px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 100px);
+  border-radius: 22px;
+  box-shadow: 0 24px 76px -42px rgba(20,21,43,0.50);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), opacity 0.3s ease;
+  opacity: 1;
+  border: none;
+  top: calc(70px + 46vh + 24px + 390px + 16px);
+  bottom: 20px;
+}
+
 /* ── Resize handle (left edge of each panel) ── */
 .panel-resize-handle {
   position: absolute;
