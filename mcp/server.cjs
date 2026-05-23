@@ -42,6 +42,17 @@ const express = require(path.join(BRIDGE_NM, 'express'));
 const wsLib   = require(path.join(BRIDGE_NM, 'ws'));
 const { WebSocketServer } = wsLib;
 
+// Trading domain extension (lazy init — see bootstrap below)
+const tradingEvents = require('../trading/trading-events.cjs');
+const tradingRoutes = require('../trading/trading-routes.cjs');
+const tradingPolicyGate = require('../trading/policy-gate.cjs');
+const tradingCanvasRenderer = require('../trading/trading-canvas-renderer.cjs');
+
+const inbox              = require('./inbox.cjs');
+const { PushBroker }     = require('./push-broker.cjs');
+const scheduler          = require('./scheduler.cjs');
+const connectorRegistry  = require('./connectors/index.cjs');
+
 [OUTPUT_DIR, PROMPTS_DIR, LOGS_DIR, RUNTIME_DIR, WORKSPACE_DIR, SESSIONS_DIR].forEach(d => {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 });
@@ -64,6 +75,8 @@ const SERVER_BOOT_MS = Date.now();
 const LOOP_BOOT_GRACE_MS = 5000;
 const processRegistry = new Map();
 const managedChildren = new Map();
+
+let pushBroker = null;
 
 let currentSession = null;
 let lastUserIntentId = null;
@@ -481,6 +494,130 @@ app.post('/patch', (req, res) => {
   res.json({ ok: true, cascade_warnings: missed.length });
 });
 
+// ── Inbox routes ─────────────────────────────────────────────────────
+
+app.get('/inbox', (req, res) => {
+  const { domain, unread } = req.query;
+  res.json({ ok: true, items: inbox.list({ domain, unread: unread === 'true' }) });
+});
+
+app.get('/inbox/counts', (req, res) => {
+  res.json({ ok: true, counts: inbox.unreadCounts() });
+});
+
+app.post('/inbox/read-all', (req, res) => {
+  inbox.markAllRead(req.body?.domain || null);
+  broadcastBrowserMessage({ type: 'inbox_updated', counts: inbox.unreadCounts() });
+  res.json({ ok: true });
+});
+
+app.post('/inbox/:id/read', (req, res) => {
+  const ok = inbox.markRead(req.params.id);
+  if (ok) broadcastBrowserMessage({ type: 'inbox_updated', counts: inbox.unreadCounts() });
+  res.json({ ok });
+});
+
+app.post('/push/manual', (req, res) => {
+  const event = req.body;
+  if (!event || !event.domain || !event.title) {
+    return res.status(400).json({ error: 'domain and title required' });
+  }
+  const item = pushBroker.push({ ...event, source: event.source || 'manual' });
+  res.json({ ok: true, item });
+});
+
+// ── Schedule routes ───────────────────────────────────────────────────
+
+app.get('/schedules', (req, res) => {
+  res.json({ ok: true, schedules: scheduler.list() });
+});
+
+app.post('/schedules', (req, res) => {
+  try {
+    const spec = scheduler.add(req.body || {});
+    res.json({ ok: true, spec });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
+app.delete('/schedules/:id', (req, res) => {
+  scheduler.remove(req.params.id);
+  res.json({ ok: true });
+});
+
+// ── Domain workspace page ─────────────────────────────────────────────
+
+const DOMAIN_META = {
+  market:   { icon: '📊', label: '市场情报', color: 'aurora' },
+  position: { icon: '💼', label: '仓位管理', color: 'cool'   },
+  target:   { icon: '🎯', label: '标的跟踪', color: 'warm'   }
+};
+
+function buildDomainStubHtml(domain) {
+  const meta  = DOMAIN_META[domain] || { icon: '📄', label: domain, color: 'arctic' };
+  const items = inbox.list({ domain });
+  const itemsHtml = items.length === 0
+    ? `<p style="color:var(--fg-3);text-align:center;padding:40px 0;">暂无推送内容 · 等待 Agent 推送或手动触发</p>`
+    : items.map(item => `
+      <div class="anc-section anc-section--gc" data-anc="inbox-item.${item.id}" data-handles="refine,annotate" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div>
+            <strong>${item.title}</strong>
+            <p style="margin:6px 0 0;color:var(--fg-2);font-size:14px;">${item.summary}</p>
+          </div>
+          <span style="font-size:12px;color:var(--fg-3);white-space:nowrap;">${new Date(item.timestamp).toLocaleString('zh-CN')}</span>
+        </div>
+      </div>`).join('\n');
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>${meta.label}</title></head>
+<body>
+<section class="anc-section anc-section--gc anc-section--${meta.color}" data-anc="${domain}.header" data-handles="refine,restructure">
+  <h2>${meta.icon} ${meta.label}</h2>
+  <p>共 <strong>${items.length}</strong> 条推送 · 点击任意条目进行 AI 精炼</p>
+</section>
+<section class="anc-section anc-section--gc" data-anc="${domain}.feed" data-handles="refine,restructure">
+  <h3>推送流</h3>
+  ${itemsHtml}
+</section>
+</body>
+</html>`;
+}
+
+app.get('/workspace/domain/:domain', (req, res) => {
+  const domain = req.params.domain;
+  if (!DOMAIN_META[domain]) return res.status(400).json({ error: 'unknown domain' });
+  const ws   = ensureWorkspace();
+  const meta = DOMAIN_META[domain];
+
+  let file = Object.values(ws.files).find(f => f.domain === domain);
+  const html = buildDomainStubHtml(domain);
+
+  if (!file) {
+    const id = 'domain-' + domain + '-' + Date.now();
+    const ts = new Date().toISOString();
+    const node = { id, name: meta.label, type: 'file', domain, created_at: ts, updated_at: ts };
+    file = { id, title: meta.label, domain, html, history: [], context: {}, prompt: '', created_at: ts, updated_at: ts };
+    ws.nodes.unshift(node);
+    ws.files[id] = file;
+  } else {
+    file.html = html;
+    file.updated_at = new Date().toISOString();
+  }
+
+  ws.current_file_id = file.id;
+  currentHtml = html;
+  try { fs.writeFileSync(CURRENT_HTML, html, 'utf8'); } catch {}
+  saveWorkspace(ws);
+  broadcastBrowserMessage({ type: 'workspace_current', file });
+  broadcast(html);
+  res.json({ ok: true, fileId: file.id });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+
 app.get('/health', (req, res) => res.json({
   ok: true, port: PORT,
   shutting_down: shuttingDown,
@@ -662,6 +799,35 @@ app.get('/workspace/linked-folder/file', (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to read file: ' + e.message }); }
 });
 
+app.post('/workspace/linked-file', (req, res) => {
+  const ws = ensureWorkspace();
+  const filePath = req.body?.path;
+  const fileName = req.body?.name || (filePath ? path.basename(filePath) : 'linked-file');
+  if (!filePath) return res.status(400).json({ error: 'path required' });
+  const resolved = path.resolve(filePath);
+  if (!isPathSafe(resolved)) return res.status(403).json({ error: 'Path is not allowed' });
+  try {
+    if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'File not found' });
+    const content = fs.readFileSync(resolved, 'utf8');
+    const ts = nowIso();
+    const fileId = createId('linked-file', fileName);
+    const node = {
+      id: fileId, type: 'file', parent_id: req.body?.parent_id || 'folder_root',
+      name: fileName, linked_path: resolved, created_at: ts, updated_at: ts
+    };
+    const file = {
+      id: fileId, title: fileName, html: content, linked_path: resolved,
+      history: [], context: { memory_ids: [], skill_ids: [], subagent_ids: [], resource_ids: [], subagent_id: null, context_mode: null },
+      created_at: ts, updated_at: ts
+    };
+    ws.nodes.push(node);
+    ws.files[fileId] = file;
+    ws.current_file_id = fileId;
+    saveWorkspace(ws);
+    res.json({ ok: true, node, file, workspace: ws });
+  } catch (e) { res.status(500).json({ error: 'Failed to register linked file: ' + e.message }); }
+});
+
 app.post('/workspace/file', (req, res) => {
   const ws = ensureWorkspace();
   const title = String(req.body?.name || req.body?.title || 'Untitled').trim() || 'Untitled';
@@ -670,22 +836,35 @@ app.post('/workspace/file', (req, res) => {
   const id = createId('file', title);
   const html = String(req.body?.html || '');
   const node = { id, type: 'file', parent_id: parentId, name: title, created_at: ts, updated_at: ts };
+  var context = req.body?.context || { memory_ids: [], skill_ids: [], subagent_ids: [], resource_ids: [], subagent_id: null, context_mode: null };
+  var isTrading = req.body?.domain === 'trading.private';
+  var effectiveHtml = html;
+  if (isTrading) {
+    context.domain = 'trading.private';
+    context.trading_session_id = tradingEvents.initTradingSession(id, currentSession?.id);
+    if (!effectiveHtml) {
+      effectiveHtml = tradingCanvasRenderer.generateTradingCanvasHTML({
+        trading_session_id: context.trading_session_id,
+        title: title
+      });
+    }
+  }
   const file = {
     id,
     title,
     prompt: String(req.body?.prompt || ''),
-    html,
+    html: effectiveHtml,
     history: [],
-    context: req.body?.context || { memory_ids: [], skill_ids: [], subagent_ids: [], resource_ids: [], subagent_id: null, context_mode: null },
+    context: context,
     created_at: ts,
     updated_at: ts
   };
   ws.nodes.push(node);
   ws.files[id] = file;
   ws.current_file_id = id;
-  if (html) {
-    currentHtml = html;
-    try { fs.writeFileSync(CURRENT_HTML, html, 'utf8'); } catch {}
+  if (effectiveHtml) {
+    currentHtml = effectiveHtml;
+    try { fs.writeFileSync(CURRENT_HTML, effectiveHtml, 'utf8'); } catch {}
   }
   saveWorkspace(ws);
   const filePath = path.join(TARGET_PATH, title + '.html');
@@ -979,6 +1158,25 @@ wssBrowser.on('connection', (ws) => {
         }
         const eid = recordEvent('user.intent', msg.envelope);
         lastUserIntentId = eid;
+
+        // Trading domain extension — record trading-specific events
+        if (msg.envelope.domain && msg.envelope.domain.namespace === 'trading.private') {
+          try {
+            const tKind = 'trading.' + String(msg.envelope.domain.action || 'unknown').toLowerCase();
+            tradingEvents.recordTradingEvent(tKind, {
+              trading_session_id: msg.envelope.domain.trading_session_id,
+              workspace_file_id: msg.envelope.context_bundle?.file_id || null,
+              actor: 'human',
+              visibility: 'private',
+              envelope: msg.envelope,
+              domain_action: msg.envelope.domain.action,
+              claim_id: msg.envelope.domain.claim_id || null,
+              finding_id: msg.envelope.domain.finding_id || null
+            });
+          } catch (e) {
+            log('trading event recording failed: ' + e.message);
+          }
+        }
         wsTrace('recv', 'browser', 'envelope', {
           op: msg.envelope?.intent?.op,
           target: msg.envelope?.intent?.target_ref,
@@ -1733,6 +1931,12 @@ function formatOpAsPrompt(op) {
   return `## Anchor User Action\n\n**Operation**: \`${op.op}\`\n**Target**: \`${op.target}\`${sel}\n**Instruction**: ${instruction}\n\n### Current HTML\n\`\`\`html\n${currentHtml}\n\`\`\`\n\n### Instructions\n\n1. Generate the modified HTML fragment for \`${op.target}\`.\n2. Call \`anchor_patch({patches:[{anchor_id:"${op.target}",html_fragment:"<new complete outerHTML>"}]})\`.\n3. Call \`anchor_await_op()\` to wait for the next user action.\n`;
 }
 
+// ── Push infrastructure init ──────────────────────────────────────────
+inbox.load();
+pushBroker = new PushBroker({ inbox, pendingOps, notifyPendingChanged, broadcastBrowserMessage });
+scheduler.init(pushBroker);
+connectorRegistry.loadAll(pushBroker, scheduler);
+
 // ── File watcher ──────────────────────────────────────────────────────
 
 function watchHtmlFile() {
@@ -1932,6 +2136,7 @@ const SCHEMA_STUB = {
   required: ['intent', 'provenance', 'schema_version'],
   properties: {
     schema_version: { const: '1.0' },
+    domain: { type: ['object', 'null'] },
     intent: {
       type: 'object',
       required: ['op', 'target_kind'],
@@ -2248,6 +2453,22 @@ httpServer.listen(PORT, () => {
   log(`  Agent WS   : ws://localhost:${PORT}/ws/agent`);
   initSession();
   loadEnvelopeSchema();
+
+  // Trading domain extension — initialize with DI
+  tradingEvents.initialize({
+    recordEvent: recordEvent,
+    generateEventId: generateEventId,
+    createId: createId,
+    nowIso: nowIso,
+    get currentSession() { return currentSession; }
+  });
+  tradingRoutes.mountTradingRoutes(app, {
+    tradingEvents: tradingEvents,
+    policyGate: tradingPolicyGate,
+    recordEvent: recordEvent,
+    get currentSession() { return currentSession; }
+  });
+
   recoverPendingFallback();
   maybeAutoOpenBrowser();
   watchHtmlFile();
