@@ -63,20 +63,131 @@ const Anchor = {
   _initHashRouting() {
     window.addEventListener('hashchange', () => this._handleHashChange());
     const hash = window.location.hash.slice(1);
-    if (hash && ['market','position','target','sentiment'].includes(hash)) {
-      this._loadBlogDomain(hash);
-    }
+    if (!hash || hash === 'overview') { this._loadOverview(); }
+    else if (['market','position','target','sentiment'].includes(hash)) { this._loadBlogDomain(hash); }
   },
 
   _handleHashChange() {
     const hash = window.location.hash.slice(1);
-    if (['market','position','target','sentiment'].includes(hash)) {
-      this._loadBlogDomain(hash);
-    } else if (!hash) {
+    if (!hash || hash === 'overview') { this._loadOverview(); }
+    else if (['market','position','target','sentiment'].includes(hash)) { this._loadBlogDomain(hash); }
+    else {
       this.currentHtml = '';
       this.container.innerHTML = '';
       this._syncHomeVisibility();
     }
+  },
+
+  async _loadOverview() {
+    window.location.hash = 'overview';
+    try {
+      const [mRes, tRes, sRes] = await Promise.all([
+        fetch('/api/inbox/market').then(r => r.json()),
+        fetch('/api/inbox/target').then(r => r.json()),
+        fetch('/api/inbox/sentiment').then(r => r.json())
+      ]);
+      this._renderOverview({
+        market: mRes.items || [],
+        target: tRes.items || [],
+        sentiment: sRes.items || [],
+        counts: { ...(mRes.meta||{}), ...(tRes.meta||{}), ...(sRes.meta||{}) }
+      });
+      this._syncHomeVisibility();
+      this._updateToolbarTabs('overview');
+    } catch (e) { console.error('[_loadOverview]', e); }
+  },
+
+  _renderOverview(data) {
+    const sourceTag = (src) => {
+      if (!src) return '';
+      if (src.startsWith('feed:')) src = src.slice(5);
+      return '<span class="blog-source-tag">' + _escHtml(src.split(':')[0].split('-').map(w => w[0] ? w[0].toUpperCase() : '').join('')) + '</span>';
+    };
+    const timeAgo = (ts) => {
+      if (!ts) return '';
+      const diff = Date.now() - new Date(ts).getTime();
+      if (diff < 60000) return '刚刚';
+      if (diff < 3600000) return Math.floor(diff/60000)+'m前';
+      if (diff < 86400000) return Math.floor(diff/3600000)+'h前';
+      return new Date(ts).toLocaleDateString('zh-CN',{month:'short',day:'numeric'});
+    };
+
+    const card = (id, color, icon, title, summary, source, ts, url, tags) =>
+      `<section class="anc-section anc-section--gc anc-section--${color}" data-anc="overview.card.${_escHtml(id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
+        <div class="blog-card-header">
+          <span class="blog-card-icon">${icon}</span>
+          <div>
+            <div class="blog-card-title" data-anc="overview.card.title" data-handles="edit,refine">${_escHtml(title)}</div>
+            <div class="blog-card-meta">${sourceTag(source)} · ${timeAgo(ts)}</div>
+          </div>
+        </div>
+        <p class="blog-card-summary" data-anc="overview.card.summary" data-handles="shorten,longer,edit,refine">${_escHtml(summary||'')}</p>
+        ${url ? '<a class="blog-card-link" href="'+_escHtml(url)+'" target="_blank" rel="noopener">查看原文 ↗</a>' : ''}
+        ${tags ? '<div class="blog-card-tags">'+tags.map(t=>'<span class="blog-ticker-tag">'+_escHtml(t)+'</span>').join('')+'</div>' : ''}
+      </section>`;
+
+    // Market highlights: filings + macro + news
+    const mFilings = data.market.filter(i => i.payload?.kind==='filing').slice(0,2);
+    const mNews    = data.market.filter(i => ['news','macro','commentary'].includes(i.payload?.kind)).slice(0,2);
+    const mAnalyst = data.market.filter(i => ['price_alert','analyst'].includes(i.payload?.kind)).slice(0,2);
+
+    // Target highlights
+    const tTop = data.target.slice(0,2);
+
+    // Sentiment highlights
+    const sFear = data.sentiment.filter(i => i.source?.includes('fear-greed')).slice(0,1);
+    const stTop = data.sentiment.filter(i => i.source?.includes('stocktwits')).slice(0,1);
+    const rTop  = data.sentiment.filter(i => i.source?.includes('reddit')).slice(0,1);
+
+    const total = (data.market.length + data.target.length + data.sentiment.length);
+
+    const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>市场总览</title></head>
+<body>
+<div class="blog-page blog-page--overview">
+  <header class="blog-header anc-section anc-section--gc anc-section--aurora" data-anc="overview.header" data-handles="refine,restructure">
+    <div class="blog-header-inner">
+      <span class="blog-domain-icon">📊</span>
+      <div>
+        <h1 class="blog-domain-title" data-anc="overview.title" data-handles="edit,refine">市场总览</h1>
+        <p class="blog-domain-count" data-anc="overview.count" data-handles="edit,refine">市场 <strong>${data.market.length}</strong> · 标的 <strong>${data.target.length}</strong> · 情绪 <strong>${data.sentiment.length}</strong> · 共 <strong>${total}</strong> 条</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="blog-content">
+    <div class="blog-section-label">📋 重要文件 & 宏观</div>
+    <div class="blog-card-grid">
+      ${mFilings.map(it => card(it.id, 'aurora', '📄', it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
+      ${mNews.map(it => card(it.id, 'arctic', it.payload?.kind==='macro'?'📈':'📰', it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
+      ${mAnalyst.map(it => card(it.id, 'warm', '🎯', it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
+      ${(mFilings.length+mNews.length+mAnalyst.length)===0?'<div class="blog-empty-row">暂无市场数据</div>':''}
+    </div>
+
+    <div class="blog-section-label">🎯 热门标的</div>
+    <div class="blog-card-grid">
+      ${tTop.map(it => card(it.id, 'warm', '🎯', it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
+      ${tTop.length===0?'<div class="blog-empty-row">暂无标的数据</div>':''}
+    </div>
+
+    <div class="blog-section-label">🌡️ 市场情绪</div>
+    <div class="blog-card-grid">
+      ${sFear.map(it => card(it.id, 'flame', '🌡️', it.title, it.summary, 'fear-greed', it.timestamp, null, null)).join('')}
+      ${stTop.map(it => card(it.id, 'cool', it.payload?.bull_ratio>0.5?'🟢':'🔴', it.title, it.summary, 'stocktwits', it.timestamp, null, null)).join('')}
+      ${rTop.map(it => card(it.id, 'aurora', '💬', it.title, it.summary, it.source, it.timestamp, null, it.payload?.tickers)).join('')}
+      ${(sFear.length+stTop.length+rTop.length)===0?'<div class="blog-empty-row">暂无情绪数据</div>':''}
+    </div>
+  </main>
+</div>
+</body>
+</html>`;
+
+    this.currentHtml = html;
+    this.container.innerHTML = '';
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    document.getElementById('anchor-content').appendChild(template.content.cloneNode(true));
   },
 
   async _loadBlogDomain(domain) {
