@@ -105,24 +105,197 @@ const Anchor = {
     const sourceTag = (src) => {
       if (!src) return '';
       if (src.startsWith('feed:')) src = src.slice(5);
-      const short = src.split(':')[0].split('-').map(w => w[0] && w[0].toUpperCase()).join('');
+      const parts = src.split(':');
+      const short = parts[0].split('-').map(w => w[0] ? w[0].toUpperCase() : '').join('');
       return '<span class="blog-source-tag">' + _escHtml(short) + '</span>';
     };
 
-    const itemsHtml = items.length === 0
-      ? '<div class="blog-empty">暂无推送内容 · 等待 Connector 拉取数据</div>'
-      : items.map(it => {
-        const time = it.ts ? new Date(it.ts).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
-        return `<article class="blog-item" data-id="${_escHtml(it.id)}">
-          <div class="blog-item-meta">
-            ${sourceTag(it.source)}
-            <span class="blog-item-time">${time}</span>
+    const timeAgo = (ts) => {
+      if (!ts) return '';
+      const d = new Date(ts);
+      const now = Date.now();
+      const diff = now - d.getTime();
+      if (diff < 60000) return '刚刚';
+      if (diff < 3600000) return Math.floor(diff/60000)+'m前';
+      if (diff < 86400000) return Math.floor(diff/3600000)+'h前';
+      return d.toLocaleDateString('zh-CN', { month:'short', day:'numeric' });
+    };
+
+    // ── Domain-specific card builders ──────────────────────────────
+    const renderMarketCards = (items) => {
+      const filings = items.filter(i => i.payload?.kind === 'filing');
+      const macros  = items.filter(i => i.payload?.kind === 'macro');
+      const news    = items.filter(i => i.payload?.kind === 'news' || i.payload?.kind === 'commentary');
+      const alerts  = items.filter(i => i.payload?.kind === 'price_alert' || i.payload?.kind === 'analyst');
+
+      return `
+      <div class="blog-section-label">📋 重要文件</div>
+      <div class="blog-card-grid">${filings.slice(0,3).map(it => `
+        <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-id="${_escHtml(it.id)}">
+          <div class="blog-card-header">
+            <span class="blog-card-icon">📄</span>
+            <div>
+              <div class="blog-card-title">${_escHtml(it.title)}</div>
+              <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
+            </div>
           </div>
-          <h3 class="blog-item-title">${_escHtml(it.title)}</h3>
-          ${it.summary ? '<p class="blog-item-summary">'+_escHtml(it.summary)+'</p>' : ''}
-          ${it.payload?.url ? '<a class="blog-item-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">原文链接 ↗</a>' : ''}
-        </article>`;
-      }).join('\n');
+          <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
+          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">查看原文 ↗</a>' : ''}
+        </div>`).join('')}${filings.length === 0 ? '<div class="blog-empty-row">暂无 SEC 文件</div>' : ''}</div>
+
+      <div class="blog-section-label">📰 宏观 & 新闻</div>
+      <div class="blog-card-grid">${macros.slice(0,2).concat(news.slice(0,2)).map(it => `
+        <div class="anc-section anc-section--gc anc-section--arctic blog-card" data-id="${_escHtml(it.id)}">
+          <div class="blog-card-header">
+            <span class="blog-card-icon">${it.payload?.kind === 'macro' ? '📈' : '📰'}</span>
+            <div>
+              <div class="blog-card-title">${_escHtml(it.title)}</div>
+              <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
+            </div>
+          </div>
+          <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
+          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">查看原文 ↗</a>' : ''}
+        </div>`).join('')}${(macros.length + news.length) === 0 ? '<div class="blog-empty-row">暂无新闻</div>' : ''}</div>
+
+      <div class="blog-section-label">🎯 分析师观点</div>
+      <div class="blog-card-grid">${alerts.slice(0,3).map(it => `
+        <div class="anc-section anc-section--gc anc-section--warm blog-card" data-id="${_escHtml(it.id)}">
+          <div class="blog-card-header">
+            <span class="blog-card-icon">🎯</span>
+            <div>
+              <div class="blog-card-title">${_escHtml(it.title)}</div>
+              <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
+            </div>
+          </div>
+          <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
+          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">查看原文 ↗</a>' : ''}
+        </div>`).join('')}${alerts.length === 0 ? '<div class="blog-empty-row">暂无分析师更新</div>' : ''}</div>`;
+    };
+
+    const renderPositionCards = (items) => {
+      if (items.length === 0) return '<div class="blog-empty">暂无仓位记录 · 使用 #position 新增仓位</div>';
+      return '<div class="blog-card-grid">' + items.map(it => {
+        const pnl = it.payload?.pnl_pct;
+        const pnlColor = pnl > 0 ? '#16a34a' : pnl < 0 ? '#dc2626' : 'var(--fg-2)';
+        const pnlSign = pnl > 0 ? '+' : '';
+        return `
+        <div class="anc-section anc-section--gc anc-section--ocean blog-card blog-card--position" data-id="${_escHtml(it.id)}">
+          <div class="blog-card-header">
+            <span class="blog-card-icon">💼</span>
+            <div>
+              <div class="blog-card-title">${_escHtml(it.title)}</div>
+              <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
+            </div>
+          </div>
+          <div class="position-pnl" style="color:${pnlColor}">${pnlSign}${pnl}%</div>
+          <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
+          <div class="blog-card-tags">
+            ${(it.payload?.tickers || []).map(t => '<span class="blog-ticker-tag">'+_escHtml(t)+'</span>').join('')}
+          </div>
+        </div>`;
+      }).join('') + '</div>';
+    };
+
+    const renderTargetCards = (items) => {
+      if (items.length === 0) return '<div class="blog-empty">暂无标的跟踪 · 使用 #target 新增标的</div>';
+      return '<div class="blog-card-grid">' + items.map(it => `
+        <div class="anc-section anc-section--gc anc-section--warm blog-card blog-card--target" data-id="${_escHtml(it.id)}">
+          <div class="blog-card-header">
+            <span class="blog-card-icon">🎯</span>
+            <div>
+              <div class="blog-card-title">${_escHtml(it.title)}</div>
+              <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
+            </div>
+          </div>
+          <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
+          <div class="blog-card-tags">
+            ${(it.payload?.tickers || []).map(t => '<span class="blog-ticker-tag">'+_escHtml(t)+'</span>').join('')}
+          </div>
+          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">查看详情 ↗</a>' : ''}
+        </div>`).join('') + '</div>';
+    };
+
+    const renderSentimentCards = (items) => {
+      const social  = items.filter(i => i.payload?.kind === 'social');
+      const fear   = items.filter(i => i.source?.includes('fear-greed'));
+      const reddit = items.filter(i => i.source?.includes('reddit'));
+      const st     = items.filter(i => i.source?.includes('stocktwits'));
+      const aaii   = items.filter(i => i.source?.includes('aaii'));
+
+      return `
+      <div class="blog-section-label">🌡️ 市场情绪综合</div>
+      <div class="blog-card-grid">${fear.slice(0,2).map(it => `
+        <div class="anc-section anc-section--gc anc-section--flame blog-card" data-id="${_escHtml(it.id)}">
+          <div class="blog-card-header">
+            <span class="blog-card-icon">🌡️</span>
+            <div>
+              <div class="blog-card-title">${_escHtml(it.title)}</div>
+              <div class="blog-card-meta">CNN 恐慌贪婪指数 · ${timeAgo(it.timestamp)}</div>
+            </div>
+          </div>
+          <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
+        </div>`).join('')}${fear.length === 0 ? '<div class="blog-empty-row">暂无数据</div>' : ''}</div>
+
+      <div class="blog-section-label">📊 StockTwits 情绪异动</div>
+      <div class="blog-card-grid">${st.slice(0,3).map(it => `
+        <div class="anc-section anc-section--gc anc-section--cool blog-card" data-id="${_escHtml(it.id)}">
+          <div class="blog-card-header">
+            <span class="blog-card-icon">${it.payload?.bull_ratio > 0.5 ? '🟢' : '🔴'}</span>
+            <div>
+              <div class="blog-card-title">${_escHtml(it.title)}</div>
+              <div class="blog-card-meta">StockTwits · ${timeAgo(it.timestamp)}</div>
+            </div>
+          </div>
+          <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
+          <div class="sentiment-bar">
+            <div class="sentiment-bar-fill" style="width:${Math.round((it.payload?.bull_ratio||0.5)*100)}%;background:${it.payload?.bull_ratio > 0.5 ? '#16a34a' : '#dc2626'}"></div>
+          </div>
+          <div class="sentiment-bar-labels"><span>🐂 ${Math.round((it.payload?.bull_ratio||0.5)*100)}%</span><span>熊 ${Math.round((1-(it.payload?.bull_ratio||0.5))*100)}%</span></div>
+        </div>`).join('')}${st.length === 0 ? '<div class="blog-empty-row">暂无情绪异动</div>' : ''}</div>
+
+      <div class="blog-section-label">💬 社区热帖</div>
+      <div class="blog-card-grid">${reddit.slice(0,3).map(it => `
+        <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-id="${_escHtml(it.id)}">
+          <div class="blog-card-header">
+            <span class="blog-card-icon">💬</span>
+            <div>
+              <div class="blog-card-title">${_escHtml(it.title)}</div>
+              <div class="blog-card-meta">r/${_escHtml(it.payload?.subreddit||'')} · 👍 ${(it.payload?.upvotes||0).toLocaleString()} · ${timeAgo(it.timestamp)}</div>
+            </div>
+          </div>
+          <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
+          <div class="blog-card-tags">${(it.payload?.tickers||[]).map(t => '<span class="blog-ticker-tag">$'+_escHtml(t)+'</span>').join('')}</div>
+        </div>`).join('')}${reddit.length === 0 ? '<div class="blog-empty-row">暂无社区帖子</div>' : ''}</div>
+
+      <div class="blog-section-label">📋 AAII 散户调查</div>
+      <div class="blog-card-grid">${aaii.slice(0,1).map(it => `
+        <div class="anc-section anc-section--gc anc-section--dusk blog-card" data-id="${_escHtml(it.id)}">
+          <div class="blog-card-header">
+            <span class="blog-card-icon">📋</span>
+            <div>
+              <div class="blog-card-title">${_escHtml(it.title)}</div>
+              <div class="blog-card-meta">AAII · ${timeAgo(it.timestamp)}</div>
+            </div>
+          </div>
+          <div class="aaii-bars">
+            <div class="aaii-row"><span>🐂 看涨</span><div class="aaii-bar"><div class="aaii-fill" style="width:${it.payload?.bullish_pct||0}%"></div></div><span>${it.payload?.bullish_pct||0}%</span></div>
+            <div class="aaii-row"><span>🐻 看跌</span><div class="aaii-bar"><div class="aaii-fill aaii-fill--bear" style="width:${it.payload?.bearish_pct||0}%"></div></div><span>${it.payload?.bearish_pct||0}%</span></div>
+            <div class="aaii-row"><span>😐 中性</span><div class="aaii-bar"><div class="aaii-fill aaii-fill--neutral" style="width:${it.payload?.neutral_pct||0}%"></div></div><span>${it.payload?.neutral_pct||0}%</span></div>
+          </div>
+        </div>`).join('')}${aaii.length === 0 ? '<div class="blog-empty-row">暂无 AAII 数据</div>' : ''}</div>`;
+    };
+
+    let cardsHtml = '';
+    if (domain === 'market')    cardsHtml = renderMarketCards(items);
+    else if (domain === 'position') cardsHtml = renderPositionCards(items);
+    else if (domain === 'target')  cardsHtml = renderTargetCards(items);
+    else if (domain === 'sentiment') cardsHtml = renderSentimentCards(items);
+    else cardsHtml = items.length === 0 ? '<div class="blog-empty">暂无内容</div>' : items.map(it => `
+      <div class="anc-section anc-section--gc blog-card" data-id="${_escHtml(it.id)}">
+        <div class="blog-card-title">${_escHtml(it.title)}</div>
+        <p class="blog-card-summary">${_escHtml(it.summary||'')}</p>
+        <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
+      </div>`).join('');
 
     const html = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -139,7 +312,7 @@ const Anchor = {
     </div>
   </header>
   <main class="blog-content">
-    ${itemsHtml}
+    ${cardsHtml}
   </main>
 </div>
 </body>
