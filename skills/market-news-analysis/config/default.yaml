@@ -1,0 +1,181 @@
+version: 1
+skill: market-news-analysis
+
+defaults:
+  market: us_equities
+  time_horizon: daily
+  output_depth: standard
+  output_format: news_brief
+  language: auto
+  require_reversal_conditions: true
+  require_source_tiers: true
+  show_conflicting_evidence: true
+  stale_data_label: true
+
+source_tier_weights:
+  A_official_original: 1.00
+  B_market_data_vendor: 0.90
+  C_mainstream_financial_news: 0.75
+  D_industry_source: 0.70
+  E_sentiment_source: 0.35
+  F_secondary_commentary: 0.25
+
+recency_weights:
+  intraday: 1.00
+  daily: 0.90
+  weekly: 0.70
+  quarterly: 0.60
+  evergreen: 0.50
+  stale: 0.20
+
+confidence_weights:
+  verified: 1.00
+  corroborated: 0.85
+  single_source: 0.55
+  inferred: 0.40
+  speculative: 0.20
+
+conflict_penalties:
+  no_conflict: 1.00
+  minor_conflict: 0.80
+  unresolved_conflict: 0.50
+  conflicts_with_official_source: 0.25
+
+profiles:
+  market_regime:
+    enabled_modules:
+      - market_state
+      - market_breadth
+      - macro_data
+      - rates_fed_usd
+      - liquidity_credit
+      - volatility_options
+      - earnings_valuation
+      - event_risk
+    driver_weights:
+      macro: 0.90
+      rates: 1.00
+      liquidity: 0.95
+      earnings: 0.80
+      valuation: 0.75
+      policy: 0.70
+      technicals: 0.55
+      options: 0.55
+      sentiment: 0.30
+      news_event: 0.65
+
+  sector_rotation:
+    enabled_modules:
+      - heatmap
+      - relative_strength
+      - flows
+      - earnings_revision
+      - valuation
+      - macro_sensitivity
+      - industry_conditions
+      - policy_regulation
+      - internal_structure
+    driver_weights:
+      relative_strength: 1.00
+      flows: 0.95
+      earnings_revision: 0.90
+      industry_conditions: 0.80
+      macro_sensitivity: 0.75
+      valuation: 0.65
+      policy: 0.60
+      technicals: 0.55
+      sentiment: 0.25
+      news_event: 0.60
+
+  core_ticker:
+    enabled_modules:
+      - ticker_snapshot
+      - price_structure
+      - options_sentiment
+      - fundamentals
+      - earnings_guidance
+      - expectations
+      - valuation
+      - competitive_position
+      - capital_actions
+      - ownership_regulatory
+      - catalysts
+    driver_weights:
+      move_attribution: 1.00
+      earnings_guidance: 0.95
+      expectations: 0.90
+      fundamentals: 0.85
+      valuation: 0.80
+      trading_structure: 0.65
+      options: 0.60
+      policy_regulatory: 0.60
+      sentiment: 0.30
+      news_event: 0.75
+
+external_resources:
+  ingestion_policy:
+    require_metadata_when_possible: true
+    default_trust_tier: F_secondary_commentary
+    default_conflict_policy: corroborate
+    do_not_persist_without_user_request: true
+  accepted_types:
+    - data_feed
+    - document_source
+    - news_source
+    - user_preference
+    - feedback_signal
+  conflict_policies:
+    override: use only when explicitly requested by the user
+    corroborate: use to support or challenge other evidence
+    background_only: use for context but not conclusions
+    ignore: do not use in analysis
+
+feedback_harness:
+  collect_feedback_categories:
+    - wrong_fact
+    - missing_source
+    - weak_reasoning
+    - wrong_depth
+    - wrong_tone
+    - missing_module
+    - irrelevant_module
+    - preferred_source
+    - rejected_source
+  adaptation_actions:
+    - adjust_driver_weight
+    - adjust_source_weight
+    - change_output_depth
+    - change_output_format
+    - add_required_module
+    - remove_module
+    - add_watchlist
+    - update_conflict_policy
+  persistence_rule: propose_config_override_after_repeated_feedback
+
+ui_preferences:
+  density: high
+  tone: professional_scan_friendly
+  components:
+    market:
+      - MarketStatusBar
+      - IndexSummaryCards
+      - MarketBreadthPanel
+      - RatesAndFedPanel
+      - LiquidityDashboard
+      - VolatilityOptionsPanel
+      - EarningsValuationPanel
+      - RiskCalendar
+    sector:
+      - SectorHeatmap
+      - SectorRankingTable
+      - SectorFlowPanel
+      - RelativeStrengthChart
+      - RotationMap
+    ticker:
+      - TickerHero
+      - MoveAttributionPanel
+      - FundamentalsSnapshot
+      - EarningsExpectationPanel
+      - OptionsSentimentPanel
+      - CatalystRiskTimeline
+

@@ -361,6 +361,49 @@ When processing a pending user op, call `anchor_emit_event` at key milestones to
 
 Process flow: `anchor_await_op()` → generate patch from `relevant_subtree` → `anchor_patch(…)` → `anchor_await_op()`.
 
+## Market Intelligence Skill
+
+The project uses the **market-news-analysis** skill (`skills/market-news-analysis/`) as its core information-gathering framework for market研判 (market intelligence).
+
+### When to use this skill
+
+Invoke `Skill(skill="market-news-analysis")` when:
+- Analyzing market data pushed by connectors (SEC EDGAR, FRED, Reuters, MarketWatch, CNBC, etc.)
+- Generating market briefings, sector analysis, or ticker-level reports
+- Processing inbox items from the market/sentiment/target domains
+- The user asks for market commentary, stock analysis, or macro assessment
+
+### Analysis framework (three-layer funnel)
+
+1. **Market Regime** (Page 1) — macro, rates, liquidity, breadth, earnings/valuation, event risk
+2. **Sector Rotation** (Page 2) — heatmap, relative strength, flows, earnings revision, industry conditions
+3. **Core Ticker** (Page 3) — move attribution, fundamentals, expectations, valuation, catalysts, reversal conditions
+
+### Source tiering (from project-override.yaml)
+
+| Tier | Sources | Use |
+|------|---------|-----|
+| A | SEC EDGAR, FRED | Fact base |
+| B | Finnhub, Yahoo Finance, CFTC COT, TradingView | Structured data |
+| C | Reuters, MarketWatch, CNBC | News attribution |
+| E | StockTwits, Reddit, Fear & Greed, AAII, NAAIM | Sentiment only |
+| F | KOL RSS (Lyn Alden, etc.) | Commentary only |
+
+### Connector enrichment
+
+The `_base.cjs` `_buildCcPrompt()` method now generates analysis prompts using this skill's framework, including:
+- Tier tagging per connector source
+- Layer assignment (market_regime / sector_rotation / core_ticker)
+- Required output components (move attribution, evidence ranking, reversal conditions)
+
+### Quality rules
+
+- Official data (Tier A/B) establishes facts; sentiment (Tier E/F) provides context only
+- Never let weak social signals override official data or company filings
+- Every conclusion needs evidence + a reversal condition
+- Conflicting evidence must be shown, not hidden
+- Stale or missing data should be labeled rather than silently ignored
+
 ## Cross-Task Usage
 
 The same anchor protocol works across domains:
