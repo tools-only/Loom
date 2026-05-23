@@ -8,12 +8,11 @@ const ROOT = path.join(__dirname, '..', '..');
 const CONFIG_FILE = path.join(ROOT, 'logs', 'workspace', 'connectors.json');
 
 // ── Phase 1 connectors ────────────────────────────────────────────────
-// Uncomment each line as the connector file is created:
-// const secEdgar      = require('./sec-edgar.cjs');
-// const fred          = require('./fred.cjs');
-// const reutersRss    = require('./reuters-rss.cjs');
-// const marketwatchRss = require('./marketwatch-rss.cjs');
-// const yahooFinance  = require('./yahoo-finance.cjs');
+const secEdgar      = require('./sec-edgar.cjs');
+const fred          = require('./fred.cjs');
+const reutersRss    = require('./reuters-rss.cjs');
+const marketwatchRss = require('./marketwatch-rss.cjs');
+const yahooFinance  = require('./yahoo-finance.cjs');
 
 // ── Phase 2 connectors ────────────────────────────────────────────────
 // const cnbcRss       = require('./cnbc-rss.cjs');
@@ -33,7 +32,7 @@ const CONFIG_FILE = path.join(ROOT, 'logs', 'workspace', 'connectors.json');
 // const naaim         = require('./naaim.cjs');
 
 const CONNECTORS = [
-  // secEdgar, fred, reutersRss, marketwatchRss, yahooFinance,
+  secEdgar, fred, reutersRss, marketwatchRss, yahooFinance,
   // cnbcRss, investingCal, finnhub, kolRss,
   // stocktwits, reddit, fearGreed, aaii,
   // tradingviewWh, cftcCot, naaim,
