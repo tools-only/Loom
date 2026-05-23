@@ -27,15 +27,15 @@ const fearGreed     = require('./fear-greed.cjs');
 const aaii          = require('./aaii.cjs');
 
 // ── Phase 4 connectors ────────────────────────────────────────────────
-// const tradingviewWh = require('./tradingview-webhook.cjs');
-// const cftcCot       = require('./cftc-cot.cjs');
-// const naaim         = require('./naaim.cjs');
+const tradingviewWh = require('./tradingview-webhook.cjs');
+const cftcCot       = require('./cftc-cot.cjs');
+const naaim         = require('./naaim.cjs');
 
 const CONNECTORS = [
   secEdgar, fred, reutersRss, marketwatchRss, yahooFinance,
   cnbcRss, investingCal, finnhub, kolRss,
   stocktwits, reddit, fearGreed, aaii,
-  // tradingviewWh, cftcCot, naaim,
+  tradingviewWh, cftcCot, naaim,
 ];
 
 function loadConfig() {

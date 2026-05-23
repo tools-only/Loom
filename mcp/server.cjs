@@ -35,6 +35,7 @@ const SHUTDOWN_LOG = path.join(RUNTIME_DIR, 'shutdown.log');
 const WORKSPACE_FILE = path.join(WORKSPACE_DIR, 'workspace.json');
 const CUSTOM_CONTEXT_FILE = path.join(WORKSPACE_DIR, 'context-registry.json');
 const TARGET_PATH = process.env.ANCHOR_TARGET_PATH || path.join(ROOT, 'anchor-output');
+const CONFIG_FILE = path.join(WORKSPACE_DIR, 'connectors.json');
 
 const PORT = parseInt(process.env.ANCHOR_PORT || '3000');
 
@@ -526,6 +527,41 @@ app.post('/push/manual', (req, res) => {
   res.json({ ok: true, item });
 });
 
+// ── Webhook receiver ─────────────────────────────────────────────────
+const crypto = require('crypto');
+
+app.post('/webhook/:connectorId', (req, res) => {
+  const { connectorId } = req.params;
+  const cfg = (() => {
+    try {
+      const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
+      const js  = JSON.parse(raw);
+      return js[connectorId] || {};
+    } catch { return {}; }
+  })();
+
+  // HMAC signature verification if secret configured
+  const secret = cfg.webhookSecret;
+  if (secret) {
+    const sig   = req.headers['x-signature'] || req.headers['x-webhook-signature'] || '';
+    const hmac  = crypto.createHmac('sha256', secret);
+    const raw   = JSON.stringify(req.body);
+    const digest = 'sha256=' + hmac.update(raw).digest('hex');
+    if (sig !== digest) {
+      return res.status(401).json({ error: 'invalid signature' });
+    }
+  }
+
+  const item = pushBroker.push({
+    domain:   cfg.webhookDomain   || 'market',
+    title:    cfg.webhookTitle    || `[Webhook] ${connectorId}`,
+    summary:  cfg.webhookSummary  || JSON.stringify(req.body).slice(0, 200),
+    source:   `webhook:${connectorId}`,
+    payload:  { external_id: `webhook:${connectorId}:${Date.now()}`, kind: 'webhook', data: req.body }
+  });
+  res.json({ ok: true, item });
+});
+
 // ── Schedule routes ───────────────────────────────────────────────────
 
 app.get('/schedules', (req, res) => {
@@ -549,9 +585,10 @@ app.delete('/schedules/:id', (req, res) => {
 // ── Domain workspace page ─────────────────────────────────────────────
 
 const DOMAIN_META = {
-  market:   { icon: '📊', label: '市场情报', color: 'aurora' },
-  position: { icon: '💼', label: '仓位管理', color: 'cool'   },
-  target:   { icon: '🎯', label: '标的跟踪', color: 'warm'   }
+  market:    { icon: '📊', label: '市场情报', color: 'aurora' },
+  position:  { icon: '💼', label: '仓位管理', color: 'cool'   },
+  target:    { icon: '🎯', label: '标的跟踪', color: 'warm'   },
+  sentiment: { icon: '🌡️', label: '市场情绪', color: 'flame'  }
 };
 
 function buildDomainStubHtml(domain) {
