@@ -1164,15 +1164,56 @@ tr:hover td { background: rgba(122,90,248,0.04); }
   box-shadow: 0 14px 44px rgba(0,0,0,0.13);
 }
 
-/* Section color modifiers — active for blog cards */
-.anc-section--warm  { background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); }
-.anc-section--cool { background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%); }
-.anc-section--aurora { background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); }
-.anc-section--ocean { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); }
-.anc-section--berry { background: linear-gradient(135deg, #fdf4ff 0%, #f5d0fe 100%); }
-.anc-section--arctic { background: linear-gradient(135deg, #ecfeff 0%, #cffafe 100%); }
-.anc-section--flame { background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%); }
-.anc-section--dusk  { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); }
+/* Section color modifiers — 7 Gradient Themes from card1.html */
+.anc-section--gc.anc-section--warm {
+  background:
+    radial-gradient(circle at 0% 100%, #d4724e 0%, rgba(212,114,78,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 100% 0%, #a878c8 0%, rgba(168,120,200,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 50% 50%, #ffffff 0%, #ffffff 20%, rgba(255,255,255,0.97) 42%, rgba(255,255,255,0.7) 62%, transparent 82%),
+    linear-gradient(135deg, #ecc4b0 0%, #f8ede8 20%, #ffffff 38% 62%, #f0e8f4 80%, #d4bce0 100%);
+}
+.anc-section--gc.anc-section--cool {
+  background:
+    radial-gradient(circle at 0% 100%, #38a8ae 0%, rgba(56,168,174,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 100% 0%, #5a92d8 0%, rgba(90,146,216,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 50% 50%, #ffffff 0%, #ffffff 20%, rgba(255,255,255,0.97) 42%, rgba(255,255,255,0.7) 62%, transparent 82%),
+    linear-gradient(135deg, #b0dede 0%, #e8f4f4 20%, #ffffff 38% 62%, #e8eef8 80%, #b8cce8 100%);
+}
+.anc-section--gc.anc-section--aurora {
+  background:
+    radial-gradient(circle at 0% 100%, #4a5fd0 0%, rgba(74,95,208,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 100% 0%, #3aaf7a 0%, rgba(58,175,122,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 50% 50%, #ffffff 0%, #ffffff 20%, rgba(255,255,255,0.97) 42%, rgba(255,255,255,0.7) 62%, transparent 82%),
+    linear-gradient(135deg, #bfc8ee 0%, #e8ecf8 20%, #ffffff 38% 62%, #e4f2ec 80%, #b0dac8 100%);
+}
+.anc-section--gc.anc-section--ocean {
+  background:
+    radial-gradient(circle at 0% 100%, #2870b8 0%, rgba(40,112,184,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 100% 0%, #e0808a 0%, rgba(224,128,138,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 50% 50%, #ffffff 0%, #ffffff 20%, rgba(255,255,255,0.97) 42%, rgba(255,255,255,0.7) 62%, transparent 82%),
+    linear-gradient(135deg, #aecce8 0%, #e4eff6 20%, #ffffff 38% 62%, #f6eaec 80%, #e8c0c4 100%);
+}
+.anc-section--gc.anc-section--berry {
+  background:
+    radial-gradient(circle at 0% 100%, #7040b0 0%, rgba(112,64,176,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 100% 0%, #c0405a 0%, rgba(192,64,90,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 50% 50%, #ffffff 0%, #ffffff 20%, rgba(255,255,255,0.97) 42%, rgba(255,255,255,0.7) 62%, transparent 82%),
+    linear-gradient(135deg, #cbb8e4 0%, #ece4f4 20%, #ffffff 38% 62%, #f4e4e8 80%, #e0b8c4 100%);
+}
+.anc-section--gc.anc-section--arctic {
+  background:
+    radial-gradient(circle at 0% 100%, #3078c8 0%, rgba(48,120,200,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 100% 0%, #40b8a0 0%, rgba(64,184,160,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 50% 50%, #ffffff 0%, #ffffff 20%, rgba(255,255,255,0.97) 42%, rgba(255,255,255,0.7) 62%, transparent 82%),
+    linear-gradient(135deg, #b0cce8 0%, #e4eff6 20%, #ffffff 38% 62%, #e4f4f0 80%, #b0dcd0 100%);
+}
+.anc-section--gc.anc-section--flame {
+  background:
+    radial-gradient(circle at 0% 100%, #d86030 0%, rgba(216,96,48,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 100% 0%, #c83868 0%, rgba(200,56,104,0.45) 18%, transparent 38%),
+    radial-gradient(circle at 50% 50%, #ffffff 0%, #ffffff 20%, rgba(255,255,255,0.97) 42%, rgba(255,255,255,0.7) 62%, transparent 82%),
+    linear-gradient(135deg, #ecc8a8 0%, #f6e8e0 20%, #ffffff 38% 62%, #f4e0e8 80%, #e4b0c4 100%);
+}
 
 /* ── 15. Toast Notification ────────────────── */
 .anc-toast {

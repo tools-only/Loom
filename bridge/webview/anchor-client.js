@@ -131,7 +131,7 @@ const Anchor = {
       return `
       <div class="blog-section-label">📋 重要文件</div>
       <div class="blog-card-grid">${filings.slice(0,3).map(it => `
-        <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-id="${_escHtml(it.id)}">
+        <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
             <span class="blog-card-icon">📄</span>
             <div>
@@ -145,7 +145,7 @@ const Anchor = {
 
       <div class="blog-section-label">📰 宏观 & 新闻</div>
       <div class="blog-card-grid">${macros.slice(0,2).concat(news.slice(0,2)).map(it => `
-        <div class="anc-section anc-section--gc anc-section--arctic blog-card" data-id="${_escHtml(it.id)}">
+        <div class="anc-section anc-section--gc anc-section--arctic blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
             <span class="blog-card-icon">${it.payload?.kind === 'macro' ? '📈' : '📰'}</span>
             <div>
@@ -159,7 +159,7 @@ const Anchor = {
 
       <div class="blog-section-label">🎯 分析师观点</div>
       <div class="blog-card-grid">${alerts.slice(0,3).map(it => `
-        <div class="anc-section anc-section--gc anc-section--warm blog-card" data-id="${_escHtml(it.id)}">
+        <div class="anc-section anc-section--gc anc-section--warm blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
             <span class="blog-card-icon">🎯</span>
             <div>
@@ -179,7 +179,7 @@ const Anchor = {
         const pnlColor = pnl > 0 ? '#16a34a' : pnl < 0 ? '#dc2626' : 'var(--fg-2)';
         const pnlSign = pnl > 0 ? '+' : '';
         return `
-        <div class="anc-section anc-section--gc anc-section--ocean blog-card blog-card--position" data-id="${_escHtml(it.id)}">
+        <div class="anc-section anc-section--gc anc-section--ocean blog-card blog-card--position" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
             <span class="blog-card-icon">💼</span>
             <div>
@@ -199,7 +199,7 @@ const Anchor = {
     const renderTargetCards = (items) => {
       if (items.length === 0) return '<div class="blog-empty">暂无标的跟踪 · 使用 #target 新增标的</div>';
       return '<div class="blog-card-grid">' + items.map(it => `
-        <div class="anc-section anc-section--gc anc-section--warm blog-card blog-card--target" data-id="${_escHtml(it.id)}">
+        <div class="anc-section anc-section--gc anc-section--warm blog-card blog-card--target" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
             <span class="blog-card-icon">🎯</span>
             <div>
@@ -225,7 +225,7 @@ const Anchor = {
       return `
       <div class="blog-section-label">🌡️ 市场情绪综合</div>
       <div class="blog-card-grid">${fear.slice(0,2).map(it => `
-        <div class="anc-section anc-section--gc anc-section--flame blog-card" data-id="${_escHtml(it.id)}">
+        <div class="anc-section anc-section--gc anc-section--flame blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
             <span class="blog-card-icon">🌡️</span>
             <div>
@@ -238,7 +238,7 @@ const Anchor = {
 
       <div class="blog-section-label">📊 StockTwits 情绪异动</div>
       <div class="blog-card-grid">${st.slice(0,3).map(it => `
-        <div class="anc-section anc-section--gc anc-section--cool blog-card" data-id="${_escHtml(it.id)}">
+        <div class="anc-section anc-section--gc anc-section--cool blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
             <span class="blog-card-icon">${it.payload?.bull_ratio > 0.5 ? '🟢' : '🔴'}</span>
             <div>
@@ -255,7 +255,7 @@ const Anchor = {
 
       <div class="blog-section-label">💬 社区热帖</div>
       <div class="blog-card-grid">${reddit.slice(0,3).map(it => `
-        <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-id="${_escHtml(it.id)}">
+        <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
             <span class="blog-card-icon">💬</span>
             <div>
@@ -269,7 +269,7 @@ const Anchor = {
 
       <div class="blog-section-label">📋 AAII 散户调查</div>
       <div class="blog-card-grid">${aaii.slice(0,1).map(it => `
-        <div class="anc-section anc-section--gc anc-section--dusk blog-card" data-id="${_escHtml(it.id)}">
+        <div class="anc-section anc-section--gc anc-section--berry blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
             <span class="blog-card-icon">📋</span>
             <div>
@@ -291,7 +291,7 @@ const Anchor = {
     else if (domain === 'target')  cardsHtml = renderTargetCards(items);
     else if (domain === 'sentiment') cardsHtml = renderSentimentCards(items);
     else cardsHtml = items.length === 0 ? '<div class="blog-empty">暂无内容</div>' : items.map(it => `
-      <div class="anc-section anc-section--gc blog-card" data-id="${_escHtml(it.id)}">
+      <div class="anc-section anc-section--gc anc-section--arctic blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
         <div class="blog-card-title">${_escHtml(it.title)}</div>
         <p class="blog-card-summary">${_escHtml(it.summary||'')}</p>
         <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
@@ -302,12 +302,12 @@ const Anchor = {
 <head><meta charset="UTF-8"><title>${meta.label}</title></head>
 <body>
 <div class="blog-page blog-page--${domain}">
-  <header class="blog-header blog-header--${meta.color}">
+  <header class="blog-header anc-section anc-section--gc anc-section--${meta.color}" data-anc="${domain}.header" data-handles="refine,restructure">
     <div class="blog-header-inner">
       <span class="blog-domain-icon">${meta.icon}</span>
       <div>
-        <h1 class="blog-domain-title">${meta.label}</h1>
-        <p class="blog-domain-count">共 <strong>${count}</strong> 条推送 · ${items.length} 条已加载</p>
+        <h1 class="blog-domain-title" data-anc="${domain}.title" data-handles="edit,refine">${meta.label}</h1>
+        <p class="blog-domain-count" data-anc="${domain}.count" data-handles="edit,refine">共 <strong>${count}</strong> 条推送 · ${items.length} 条已加载</p>
       </div>
     </div>
   </header>
