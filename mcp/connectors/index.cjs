@@ -21,10 +21,10 @@ const finnhub       = require('./finnhub.cjs');
 const kolRss        = require('./kol-rss.cjs');
 
 // ── Phase 3 connectors ────────────────────────────────────────────────
-// const stocktwits    = require('./stocktwits.cjs');
-// const reddit        = require('./reddit.cjs');
-// const fearGreed     = require('./fear-greed.cjs');
-// const aaii          = require('./aaii.cjs');
+const stocktwits    = require('./stocktwits.cjs');
+const reddit        = require('./reddit.cjs');
+const fearGreed     = require('./fear-greed.cjs');
+const aaii          = require('./aaii.cjs');
 
 // ── Phase 4 connectors ────────────────────────────────────────────────
 // const tradingviewWh = require('./tradingview-webhook.cjs');
@@ -34,7 +34,7 @@ const kolRss        = require('./kol-rss.cjs');
 const CONNECTORS = [
   secEdgar, fred, reutersRss, marketwatchRss, yahooFinance,
   cnbcRss, investingCal, finnhub, kolRss,
-  // stocktwits, reddit, fearGreed, aaii,
+  stocktwits, reddit, fearGreed, aaii,
   // tradingviewWh, cftcCot, naaim,
 ];
 
