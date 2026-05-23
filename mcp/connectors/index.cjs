@@ -15,10 +15,10 @@ const marketwatchRss = require('./marketwatch-rss.cjs');
 const yahooFinance  = require('./yahoo-finance.cjs');
 
 // ── Phase 2 connectors ────────────────────────────────────────────────
-// const cnbcRss       = require('./cnbc-rss.cjs');
-// const investingCal  = require('./investing-calendar.cjs');
-// const finnhub       = require('./finnhub.cjs');
-// const kolRss        = require('./kol-rss.cjs');
+const cnbcRss       = require('./cnbc-rss.cjs');
+const investingCal  = require('./investing-calendar.cjs');
+const finnhub       = require('./finnhub.cjs');
+const kolRss        = require('./kol-rss.cjs');
 
 // ── Phase 3 connectors ────────────────────────────────────────────────
 // const stocktwits    = require('./stocktwits.cjs');
@@ -33,7 +33,7 @@ const yahooFinance  = require('./yahoo-finance.cjs');
 
 const CONNECTORS = [
   secEdgar, fred, reutersRss, marketwatchRss, yahooFinance,
-  // cnbcRss, investingCal, finnhub, kolRss,
+  cnbcRss, investingCal, finnhub, kolRss,
   // stocktwits, reddit, fearGreed, aaii,
   // tradingviewWh, cftcCot, naaim,
 ];

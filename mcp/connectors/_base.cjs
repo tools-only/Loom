@@ -56,8 +56,28 @@ class BaseConnector {
       }
       this._seen.add(key);
     }
-    this._broker.push(item);
+    // Attach ccPrompt for Agent enrichment if enrichWithAgent is configured
+    const enriched = this._config.enrichWithAgent
+      ? { ...item, ccPrompt: this._buildCcPrompt(item) }
+      : item;
+    this._broker.push(enriched);
     return true;
+  }
+
+  // Build ccPrompt for push_analyze enrichment. Subclasses may override.
+  _buildCcPrompt(item) {
+    const kind = item.payload && item.payload.kind;
+    const url  = item.payload && item.payload.url;
+    if (kind === 'filing') {
+      return `分析此 SEC 申报文件摘要，给出：1) 200字中文概要 2) 涉及的股票代码列表 3) 重要性评分0-100（财报/并购/CEO变动=高）。申报: "${item.title}"。摘要: ${item.summary}${url ? `。原文链接: ${url}` : ''}`;
+    }
+    if (kind === 'commentary') {
+      return `阅读此分析师文章，给出：1) 100字中文核心论点 2) 关联美股板块或个股 3) 多空倾向（bullish/bearish/neutral）。标题: "${item.title}"${url ? `。链接: ${url}` : ''}`;
+    }
+    if (kind === 'macro') {
+      return `分析此宏观经济数据变化，给出50字中文市场影响分析。数据: "${item.title}"。详情: ${item.summary}`;
+    }
+    return `用50字中文概括此市场资讯的关键信息：${item.title}`;
   }
 
   // HTTP GET helper — returns response data or throws
