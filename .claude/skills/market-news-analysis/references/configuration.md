@@ -129,36 +129,6 @@ Convert feedback into durable config changes:
 
 For repeated feedback, propose a small config patch and explain what behavior will change.
 
-## Conflict Resolution Matrix
-
-When two sources conflict, apply the `conflict_resolution_matrix` rules in `config/default.yaml` rather than making an ad-hoc call.
-
-**Evidence classes** (mapped to source tiers):
-| Class | Tier |
-|---|---|
-| `official_data` | A |
-| `vendor_data` | B |
-| `news_event` | C |
-| `industry_source` | D |
-| `sentiment_source` | E |
-| `secondary_commentary` | F |
-
-**Resolution rules**:
-| Class A | Class B | Rule | Rationale |
-|---|---|---|---|
-| `official_data` | `sentiment_source` | `prefer_a` | A-tier always outranks E-tier |
-| `official_data` | `secondary_commentary` | `prefer_a` | A-tier always outranks F-tier |
-| `vendor_data` | `sentiment_source` | `prefer_a` | B-tier structured data outranks sentiment |
-| `vendor_data` | `news_event` | `surface_both` | Complementary stories; show both |
-| `news_event` | `secondary_commentary` | `prefer_a` | News facts outrank interpretation |
-| `industry_source` | `sentiment_source` | `prefer_a` | D-tier industry data outranks sentiment |
-| `official_data` | `official_data` | `flag_for_review` | Two A-tier sources: surface both, prefer more recent revision |
-| `vendor_data` | `vendor_data` | `surface_both` | Two B-tier vendors: show both with methodology note |
-
-**How to apply in output**: Name the rule explicitly. Example: `"A-tier (FRED PCE) conflicts with F-tier (KOL commentary): applying prefer_a — using FRED as the fact base."` Do not silently resolve conflicts.
-
-**Override**: A project-override.yaml can add rules or change the default for specific source pairs. New rules append to the list; they do not replace the default table.
-
 ## Output Adaptation
 
 Map `output_format` to structure:

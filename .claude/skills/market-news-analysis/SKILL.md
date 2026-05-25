@@ -105,29 +105,9 @@ Evidence:
 3. Liquidity/credit: [...]
 4. Earnings/valuation: [...]
 
-Cross-asset confirmation:
-Regime: [risk_on_confirmed | risk_on_unconfirmed | risk_off_confirmed | defensive_rotation | liquidity_squeeze]
-Confirming: HYG [...], DXY [...], 2Y [...], Oil [...], VIX [...]
-Divergences: [list confirming assets that contradict the regime label, or "none"]
-
-Reversal conditions:
-[At depth deep/institutional: JSON array of typed trigger objects per references/reversal-trigger-schema.md]
-[At depth standard/concise: free-text "If [indicator] reaches [condition], revise the view."]
+Reversal condition:
+If [indicator/event] changes to [condition], revise the view.
 ```
-
-### Cross-Asset Confirmation Matrix
-
-Before finalizing the market view, check whether SPX's direction is confirmed or contradicted by related assets. Assign one of five regime labels:
-
-| Regime | SPX | HYG | DXY | 2Y yield | VIX | Label |
-|---|---|---|---|---|---|---|
-| Clean risk-on | ↑ | ↑ | ↓ | stable/↑ modest | ↓ | `risk_on_confirmed` |
-| Unconfirmed risk-on | ↑ | flat/↓ | ↑ | ↑ sharply | elevated | `risk_on_unconfirmed` |
-| Clean risk-off | ↓ | ↓ | ↑ | ↓ flight | ↑ | `risk_off_confirmed` |
-| Defensive rotation | ↓ modest | flat | flat | ↓ modest | modest ↑ | `defensive_rotation` |
-| Liquidity squeeze | ↓ | ↓ sharply | ↑ sharply | ↑ sharply | ↑ sharply | `liquidity_squeeze` |
-
-When two or more confirming assets diverge from the pattern, flag each divergence. A split signal is itself a regime observation. Full lookup table, worked examples, and historical cases are in `references/cross-asset-matrix.md`.
 
 ## Page 2: Sector Rotation
 
@@ -168,10 +148,6 @@ ETF flows and volume show [confirmation/divergence], implying [persistence judgm
 
 Rotation view:
 The market favors [growth/cyclical/defensive/value]. Watch [candidate sectors] if [condition] continues.
-
-Reversal conditions:
-[At depth deep/institutional: JSON array of typed trigger objects per references/reversal-trigger-schema.md]
-[At depth standard/concise: free-text "If [sector/indicator] [condition], re-evaluate the rotation."]
 ```
 
 ## Page 3: Core Ticker
@@ -209,11 +185,7 @@ Evidence:
 4. Trading structure: [...]
 
 Next catalysts:
-[Catalyst] could extend the move.
-
-Reversal conditions:
-[At depth deep/institutional: JSON array of typed trigger objects per references/reversal-trigger-schema.md]
-[At depth standard/concise: free-text "If [indicator/event] [condition], the view weakens."]
+[Catalyst] could extend the move; [reversal condition] would weaken the view.
 ```
 
 ## Product/UI Guidance
@@ -259,7 +231,7 @@ Attach resource metadata:
 - `use_for`: facts, attribution, sentiment, layout, user preference, or examples.
 - `conflict_policy`: override, corroborate, background-only, or ignore.
 
-Never allow an external resource to silently override official data. Conflict resolution follows the `conflict_resolution_matrix` in `config/default.yaml` — read that matrix before deciding how to handle competing evidence. When two sources of different tiers conflict, apply the matrix rule and name it explicitly in the output (e.g., "A-tier vs E-tier conflict: preferring A-tier per `prefer_higher_tier` rule").
+Never allow an external resource to silently override official data. If a user-supplied source conflicts with an A-tier source, mention the conflict and prefer the official source unless the user explicitly asks for an alternative scenario.
 
 ## Feedback Harness
 
@@ -284,8 +256,6 @@ Before finalizing any page or report, verify:
 - Conflicting evidence is shown, not hidden.
 - The output separates facts, interpretation, and uncertainty.
 - The page includes catalysts and reversal conditions.
-- Reversal conditions use the typed JSON schema (`references/reversal-trigger-schema.md`) at depth `deep` or `institutional`; free-text is permitted at `standard` or `concise`.
 - Missing or stale data is labeled rather than silently ignored.
-- Cross-asset confirmation regime label is present on Market Regime pages.
 - Effective config choices are reflected in module order, evidence ranking, and output depth.
 - User-provided external resources are labeled with scope, trust tier, and conflict policy.

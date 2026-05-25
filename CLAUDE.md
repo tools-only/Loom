@@ -411,3 +411,46 @@ The same anchor protocol works across domains:
 - **Data analysis**: Use charts, tables, KPI cards
 - **Research**: Hypothesis trees with confidence encoding
 - **Documents**: Section-based with text handles
+
+## Debate Mechanism
+
+A structured adversarial debate system for producing high-quality PRDs. Invoke via `/debate <topic>` (CC CLI) or the Debate button in the webview toolbar.
+
+### Architecture
+
+| Component | File | Role |
+|---|---|---|
+| Skill | `.claude/skills/anchor-debate/SKILL.md` | Trigger guide, four-layer template, retro-mapping rules |
+| Host agent | `.claude/agents/debate-host.md` | Organizes scope, enforces retro-mapping, judges verdicts |
+| Proposer agent | `.claude/agents/debate-proposer.md` | Affirmative position (Claude Sonnet) |
+| Reviewer agent | `.claude/agents/debate-reviewer.md` | Critical position (GPT-5 via codex-bridge) |
+| Orchestrator | `mcp/debate-orchestrator.cjs` | 14-round main loop, runs inside inproc-agent |
+| Codex bridge | `mcp/lib/codex-bridge.cjs` | Spawns codex CLI to call GPT-5; run `--selftest` to verify |
+| Transcript | `mcp/lib/debate-transcript.cjs` | JSON persistence at `output/debates/<id>/transcript.json` |
+| Spec writer | `mcp/lib/debate-spec-writer.cjs` | Four-layer markdown at `output/debates/<id>/spec.md` |
+| UI overlay | `bridge/webview/anchor-debate-overlay.js` + `anchor-debate.css` | Dual-column real-time view (Proposer left, Reviewer right) |
+| Slash command | `.claude/commands/debate.md` | `/debate <topic>` entry point |
+
+### How it works
+
+1. User clicks **Debate** button in toolbar or types `/debate <topic>`
+2. A debate envelope (`intent.op = 'debate'`) is POSTed to `/envelope`
+3. `inproc-agent.cjs` detects the op kind and routes to `debate-orchestrator.cjs`
+4. Orchestrator runs up to 14 rounds: Host setup → Proposer → Reviewer (GPT-5) → Host judge
+5. Each round emits `decision` events with `kind: debate.*` payload to the webview timeline
+6. The Debate overlay (`#anchor-debate-overlay`) shows the dual-column debate in real-time
+7. On convergence or max rounds, spec.md and transcript.json are written to `output/debates/<id>/`
+
+### Four-layer structure
+
+Debates always progress: **Problem** → **Ideal** → **Gap** → **Strategy**
+
+The Host enforces **retro-mapping**: whenever the scope layer changes, it must map new scope items back to prior commitments to prevent context decay.
+
+### Routing constraint
+
+Debate ops follow the same inproc routing as all other ops — the orchestrator runs inside the server process, not as a spawned CC subprocess. Default path is inproc; no additional CC spawning.
+
+### Fallback
+
+If codex CLI is not available, the Reviewer falls back to Claude Sonnet with the adversarial reviewer system prompt. The overlay displays a fallback warning.

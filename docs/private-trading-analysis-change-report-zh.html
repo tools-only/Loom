@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Private Trading Analysis — 变更报告 v0.1.0</title>
+<style>
+  :root {
+    --ink: #1a1a2e;
+    --paper: #fafafa;
+    --accent: #7A5AF8;
+    --border: #e0e0e0;
+    --code-bg: #f4f4f8;
+    --tag-new: #d4edda;
+    --tag-new-ink: #155724;
+    --tag-mod: #fff3cd;
+    --tag-mod-ink: #856404;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Plus Jakarta Sans", "Noto Sans SC", system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--paper); line-height: 1.7; max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+  h1 { font-family: "Bricolage Grotesque", "Noto Serif SC", serif; font-size: 2rem; font-weight: 700; border-bottom: 2px solid var(--accent); padding-bottom: 12px; margin-bottom: 8px; }
+  h2 { font-family: "Bricolage Grotesque", "Noto Serif SC", serif; font-size: 1.35rem; margin-top: 40px; margin-bottom: 12px; color: var(--accent); }
+  h3 { font-size: 1.05rem; margin-top: 24px; margin-bottom: 8px; }
+  p { margin-bottom: 10px; }
+  .meta { color: #666; font-size: 0.9rem; margin-bottom: 32px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 0.92rem; }
+  th { background: #f0edff; text-align: left; padding: 10px 14px; border-bottom: 2px solid var(--accent); }
+  td { padding: 8px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #fafaff; }
+  code { font-family: "JetBrains Mono", "Cascadia Code", monospace; background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 0.88rem; }
+  pre { background: var(--code-bg); padding: 16px 20px; border-radius: 8px; overflow-x: auto; font-size: 0.84rem; line-height: 1.6; margin: 12px 0 20px; border: 1px solid var(--border); }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+  .tag-new { background: var(--tag-new); color: var(--tag-new-ink); }
+  .tag-mod { background: var(--tag-mod); color: var(--tag-mod-ink); }
+  ul, ol { margin-left: 20px; margin-bottom: 16px; }
+  li { margin-bottom: 4px; }
+  .flow { background: #f8f7ff; border-left: 4px solid var(--accent); padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 16px 0; font-family: "JetBrains Mono", "Cascadia Code", monospace; font-size: 0.84rem; white-space: pre; line-height: 1.8; }
+  .check { color: #2d8a4e; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+</style>
+</head>
+<body>
+
+<h1>Private Trading Analysis — 变更报告 v0.1.0</h1>
+<p class="meta">日期: 2026-05-22 &nbsp;|&nbsp; 基线: <code>main</code> @ <code>844c4d4</code> &nbsp;|&nbsp; 阶段: Phase 1 + Phase 2 基础</p>
+
+<h2>概要</h2>
+<p>基于 <code>docs/private-trading-analysis-loom-native-design.md</code> 设计文档，在现有 Loom/Anchor 架构之上新增 Private Trading Analysis domain 扩展。所有新代码均为模块化附加，对现有 Anchor 功能<strong>零回归</strong>。</p>
+
+<table>
+  <tr><th>类别</th><th>文件</th><th>行数</th></tr>
+  <tr><td><span class="tag tag-new">新增</span></td><td><code>trading/trading-canvas-renderer.cjs</code></td><td>338</td></tr>
+  <tr><td><span class="tag tag-new">新增</span></td><td><code>trading/trading-events.cjs</code></td><td>276</td></tr>
+  <tr><td><span class="tag tag-new">新增</span></td><td><code>trading/trading-routes.cjs</code></td><td>361</td></tr>
+  <tr><td><span class="tag tag-new">新增</span></td><td><code>trading/policy-gate.cjs</code></td><td>113</td></tr>
+  <tr><td><span class="tag tag-mod">修改</span></td><td><code>mcp/server.cjs</code></td><td>+65 / −5</td></tr>
+  <tr><td><span class="tag tag-mod">修改</span></td><td><code>bridge/webview/anchor-client.js</code></td><td>+63 / −0</td></tr>
+  <tr><th colspan="2">合计</th><th>+1,211 行</th></tr>
+</table>
+
+<hr class="divider">
+
+<h2>一、新增文件</h2>
+
+<h3>1. <code>trading/trading-canvas-renderer.cjs</code> <span class="tag tag-new">338 行</span></h3>
+<p>交易分析画布的 HTML 模板生成器，使用 Bloom Design System CSS 类。生成包含 7 个数据锚点的初始模板，每个锚点带有 domain 元数据属性：</p>
+
+<table>
+  <tr><th>锚点 ID</th><th>可操作项</th><th>说明</th></tr>
+  <tr><td><code>trade.intent</code></td><td>edit, refine, annotate</td><td>交易意图：标的、方向、时间窗口、持仓上下文</td></tr>
+  <tr><td><code>reasoning.raw</code></td><td>edit, expand, annotate</td><td>原始推理：自由文本、情绪状态、来源</td></tr>
+  <tr><td><code>claims</code></td><td>expand, restructure</td><td>Claims 列表：从推理中提取的交易主张</td></tr>
+  <tr><td><code>tracking</code></td><td>expand, restructure</td><td>追踪线程：每条 claim 的 bull/bear/perspective 线程</td></tr>
+  <tr><td><code>reactions</code></td><td>expand, annotate</td><td>用户反应记录</td></tr>
+  <tr><td><code>position.outcome</code></td><td>edit, annotate</td><td>持仓/结果：入场、出场、盈亏</td></tr>
+  <tr><td><code>postmortem</code></td><td>edit, expand</td><td>复盘记录</td></tr>
+</table>
+
+<p>提供业务对象 HTML 构建器：<code>buildClaimHTML</code>、<code>buildThreadHTML</code>（bull/bear/perspective）、<code>buildFindingHTML</code>、<code>buildReactionHTML</code>、<code>buildPositionSummaryHTML</code>。Domain 元数据属性：<code>data-domain="trading.private"</code>、<code>data-trading-session-id</code>、<code>data-claim-id</code>、<code>data-finding-id</code>。</p>
+
+<h3>2. <code>trading/trading-events.cjs</code> <span class="tag tag-new">276 行</span></h3>
+<p>交易 domain 事件层。采用依赖注入（DI）模式，通过 <code>initialize(deps)</code> 接收 server.cjs 的核心函数引用。所有 trading 事件通过同一个 <code>recordEvent()</code> 写入 <code>logs/sessions/*/events.jsonl</code>，与现有 Anchor 事件共存，通过 <code>kind: "trading.*"</code> 前缀区分。</p>
+
+<p>事件类型（11 种）：</p>
+<table>
+  <tr><th>常量</th><th>kind</th><th>触发场景</th></tr>
+  <tr><td><code>SESSION_STARTED</code></td><td><code>trading.session_started</code></td><td>创建交易 session</td></tr>
+  <tr><td><code>REASONING_DECLARED</code></td><td><code>trading.reasoning_declared</code></td><td>用户声明交易理由</td></tr>
+  <tr><td><code>CLAIM_EXTRACTED</code></td><td><code>trading.claim_extracted</code></td><td>从理由中生成 claim</td></tr>
+  <tr><td><code>SUBAGENT_SPAWNED</code></td><td><code>trading.subagent_spawned</code></td><td>启动追踪子代理</td></tr>
+  <tr><td><code>FINDING_ADDED</code></td><td><code>trading.finding_added</code></td><td>子代理提交发现</td></tr>
+  <tr><td><code>HUMAN_REACTION</code></td><td><code>trading.human_reaction</code></td><td>用户对 finding 做出反应</td></tr>
+  <tr><td><code>CLAIM_UPDATED</code></td><td><code>trading.claim_updated</code></td><td>用户修改 claim</td></tr>
+  <tr><td><code>TRADE_EXECUTED</code></td><td><code>trading.trade_executed</code></td><td>执行交易</td></tr>
+  <tr><td><code>POSITION_UNWOUND</code></td><td><code>trading.position_unwound</code></td><td>平仓</td></tr>
+  <tr><td><code>POSTMORTEM_ADDED</code></td><td><code>trading.postmortem_added</code></td><td>添加复盘记录</td></tr>
+  <tr><td><code>POLICY_REJECTED</code></td><td><code>trading.policy_rejected</code></td><td>策略校验失败</td></tr>
+</table>
+
+<p>每个事件 payload 均携带 <code>trading_session_id</code>、<code>actor</code>、<code>visibility: "private"</code>。提供 <code>replayTradingSession(events, tradingSessionId)</code> 从事件流重建业务状态。</p>
+
+<h3>3. <code>trading/trading-routes.cjs</code> <span class="tag tag-new">361 行</span></h3>
+<p>Express 路由处理器，挂载到 <code>/trading/*</code> 路径。每个路由验证请求体、记录 trading domain 事件、返回 JSON：</p>
+
+<table>
+  <tr><th>方法</th><th>路径</th><th>事件</th></tr>
+  <tr><td>POST</td><td><code>/trading/session/start</code></td><td>trading.session_started</td></tr>
+  <tr><td>GET</td><td><code>/trading/session/:id/events</code></td><td>—（查询）</td></tr>
+  <tr><td>POST</td><td><code>/trading/reasoning</code></td><td>trading.reasoning_declared</td></tr>
+  <tr><td>POST</td><td><code>/trading/claim/extract</code></td><td>trading.claim_extracted</td></tr>
+  <tr><td>POST</td><td><code>/trading/claim/update</code></td><td>trading.claim_updated</td></tr>
+  <tr><td>POST</td><td><code>/trading/finding/add</code></td><td>trading.finding_added（经 policy gate）</td></tr>
+  <tr><td>POST</td><td><code>/trading/reaction</code></td><td>trading.human_reaction</td></tr>
+  <tr><td>POST</td><td><code>/trading/trade/execute</code></td><td>trading.trade_executed</td></tr>
+  <tr><td>POST</td><td><code>/trading/position/unwind</code></td><td>trading.position_unwound</td></tr>
+  <tr><td>POST</td><td><code>/trading/postmortem</code></td><td>trading.postmortem_added</td></tr>
+  <tr><td>POST</td><td><code>/trading/subagent/spawn</code></td><td>trading.subagent_spawned</td></tr>
+</table>
+
+<h3>4. <code>trading/policy-gate.cjs</code> <span class="tag tag-new">113 行</span></h3>
+<p>Finding 提交前的策略校验模块。检查项：</p>
+<ol>
+  <li>必须绑定 <code>claim_id</code></li>
+  <li>必须声明 <code>stance</code>（supports / rebuts / complicates）</li>
+  <li>必须包含 <code>evidence</code> 或 <code>observed_at</code></li>
+  <li><code>visibility</code> 必须为 <code>"private"</code></li>
+  <li>不得包含直接买卖建议（正则匹配 buy/sell 模式）</li>
+</ol>
+<p>返回 <code>{ ok: boolean, violations: string[] }</code>。违规时产生 <code>trading.policy_rejected</code> 事件而非写入 finding。</p>
+
+<hr class="divider">
+
+<h2>二、修改文件</h2>
+
+<h3>5. <code>mcp/server.cjs</code> <span class="tag tag-mod">+65 / −5 行</span></h3>
+<p>5 处精确修改，均受 domain 条件守卫：</p>
+
+<table>
+  <tr><th>#</th><th>位置</th><th>类型</th><th>变更内容</th></tr>
+  <tr>
+    <td>a</td><td>Line 45-48</td><td>引入</td>
+    <td><code>require()</code> 4 个 trading 模块</td>
+  </tr>
+  <tr>
+    <td>b</td><td>Line 679-708</td><td>扩展</td>
+    <td><code>POST /workspace/file</code>：当 <code>req.body.domain === 'trading.private'</code> 时，自动生成 trading canvas HTML、初始化 trading session、存储 domain 元数据至 workspace file 的 context</td>
+  </tr>
+  <tr>
+    <td>c</td><td>Line 1001-1019</td><td>扩展</td>
+    <td>Browser WS envelope handler：在 <code>recordEvent('user.intent')</code> 后追加 — 当 <code>envelope.domain.namespace === 'trading.private'</code> 时，调用 <code>tradingEvents.recordTradingEvent()</code> 记录对应的 trading domain 事件</td>
+  </tr>
+  <tr>
+    <td>d</td><td>Line 1973</td><td>扩展</td>
+    <td>SCHEMA_STUB：添加可选字段 <code>domain: { type: ['object', 'null'] }</code></td>
+  </tr>
+  <tr>
+    <td>e</td><td>Line 2290-2304</td><td>初始化</td>
+    <td>Bootstrap（<code>httpServer.listen</code> 回调内）：通过 DI 初始化 <code>tradingEvents</code>，挂载 <code>tradingRoutes</code></td>
+  </tr>
+</table>
+
+<h3>6. <code>bridge/webview/anchor-client.js</code> <span class="tag tag-mod">+63 / 0 行</span></h3>
+
+<table>
+  <tr><th>#</th><th>位置</th><th>变更内容</th></tr>
+  <tr>
+    <td>a</td><td>Line 59, 73-82</td>
+    <td>新增 <code>_initHomeSuggestions()</code>：点击首页建议按钮会填充 prompt 输入框</td>
+  </tr>
+  <tr>
+    <td>b</td><td>Line 1034-1046</td>
+    <td><code>buildEnvelope()</code> 扩展：检测目标锚点的 <code>data-domain</code> 属性，若为 <code>"trading.private"</code> 则构建 <code>domain</code> 对象（包含 namespace、action、trading_session_id、claim_id、finding_id）</td>
+  </tr>
+  <tr>
+    <td>c</td><td>Line 1055-1095</td>
+    <td>新增 <code>_inferTradingAction(op, el)</code>：将 Anchor 操作码 + 目标锚点 ID 映射为 trading domain action</td>
+  </tr>
+</table>
+
+<p>action 映射规则：</p>
+<pre>edit + trade.intent  → DECLARE_REASONING
+edit + reasoning.raw → DECLARE_REASONING
+annotate + claim.*   → UPDATE_CLAIM
+annotate + finding.* → REACT_TO_FINDING
+edit + position.*    → EXECUTE_TRADE
+expand + claims      → EXTRACT_CLAIMS
+expand + tracking    → SPAWN_TRACKER
+branch + thread.*    → SPAWN_TRACKER</pre>
+
+<hr class="divider">
+
+<h2>三、架构决策</h2>
+
+<h3>依赖注入模式</h3>
+<p>Trading 模块不直接 <code>require('mcp/server.cjs')</code>（会导致循环依赖），而是通过 <code>initialize(deps)</code> 接收 server 函数引用。<code>currentSession</code> 使用 getter 传递，确保始终读取 server 模块内的最新值而非 require 时的快照。</p>
+
+<h3>事件共存策略</h3>
+<p>Trading domain 事件通过同一个 <code>recordEvent()</code> 写入同一个 <code>events.jsonl</code>，与现有 Anchor 事件共存。区分方式：事件 <code>kind</code> 前缀为 <code>"trading.*"</code> vs 现有的 <code>"user.*" / "agent.*" / "system.*"</code>。<code>replayTradingSession()</code> 扫描全部事件并按 <code>trading_session_id</code> 过滤。</p>
+
+<h3>零回归保障</h3>
+<table>
+  <tr><th>防护点</th><th>机制</th></tr>
+  <tr><td>Envelope 校验</td><td><code>domain</code> 字段类型为 <code>['object', 'null']</code>，缺失或为 null 时不做任何额外校验</td></tr>
+  <tr><td>recordEvent()</td><td>函数体未修改，仅调用方传入不同的 <code>kind</code> 前缀</td></tr>
+  <tr><td>deliverOp()</td><td>函数体未修改，trading ops 通过现有 processor pool 路由</td></tr>
+  <tr><td>Workspace API</td><td>仅在 <code>req.body.domain === 'trading.private'</code> 时注入 trading 模板和 session</td></tr>
+  <tr><td>Browser WS handler</td><td>Trading 逻辑在独立 <code>if</code> 块内，else 分支行为不变</td></tr>
+  <tr><td>CSS / HTML</td><td>仅使用现有 Bloom CSS 类（<code>anc-section</code>、<code>anc-pill</code> 等），无新增 CSS 文件和图标库</td></tr>
+  <tr><td>路由</td><td>全新 <code>/trading/*</code> 路径前缀，无现有路由被重命名或移除</td></tr>
+</table>
+
+<hr class="divider">
+
+<h2>四、数据流</h2>
+<div class="flow">Browser: 用户点击 data-anc="trade.intent"
+  └→ anchor-client.js buildEnvelope() 检测 data-domain，添加 domain 字段
+     └→ WebSocket {type:"envelope", envelope:{
+          ...,
+          domain:{namespace:"trading.private", action:"DECLARE_REASONING", trading_session_id:"trd_...", ...}
+        }}
+        └→ server.cjs wssBrowser handler
+           ├→ validateEnvelope() — 通过（domain 为可选字段）
+           ├→ recordEvent('user.intent', envelope) → events.jsonl
+           ├→ tradingEvents.recordTradingEvent('trading.reasoning_declared', payload) → 同一 events.jsonl
+           └→ deliverOp() → processor pool → CC agent → anchor_patch → browser</div>
+
+<hr class="divider">
+
+<h2>五、验证结果</h2>
+<table>
+  <tr><th>验证项</th><th>结果</th></tr>
+  <tr><td>全部 6 文件 <code>node --check</code> 语法检查</td><td class="check">通过</td></tr>
+  <tr><td><code>trading-canvas-renderer.cjs</code> 生成 HTML（含全部 7 个锚点 + domain 属性）</td><td class="check">通过</td></tr>
+  <tr><td><code>trading-events.cjs</code> 初始化 → 事件记录 → 状态重放</td><td class="check">通过</td></tr>
+  <tr><td><code>policy-gate.cjs</code> 合法/非法 finding 校验</td><td class="check">通过</td></tr>
+  <tr><td><code>trading-routes.cjs</code> 导出 + Express 路由挂载</td><td class="check">通过</td></tr>
+  <tr><td>Server bootstrap（DI 初始化、路由注册）</td><td class="check">通过</td></tr>
+  <tr><td><code>mcp/server.cjs</code> 语法检查（编辑后）</td><td class="check">通过</td></tr>
+  <tr><td><code>anchor-client.js</code> 语法检查（编辑后）</td><td class="check">通过</td></tr>
+</table>
+
+<hr class="divider">
+
+<h2>六、后续阶段</h2>
+<table>
+  <tr><th>阶段</th><th>内容</th><th>依赖</th></tr>
+  <tr><td>Phase 3</td><td>Claim 抽取逻辑：从 raw reasoning 生成 structured claims，含 source_type、direction、status</td><td>Phase 1-2</td></tr>
+  <tr><td>Phase 4</td><td>Mock tracking threads：为每条 active claim 生成 bull/bear/perspective mock findings，materializer 更新 Canvas</td><td>Phase 3</td></tr>
+  <tr><td>Phase 5</td><td>Reaction + Replay：用户对 finding 做出反应，完整 replay view 展示推理→claim→finding→反应→交易→复盘的完整链路</td><td>Phase 4</td></tr>
+  <tr><td>Phase 6</td><td>真实 subagents + Hands Proxy：创建 trading-bull/bear/perspective 子代理，通过 Hands Proxy 接入外部数据，Policy Gate 全量校验</td><td>Phase 5</td></tr>
+</table>
+
+</body>
+</html>

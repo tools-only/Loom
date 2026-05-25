@@ -1,0 +1,79 @@
+# Project-level override for market-news-analysis skill
+# Overrides default.yaml for this project's use case
+
+version: 1
+skill: market-news-analysis
+
+# Defaults tuned for Mode A market intelligence workflow
+defaults:
+  market: us_equities
+  time_horizon: daily
+  output_depth: standard
+  output_format: news_brief
+  language: zh_CN
+  require_reversal_conditions: true
+  require_source_tiers: true
+  show_conflicting_evidence: true
+  stale_data_label: true
+
+# Map project connectors to source tiers
+connector_source_mapping:
+  sec-edgar:       { tier: A, label: "SEC EDGAR", use_for: facts }
+  fred:            { tier: A, label: "FRED/St. Louis Fed", use_for: facts }
+  reuters-rss:     { tier: C, label: "Reuters", use_for: facts_and_attribution }
+  marketwatch-rss: { tier: C, label: "MarketWatch", use_for: facts_and_attribution }
+  cnbc-rss:        { tier: C, label: "CNBC", use_for: attribution }
+  finnhub:         { tier: B, label: "Finnhub", use_for: facts }
+  yahoo-finance:   { tier: B, label: "Yahoo Finance", use_for: facts }
+  investing-calendar: { tier: B, label: "Investing.com", use_for: facts }
+  kol-rss:         { tier: F, label: "KOL/Substack", use_for: commentary_only }
+  stocktwits:      { tier: E, label: "StockTwits", use_for: sentiment_only }
+  reddit:          { tier: E, label: "Reddit", use_for: sentiment_only }
+  fear-greed:      { tier: E, label: "CNN Fear & Greed", use_for: sentiment_only }
+  aaii:            { tier: E, label: "AAII Sentiment", use_for: sentiment_only }
+  naaim:           { tier: E, label: "NAAIM Exposure", use_for: sentiment_only }
+  cftc-cot:        { tier: B, label: "CFTC COT", use_for: facts }
+  tradingview:     { tier: B, label: "TradingView", use_for: facts }
+
+# Tuned driver weights for our connector data mix
+profiles:
+  market_regime:
+    driver_weights:
+      macro: 1.00
+      rates: 0.95
+      liquidity: 0.85
+      earnings: 0.80
+      valuation: 0.75
+      policy: 0.70
+      technicals: 0.55
+      options: 0.50
+      sentiment: 0.30
+      news_event: 0.65
+
+  sector_rotation:
+    driver_weights:
+      relative_strength: 0.85
+      flows: 0.80
+      earnings_revision: 0.75
+      valuation: 0.70
+      macro_sensitivity: 0.85
+      industry_conditions: 0.80
+      policy_regulation: 0.65
+      internal_breadth: 0.60
+
+  core_ticker:
+    driver_weights:
+      fundamentals: 0.90
+      earnings_guidance: 0.95
+      expectations: 0.85
+      valuation: 0.80
+      technicals: 0.55
+      options_sentiment: 0.45
+      competitive_position: 0.70
+      capital_actions: 0.75
+      ownership_regulatory: 0.65
+      catalysts: 0.85
+
+# Watchlist — tickers from Mode C targets
+watchlist: ["NVDA", "AAPL", "TSLA", "MSFT", "AMD", "GOOGL"]
+sectors_of_interest: ["semiconductor", "AI", "cloud", "fintech", "EV"]

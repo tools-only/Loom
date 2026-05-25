@@ -8,7 +8,7 @@ const path = require('path');
 const ROOT       = path.join(__dirname, '..');
 const INBOX_FILE = path.join(ROOT, 'logs', 'workspace', 'inbox.json');
 
-const DOMAINS = ['market', 'position', 'target'];
+const DOMAINS = ['market', 'position', 'target', 'sentiment'];
 
 let _items = [];  // in-memory cache
 
@@ -83,7 +83,7 @@ function list({ domain, unread } = {}) {
 }
 
 function unreadCounts() {
-  const counts = { market: 0, position: 0, target: 0, total: 0 };
+  const counts = { market: 0, position: 0, target: 0, sentiment: 0, total: 0 };
   for (const item of _items) {
     if (!item.read && DOMAINS.includes(item.domain)) {
       counts[item.domain]++;
@@ -93,4 +93,4 @@ function unreadCounts() {
   return counts;
 }
 
-module.exports = { load, append, markRead, markAllRead, list, unreadCounts };
+module.exports = { load, append, markRead, markAllRead, list, unreadCounts, DOMAINS };

@@ -12,6 +12,9 @@ const Anchor = {
   openPopup: null,
   pendingOps: [],   // { op, target, instruction, anchorId, timestamp }
   currentFileId: null,
+  _allowIncomingHtml: false,
+  _selectedPromptRoute: '',
+  _pendingPromptRoute: '',
 
   _timing: null,  // per-interaction timing { t0_click, t1_built, t2_sent, t3_ack, t4_thinking, t5_patch, t6_dom }
 
@@ -51,6 +54,7 @@ const Anchor = {
     if (window.SelectionToolbar) SelectionToolbar.init(this);
     if (window.TimelinePanel)    TimelinePanel.init(this);
     if (window.HistoryPanel)     HistoryPanel.init(this);
+    if (window.DebateOverlay)    DebateOverlay.init(this);
     this._initSidePanelToggles();
     this._initExecuteAll();
     this._initShutdown();
@@ -63,13 +67,25 @@ const Anchor = {
   _initHashRouting() {
     window.addEventListener('hashchange', () => this._handleHashChange());
     const hash = window.location.hash.slice(1);
-    if (!hash || hash === 'overview') { this._loadOverview(); }
+    if (!hash) {
+      this.currentHtml = '';
+      this.container.innerHTML = '';
+      this._syncHomeVisibility();
+      this._updateToolbarTabs('');
+    }
+    else if (hash === 'overview') { this._loadOverview(); }
     else if (['market','position','target','sentiment'].includes(hash)) { this._loadBlogDomain(hash); }
   },
 
   _handleHashChange() {
     const hash = window.location.hash.slice(1);
-    if (!hash || hash === 'overview') { this._loadOverview(); }
+    if (!hash) {
+      this.currentHtml = '';
+      this.container.innerHTML = '';
+      this._syncHomeVisibility();
+      this._updateToolbarTabs('');
+    }
+    else if (hash === 'overview') { this._loadOverview(); }
     else if (['market','position','target','sentiment'].includes(hash)) { this._loadBlogDomain(hash); }
     else {
       this.currentHtml = '';
@@ -111,6 +127,7 @@ const Anchor = {
       if (diff < 86400000) return Math.floor(diff/3600000)+'h前';
       return new Date(ts).toLocaleDateString('zh-CN',{month:'short',day:'numeric'});
     };
+    const icon = (name) => '<i class="ph-bold ' + name + '"></i>';
 
     const card = (id, color, icon, title, summary, source, ts, url, tags) =>
       `<section class="anc-section anc-section--gc anc-section--${color}" data-anc="overview.card.${_escHtml(id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
@@ -148,7 +165,7 @@ const Anchor = {
 <div class="blog-page blog-page--overview">
   <header class="blog-header anc-section anc-section--gc anc-section--aurora" data-anc="overview.header" data-handles="refine,restructure">
     <div class="blog-header-inner">
-      <span class="blog-domain-icon">📊</span>
+      <span class="blog-domain-icon">${icon('ph-chart-pie-slice')}</span>
       <div>
         <h1 class="blog-domain-title" data-anc="overview.title" data-handles="edit,refine">市场总览</h1>
         <p class="blog-domain-count" data-anc="overview.count" data-handles="edit,refine">市场 <strong>${data.market.length}</strong> · 标的 <strong>${data.target.length}</strong> · 情绪 <strong>${data.sentiment.length}</strong> · 共 <strong>${total}</strong> 条</p>
@@ -157,25 +174,25 @@ const Anchor = {
   </header>
 
   <main class="blog-content">
-    <div class="blog-section-label">📋 重要文件 & 宏观</div>
+    <div class="blog-section-label"><i class="ph-bold ph-newspaper"></i> 重要文件 & 宏观</div>
     <div class="blog-card-grid">
-      ${mFilings.map(it => card(it.id, 'aurora', '📄', it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
-      ${mNews.map(it => card(it.id, 'arctic', it.payload?.kind==='macro'?'📈':'📰', it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
-      ${mAnalyst.map(it => card(it.id, 'warm', '🎯', it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
+      ${mFilings.map(it => card(it.id, 'aurora', icon('ph-file-text'), it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
+      ${mNews.map(it => card(it.id, 'arctic', it.payload?.kind==='macro'?icon('ph-chart-line-up'):icon('ph-newspaper'), it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
+      ${mAnalyst.map(it => card(it.id, 'warm', icon('ph-crosshair'), it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
       ${(mFilings.length+mNews.length+mAnalyst.length)===0?'<div class="blog-empty-row">暂无市场数据</div>':''}
     </div>
 
-    <div class="blog-section-label">🎯 热门标的</div>
+    <div class="blog-section-label"><i class="ph-bold ph-crosshair"></i> 热门标的</div>
     <div class="blog-card-grid">
-      ${tTop.map(it => card(it.id, 'warm', '🎯', it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
+      ${tTop.map(it => card(it.id, 'warm', icon('ph-crosshair'), it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
       ${tTop.length===0?'<div class="blog-empty-row">暂无标的数据</div>':''}
     </div>
 
-    <div class="blog-section-label">🌡️ 市场情绪</div>
+    <div class="blog-section-label"><i class="ph-bold ph-pulse"></i> 市场情绪</div>
     <div class="blog-card-grid">
-      ${sFear.map(it => card(it.id, 'flame', '🌡️', it.title, it.summary, 'fear-greed', it.timestamp, null, null)).join('')}
-      ${stTop.map(it => card(it.id, 'cool', it.payload?.bull_ratio>0.5?'🟢':'🔴', it.title, it.summary, 'stocktwits', it.timestamp, null, null)).join('')}
-      ${rTop.map(it => card(it.id, 'aurora', '💬', it.title, it.summary, it.source, it.timestamp, null, it.payload?.tickers)).join('')}
+      ${sFear.map(it => card(it.id, 'flame', icon('ph-pulse'), it.title, it.summary, 'fear-greed', it.timestamp, null, null)).join('')}
+      ${stTop.map(it => card(it.id, 'cool', it.payload?.bull_ratio>0.5?icon('ph-trend-up'):icon('ph-trend-down'), it.title, it.summary, 'stocktwits', it.timestamp, null, null)).join('')}
+      ${rTop.map(it => card(it.id, 'aurora', icon('ph-chat-circle-text'), it.title, it.summary, it.source, it.timestamp, null, it.payload?.tickers)).join('')}
       ${(sFear.length+stTop.length+rTop.length)===0?'<div class="blog-empty-row">暂无情绪数据</div>':''}
     </div>
   </main>
@@ -204,11 +221,12 @@ const Anchor = {
   },
 
   _renderBlogPage(domain, items, counts) {
+    const icon = (name) => '<i class="ph-bold ' + name + '"></i>';
     const META = {
-      market:    { icon: '📊', label: '市场情报', color: 'aurora' },
-      position:  { icon: '💼', label: '仓位管理', color: 'cool'   },
-      target:    { icon: '🎯', label: '标的跟踪', color: 'warm'   },
-      sentiment: { icon: '🌡️', label: '市场情绪', color: 'flame'  }
+      market:    { icon: icon('ph-newspaper'), label: '市场情报', color: 'aurora' },
+      position:  { icon: icon('ph-briefcase'), label: '仓位管理', color: 'cool'   },
+      target:    { icon: icon('ph-crosshair'), label: '标的跟踪', color: 'warm'   },
+      sentiment: { icon: icon('ph-pulse'), label: '市场情绪', color: 'flame'  }
     };
     const meta = META[domain] || META.market;
     const count = counts[domain] || 0;
@@ -240,11 +258,11 @@ const Anchor = {
       const alerts  = items.filter(i => i.payload?.kind === 'price_alert' || i.payload?.kind === 'analyst');
 
       return `
-      <div class="blog-section-label">📋 重要文件</div>
+      <div class="blog-section-label"><i class="ph-bold ph-file-text"></i> 重要文件</div>
       <div class="blog-card-grid">${filings.slice(0,3).map(it => `
         <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
-            <span class="blog-card-icon">📄</span>
+            <span class="blog-card-icon">${icon('ph-file-text')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
               <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
@@ -254,11 +272,11 @@ const Anchor = {
           ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">查看原文 ↗</a>' : ''}
         </div>`).join('')}${filings.length === 0 ? '<div class="blog-empty-row">暂无 SEC 文件</div>' : ''}</div>
 
-      <div class="blog-section-label">📰 宏观 & 新闻</div>
+      <div class="blog-section-label"><i class="ph-bold ph-chart-line-up"></i> 宏观 & 新闻</div>
       <div class="blog-card-grid">${macros.slice(0,2).concat(news.slice(0,2)).map(it => `
         <div class="anc-section anc-section--gc anc-section--arctic blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
-            <span class="blog-card-icon">${it.payload?.kind === 'macro' ? '📈' : '📰'}</span>
+            <span class="blog-card-icon">${it.payload?.kind === 'macro' ? icon('ph-chart-line-up') : icon('ph-newspaper')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
               <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
@@ -268,11 +286,11 @@ const Anchor = {
           ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">查看原文 ↗</a>' : ''}
         </div>`).join('')}${(macros.length + news.length) === 0 ? '<div class="blog-empty-row">暂无新闻</div>' : ''}</div>
 
-      <div class="blog-section-label">🎯 分析师观点</div>
+      <div class="blog-section-label"><i class="ph-bold ph-crosshair"></i> 分析师观点</div>
       <div class="blog-card-grid">${alerts.slice(0,3).map(it => `
         <div class="anc-section anc-section--gc anc-section--warm blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
-            <span class="blog-card-icon">🎯</span>
+            <span class="blog-card-icon">${icon('ph-crosshair')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
               <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
@@ -292,7 +310,7 @@ const Anchor = {
         return `
         <div class="anc-section anc-section--gc anc-section--ocean blog-card blog-card--position" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
-            <span class="blog-card-icon">💼</span>
+            <span class="blog-card-icon">${icon('ph-briefcase')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
               <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
@@ -312,7 +330,7 @@ const Anchor = {
       return '<div class="blog-card-grid">' + items.map(it => `
         <div class="anc-section anc-section--gc anc-section--warm blog-card blog-card--target" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
-            <span class="blog-card-icon">🎯</span>
+            <span class="blog-card-icon">${icon('ph-crosshair')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
               <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
@@ -334,11 +352,11 @@ const Anchor = {
       const aaii   = items.filter(i => i.source?.includes('aaii'));
 
       return `
-      <div class="blog-section-label">🌡️ 市场情绪综合</div>
+      <div class="blog-section-label"><i class="ph-bold ph-pulse"></i> 市场情绪综合</div>
       <div class="blog-card-grid">${fear.slice(0,2).map(it => `
         <div class="anc-section anc-section--gc anc-section--flame blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
-            <span class="blog-card-icon">🌡️</span>
+            <span class="blog-card-icon">${icon('ph-pulse')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
               <div class="blog-card-meta">CNN 恐慌贪婪指数 · ${timeAgo(it.timestamp)}</div>
@@ -347,11 +365,11 @@ const Anchor = {
           <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
         </div>`).join('')}${fear.length === 0 ? '<div class="blog-empty-row">暂无数据</div>' : ''}</div>
 
-      <div class="blog-section-label">📊 StockTwits 情绪异动</div>
+      <div class="blog-section-label"><i class="ph-bold ph-chart-donut"></i> StockTwits 情绪异动</div>
       <div class="blog-card-grid">${st.slice(0,3).map(it => `
         <div class="anc-section anc-section--gc anc-section--cool blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
-            <span class="blog-card-icon">${it.payload?.bull_ratio > 0.5 ? '🟢' : '🔴'}</span>
+            <span class="blog-card-icon">${it.payload?.bull_ratio > 0.5 ? icon('ph-trend-up') : icon('ph-trend-down')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
               <div class="blog-card-meta">StockTwits · ${timeAgo(it.timestamp)}</div>
@@ -361,14 +379,14 @@ const Anchor = {
           <div class="sentiment-bar">
             <div class="sentiment-bar-fill" style="width:${Math.round((it.payload?.bull_ratio||0.5)*100)}%;background:${it.payload?.bull_ratio > 0.5 ? '#16a34a' : '#dc2626'}"></div>
           </div>
-          <div class="sentiment-bar-labels"><span>🐂 ${Math.round((it.payload?.bull_ratio||0.5)*100)}%</span><span>熊 ${Math.round((1-(it.payload?.bull_ratio||0.5))*100)}%</span></div>
+          <div class="sentiment-bar-labels"><span>看多 ${Math.round((it.payload?.bull_ratio||0.5)*100)}%</span><span>看空 ${Math.round((1-(it.payload?.bull_ratio||0.5))*100)}%</span></div>
         </div>`).join('')}${st.length === 0 ? '<div class="blog-empty-row">暂无情绪异动</div>' : ''}</div>
 
-      <div class="blog-section-label">💬 社区热帖</div>
+      <div class="blog-section-label"><i class="ph-bold ph-chat-circle-text"></i> 社区热帖</div>
       <div class="blog-card-grid">${reddit.slice(0,3).map(it => `
         <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
-            <span class="blog-card-icon">💬</span>
+            <span class="blog-card-icon">${icon('ph-chat-circle-text')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
               <div class="blog-card-meta">r/${_escHtml(it.payload?.subreddit||'')} · 👍 ${(it.payload?.upvotes||0).toLocaleString()} · ${timeAgo(it.timestamp)}</div>
@@ -378,20 +396,20 @@ const Anchor = {
           <div class="blog-card-tags">${(it.payload?.tickers||[]).map(t => '<span class="blog-ticker-tag">$'+_escHtml(t)+'</span>').join('')}</div>
         </div>`).join('')}${reddit.length === 0 ? '<div class="blog-empty-row">暂无社区帖子</div>' : ''}</div>
 
-      <div class="blog-section-label">📋 AAII 散户调查</div>
+      <div class="blog-section-label"><i class="ph-bold ph-clipboard-text"></i> AAII 散户调查</div>
       <div class="blog-card-grid">${aaii.slice(0,1).map(it => `
         <div class="anc-section anc-section--gc anc-section--berry blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
           <div class="blog-card-header">
-            <span class="blog-card-icon">📋</span>
+            <span class="blog-card-icon">${icon('ph-clipboard-text')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
               <div class="blog-card-meta">AAII · ${timeAgo(it.timestamp)}</div>
             </div>
           </div>
           <div class="aaii-bars">
-            <div class="aaii-row"><span>🐂 看涨</span><div class="aaii-bar"><div class="aaii-fill" style="width:${it.payload?.bullish_pct||0}%"></div></div><span>${it.payload?.bullish_pct||0}%</span></div>
-            <div class="aaii-row"><span>🐻 看跌</span><div class="aaii-bar"><div class="aaii-fill aaii-fill--bear" style="width:${it.payload?.bearish_pct||0}%"></div></div><span>${it.payload?.bearish_pct||0}%</span></div>
-            <div class="aaii-row"><span>😐 中性</span><div class="aaii-bar"><div class="aaii-fill aaii-fill--neutral" style="width:${it.payload?.neutral_pct||0}%"></div></div><span>${it.payload?.neutral_pct||0}%</span></div>
+            <div class="aaii-row"><span>看涨</span><div class="aaii-bar"><div class="aaii-fill" style="width:${it.payload?.bullish_pct||0}%"></div></div><span>${it.payload?.bullish_pct||0}%</span></div>
+            <div class="aaii-row"><span>看跌</span><div class="aaii-bar"><div class="aaii-fill aaii-fill--bear" style="width:${it.payload?.bearish_pct||0}%"></div></div><span>${it.payload?.bearish_pct||0}%</span></div>
+            <div class="aaii-row"><span>中性</span><div class="aaii-bar"><div class="aaii-fill aaii-fill--neutral" style="width:${it.payload?.neutral_pct||0}%"></div></div><span>${it.payload?.neutral_pct||0}%</span></div>
           </div>
         </div>`).join('')}${aaii.length === 0 ? '<div class="blog-empty-row">暂无 AAII 数据</div>' : ''}</div>`;
     };
@@ -442,13 +460,42 @@ const Anchor = {
     });
   },
 
+  _navigateToRoute(route) {
+    const next = String(route || '').trim();
+    if (!next) return;
+    const current = window.location.hash.slice(1);
+    if (current === next) {
+      if (next === 'overview') this._loadOverview();
+      else if (['market','position','target','sentiment'].includes(next)) this._loadBlogDomain(next);
+      return;
+    }
+    window.location.hash = next;
+  },
+
+  _bindGeneratedPageRoute(route) {
+    const next = String(route || '').trim();
+    if (!next) return;
+    if (!['overview','market','position','target','sentiment'].includes(next)) return;
+    if (window.location.hash.slice(1) !== next) {
+      history.replaceState(null, '', '#' + next);
+    }
+    this._updateToolbarTabs(next);
+  },
+
   _initPromptBar() {
     const input = document.getElementById('anchor-prompt-input');
     const btn   = document.getElementById('anchor-prompt-submit');
     if (!input || !btn) return;
     const submit = () => {
       const text = input.value.trim();
-      if (text) { this.submitPrompt(text); input.value = ''; }
+      const route = input.dataset.route || this._selectedPromptRoute || '';
+      if (text) {
+        this.submitPrompt(text, route);
+        input.value = '';
+        delete input.dataset.route;
+        this._selectedPromptRoute = '';
+        document.querySelectorAll('#anchor-home button[data-route].is-selected').forEach(el => el.classList.remove('is-selected'));
+      }
     };
     btn.addEventListener('click', submit);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
@@ -457,20 +504,54 @@ const Anchor = {
   _initHomeSuggestions() {
     const input = document.getElementById('anchor-prompt-input');
     if (!input) return;
-    document.querySelectorAll('.home-suggestions button[data-prompt]').forEach(btn => {
+    document.querySelectorAll('#anchor-home button[data-prompt], #anchor-home button[data-route]').forEach(btn => {
       btn.addEventListener('click', () => {
-        input.value = btn.getAttribute('data-prompt') || '';
-        input.focus();
+        const route = btn.getAttribute('data-route');
+        const prompt = btn.getAttribute('data-prompt') || '';
+        if (prompt) {
+          input.value = prompt;
+          if (route) {
+            input.dataset.route = route;
+            this._selectedPromptRoute = route;
+            document.querySelectorAll('#anchor-home button[data-route].is-selected').forEach(el => el.classList.remove('is-selected'));
+            btn.classList.add('is-selected');
+          } else {
+            delete input.dataset.route;
+            this._selectedPromptRoute = '';
+          }
+          input.focus();
+        }
       });
     });
   },
 
-  submitPrompt(text) {
+  _inferRoute(text) {
+    const t = (text || '').toLowerCase();
+    if (/市场总览|market.?brief|overview|宏观.*新闻|风险日历|today/.test(t)) return 'overview';
+    if (/持仓|仓位|portfolio|position|复盘/.test(t)) return 'position';
+    if (/标的|target|tracker|nvda|aapl|tsla|触发/.test(t)) return 'target';
+    if (/情绪|sentiment|fear.?greed|reddit|stocktwits/.test(t)) return 'sentiment';
+    if (/宏观|风险偏好|market.?intel|macro/.test(t)) return 'market';
+    return 'overview';
+  },
+
+  submitPrompt(text, route = '') {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       this.toast('Not connected — please wait');
       return;
     }
-    this.ws.send(JSON.stringify({ type: 'prompt', text, ts: Date.now() }));
+    this._allowIncomingHtml = true;
+    const effectiveRoute = String(route || '').trim() || this._inferRoute(text);
+    this._pendingPromptRoute = effectiveRoute;
+    // Navigate immediately without waiting for hashchange (avoids async flicker over home)
+    history.pushState(null, '', '#' + effectiveRoute);
+    const home = document.getElementById('anchor-home');
+    const shell = document.getElementById('anchor-shell');
+    if (home) home.classList.add('is-hidden');
+    if (shell) shell.classList.add('has-content');
+    this.container.innerHTML = '';
+    this._updateToolbarTabs(effectiveRoute);
+    this.ws.send(JSON.stringify({ type: 'prompt', text, route: effectiveRoute, ts: Date.now() }));
     this.showProcessing('Generating…');
     this.toast('Prompt sent');
   },
@@ -512,7 +593,10 @@ const Anchor = {
     const goHome = () => {
       this.currentHtml = '';
       this.container.innerHTML = '';
+      if (window.location.hash) window.location.hash = '';
+      this._allowIncomingHtml = false;
       this._syncHomeVisibility();
+      this._updateToolbarTabs('');
       if (window.WorkspacePanel) {
         WorkspacePanel.currentFileId = null;
       }
@@ -525,7 +609,7 @@ const Anchor = {
       tab.addEventListener('click', () => {
         const d = tab.dataset.domain;
         if (d) {
-          window.location.hash = d;
+          this._navigateToRoute(d);
         }
       });
     });
@@ -700,14 +784,24 @@ const Anchor = {
   handleMessage(msg) {
     switch (msg.type) {
       case 'html':
+        if (!this._allowIncomingHtml && !window.location.hash) {
+          return;
+        }
+        if (this._pendingPromptRoute) {
+          this._bindGeneratedPageRoute(this._pendingPromptRoute);
+        }
         this.clearProcessing();
         this._clearSessionBlockConfig();
         this.render(msg.content);
+        this._pendingPromptRoute = '';
         break;
       case 'manifest_updated':
         if (window.ContextPanel) ContextPanel.refresh();
         break;
       case 'workspace_current':
+        if (!window.location.hash) {
+          return;
+        }
         if (window.WorkspacePanel) WorkspacePanel.applyServerCurrent(msg.file);
         break;
       case 'patch':
@@ -724,6 +818,7 @@ const Anchor = {
         break;
       case 'agent_event':
         if (window.TimelinePanel) TimelinePanel.append(msg.event);
+        if (window.DebateOverlay && msg.event && (msg.event.kind || '').startsWith('agent.debate')) DebateOverlay.append(msg.event);
         this._handleAgentEvent(msg.event);
         break;
       case 'shutdown':
@@ -2059,7 +2154,7 @@ window.WorkspacePanel = {
       if (this.anchor) this.anchor.currentFileId = this.currentFileId;
       this.renderTree();
       const current = this.currentFile();
-      if (current && current.html) this.applyFile(current);
+      if (current && current.html && window.location.hash) this.applyFile(current);
       else if (this.anchor) this.anchor._syncHomeVisibility();
       if (window.HistoryPanel) HistoryPanel.setFile(current);
     } catch (e) {
@@ -3418,8 +3513,11 @@ function _initDomainCards() {
 }
 
 function _openDomain(domain) {
-  // Server broadcasts HTML via WebSocket; we just trigger the endpoint
-  fetch('/workspace/domain/' + encodeURIComponent(domain)).catch(() => {});
+  if (window.Anchor && typeof Anchor._navigateToRoute === 'function') {
+    Anchor._navigateToRoute(domain);
+    return;
+  }
+  window.location.hash = domain;
 }
 
 function _escHtml(str) {

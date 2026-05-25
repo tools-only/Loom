@@ -92,6 +92,18 @@ if (!process.env.ANCHOR_FRESH_START && fs.existsSync(CURRENT_HTML)) {
 
 function log(msg) { process.stderr.write(`[anchor] ${msg}\n`); }
 
+function anchorLayoutContract() {
+  return [
+    'Anchor UI layout contract:',
+    '- Use only existing classes: anc-section, anc-section--gc, anc-kpi-grid, anc-kpi, kpi-top, kpi-label-top, kpi-icon, kpi-bottom, kpi-value, kpi-unit, anc-pill-row, anc-pill.',
+    '- KPI cards must be scannable: short label in kpi-label-top, one compact value in kpi-value, supporting text in kpi-unit. Never put long prose beside the value.',
+    '- For ticker/watchlist cards, do not force six columns. Use anc-kpi-grid and let CSS wrap; keep each card meaningful at 240px width.',
+    '- Long analysis belongs in p/li or nested anc-section blocks, not inside KPI cards.',
+    '- Avoid inline widths, fixed heights, negative letter spacing, and tiny font sizes. Text must wrap naturally and never become vertical.',
+    '- Preserve every data-anc, data-handles, data-deps attribute and existing class unless the user explicitly asks otherwise.'
+  ].join('\n');
+}
+
 function readJsonFile(file, fallback) {
   try {
     if (!fs.existsSync(file)) return fallback;
@@ -1252,7 +1264,7 @@ wssBrowser.on('connection', (ws) => {
         };
         try {
           if (!fs.existsSync(PENDING_PROMPT)) {
-            fs.writeFileSync(PENDING_PROMPT, `Generate an Anchor HTML page for:\n${text}\n\nWhen done, call anchor_render(html) with the complete document.\n`, 'utf8');
+            fs.writeFileSync(PENDING_PROMPT, `Generate an Anchor HTML page for:\n${text}\n\n${anchorLayoutContract()}\n\nWhen done, call anchor_render(html) with the complete document.\n`, 'utf8');
           }
         } catch {}
         const delivered = deliverOp(op);
@@ -1443,7 +1455,7 @@ function deliverOp(op) {
     // Regular op: route to any idle processor in the pool (round-robin among idle entries).
     // If no idle processor, the op stays in pendingOps for spawnCCProcessor to handle.
     for (const [key, entry] of processorPool) {
-      if (entry.ws && entry.ws.readyState === 1) {
+      if (entry.ws && entry.ws.readyState === 1 && !entry.done) {
         targetWs = entry.ws;
         targetLabel = 'pool:' + key;
         break;
@@ -1559,7 +1571,8 @@ function handleAgentMessage(ws, msg, agentId) {
       wsTrace('recv', 'proc:' + procId, 'op_req', { remaining: partition ? partition.ops.length : 0 });
       ws.send(JSON.stringify({ type: 'op', ops: [nextOp], count: 1 }));
     } else {
-      // Partition empty — send pending:false
+      // Partition empty — mark done so deliverOp won't route new ops to this exiting processor
+      if (partition) partition.done = true;
       wsTrace('recv', 'proc:' + procId, 'op_req', { remaining: 0, done: true });
       ws.send(JSON.stringify({ type: 'op', ops: [], count: 0 }));
     }
@@ -1724,6 +1737,7 @@ function buildOpPrompt(op) {
     return (
       `Generate a complete Anchor HTML page.\n` +
       `Request: ${instr}\n\n` +
+      `${anchorLayoutContract()}\n\n` +
       `Follow the Anchor HTML protocol and Bloom CSS classes from CLAUDE.md.\n` +
       `Output ONLY the raw <!DOCTYPE html> document. No markdown fences, no explanation.`
     );
@@ -1734,6 +1748,7 @@ function buildOpPrompt(op) {
     `Current HTML:\n${targetHtml}\n\n` +
     `Reply with ONLY the replacement outerHTML for data-anc="${target}". ` +
     `Keep data-anc/data-handles/data-deps. Use Bloom CSS. ` +
+    `${anchorLayoutContract()} ` +
     `NO preamble, NO explanation, NO markdown fences. ` +
     `First character of your response must be '<'.`
   );
@@ -1789,6 +1804,8 @@ function buildProcessorPrompt(ops) {
     '',
     'Never call anchor_await_op from this spawned processor.',
     'Preserve data-anc, data-handles, data-deps, and existing CSS classes in patched fragments.',
+    '',
+    anchorLayoutContract(),
     '',
     hasSubagent
       ? 'NOTE: Some ops are routed to subagents. When the op has context_bundle.subagent_id, generate a prompt describing the target HTML and instruction, then use Agent(subagent_type=<id>, prompt=...) to get the result, and call anchor_patch with the returned fragment.'
@@ -1878,7 +1895,7 @@ function spawnProcessorPartition(partitionId, ops, onDone) {
   try { fs.writeFileSync(promptFile, prompt, 'utf8'); } catch {}
   spawnBin  = 'bash';
   // $0 = promptFile, $1 = claudeBin — avoids all shell quoting issues with spaces/special chars
-  spawnArgs = ['-c', 'p=$(cat "$0"); "$1" -p "$p" < /dev/null', promptFile, claudeBin];
+  spawnArgs = ['-c', 'p=$(cat "$0"); "$1" -p "$p" --dangerously-skip-permissions < /dev/null', promptFile, claudeBin];
 
   let child;
   try {
@@ -2187,7 +2204,7 @@ const SCHEMA_STUB = {
       type: 'object',
       required: ['op', 'target_kind'],
       properties: {
-        op: { enum: ['refine','expand','shorten','longer','edit','lock','annotate','branch','restructure','ask','custom','initial_render'] },
+        op: { enum: ['refine','expand','shorten','longer','edit','lock','annotate','branch','restructure','ask','custom','initial_render','debate','debate_abort'] },
         instruction: { type: 'string', maxLength: 4000 },
         target_kind: { enum: ['anchor','selection','global'] },
         target_ref: { type: 'string' }
@@ -2237,7 +2254,7 @@ function formatEnvelopeAsPrompt(envelope) {
   const MAX_HTML = 15000;
 
   if (intent.op === 'initial_render') {
-    return `## Anchor Initial Render Request\n\n**Instruction**: ${intent.instruction || '(none)'}\n\nGenerate a complete Anchor HTML page and call \`anchor_render(html)\`.\n`;
+    return `## Anchor Initial Render Request\n\n**Instruction**: ${intent.instruction || '(none)'}\n\n${anchorLayoutContract()}\n\nGenerate a complete Anchor HTML page and call \`anchor_render(html)\`.\n`;
   }
 
   const subagentId = bundle.subagent_id || null;
@@ -2264,6 +2281,9 @@ function formatEnvelopeAsPrompt(envelope) {
       `## Your Task`,
       `1. Generate the modified HTML fragment for \`${targetRef}\`.`,
       `   Preserve every \`data-anc\`, \`data-handles\`, \`data-deps\` attribute and CSS class.`,
+      ``,
+      anchorLayoutContract(),
+      ``,
       `2. Call \`anchor_emit_event\` with type=\`thinking\`, then call \`anchor_patch\`.`,
       `3. Call \`anchor_emit_event\` with type=\`complete\`.`,
       `4. Reply with one line: "Patched \`${targetRef}\`."`,
@@ -2305,6 +2325,7 @@ function formatEnvelopeAsPrompt(envelope) {
   const targetRef = intent.target_ref || '(target)';
   out += '### Instructions\n\n';
   out += `1. Generate the modified HTML fragment for \`${targetRef}\`. Preserve all \`data-anc\`, \`data-handles\`, \`data-deps\` attrs and CSS classes.\n`;
+  out += anchorLayoutContract() + '\n';
   out += `2. Call \`anchor_patch({patches:[{anchor_id:"${targetRef}",html_fragment:"<new complete outerHTML>"}]})\`. Add reverse-dep patches in same call if needed.\n`;
   out += '3. Call `anchor_await_op()` to wait for the next user action.\n\n';
   out += '**NEVER call `anchor_render`. Dispatch Agent subagents only when `context_bundle.subagent_id` is set.**\n';

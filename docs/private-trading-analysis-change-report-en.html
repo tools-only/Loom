@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Private Trading Analysis — Change Report v0.1.0</title>
+<style>
+  :root {
+    --ink: #1a1a2e;
+    --paper: #fafafa;
+    --accent: #7A5AF8;
+    --border: #e0e0e0;
+    --code-bg: #f4f4f8;
+    --tag-new: #d4edda;
+    --tag-new-ink: #155724;
+    --tag-mod: #fff3cd;
+    --tag-mod-ink: #856404;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--paper); line-height: 1.7; max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+  h1 { font-family: "Bricolage Grotesque", serif; font-size: 2rem; font-weight: 700; border-bottom: 2px solid var(--accent); padding-bottom: 12px; margin-bottom: 8px; }
+  h2 { font-family: "Bricolage Grotesque", serif; font-size: 1.35rem; margin-top: 40px; margin-bottom: 12px; color: var(--accent); }
+  h3 { font-size: 1.05rem; margin-top: 24px; margin-bottom: 8px; }
+  p { margin-bottom: 10px; }
+  .meta { color: #666; font-size: 0.9rem; margin-bottom: 32px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 0.92rem; }
+  th { background: #f0edff; text-align: left; padding: 10px 14px; border-bottom: 2px solid var(--accent); }
+  td { padding: 8px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #fafaff; }
+  code { font-family: "JetBrains Mono", "Cascadia Code", monospace; background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 0.88rem; }
+  pre { background: var(--code-bg); padding: 16px 20px; border-radius: 8px; overflow-x: auto; font-size: 0.84rem; line-height: 1.6; margin: 12px 0 20px; border: 1px solid var(--border); }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+  .tag-new { background: var(--tag-new); color: var(--tag-new-ink); }
+  .tag-mod { background: var(--tag-mod); color: var(--tag-mod-ink); }
+  ul, ol { margin-left: 20px; margin-bottom: 16px; }
+  li { margin-bottom: 4px; }
+  .flow { background: #f8f7ff; border-left: 4px solid var(--accent); padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 16px 0; font-family: "JetBrains Mono", "Cascadia Code", monospace; font-size: 0.84rem; white-space: pre; line-height: 1.8; }
+  .check { color: #2d8a4e; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+</style>
+</head>
+<body>
+
+<h1>Private Trading Analysis — Change Report v0.1.0</h1>
+<p class="meta">Date: 2026-05-22 &nbsp;|&nbsp; Baseline: <code>main</code> @ <code>844c4d4</code> &nbsp;|&nbsp; Phase: 1 + 2 (Foundation)</p>
+
+<h2>Summary</h2>
+<p>Based on the design document <code>docs/private-trading-analysis-loom-native-design.md</code>, this adds a Private Trading Analysis domain extension on top of the existing Loom/Anchor architecture. All new code is modular and additive with <strong>zero regression</strong> on existing Anchor functionality.</p>
+
+<table>
+  <tr><th>Category</th><th>File</th><th>Lines</th></tr>
+  <tr><td><span class="tag tag-new">New</span></td><td><code>trading/trading-canvas-renderer.cjs</code></td><td>338</td></tr>
+  <tr><td><span class="tag tag-new">New</span></td><td><code>trading/trading-events.cjs</code></td><td>276</td></tr>
+  <tr><td><span class="tag tag-new">New</span></td><td><code>trading/trading-routes.cjs</code></td><td>361</td></tr>
+  <tr><td><span class="tag tag-new">New</span></td><td><code>trading/policy-gate.cjs</code></td><td>113</td></tr>
+  <tr><td><span class="tag tag-mod">Modified</span></td><td><code>mcp/server.cjs</code></td><td>+65 / −5</td></tr>
+  <tr><td><span class="tag tag-mod">Modified</span></td><td><code>bridge/webview/anchor-client.js</code></td><td>+63 / −0</td></tr>
+  <tr><th colspan="2">Total</th><th>+1,211 lines</th></tr>
+</table>
+
+<hr class="divider">
+
+<h2>1. New Files</h2>
+
+<h3>1.1 <code>trading/trading-canvas-renderer.cjs</code> <span class="tag tag-new">338 lines</span></h3>
+<p>HTML template generator for the trading analysis canvas. Uses Bloom Design System CSS classes. Generates an initial template with 7 data-anchor sections, each carrying domain metadata attributes:</p>
+
+<table>
+  <tr><th>Anchor ID</th><th>Handles</th><th>Description</th></tr>
+  <tr><td><code>trade.intent</code></td><td>edit, refine, annotate</td><td>Trade intent: ticker, direction, time window, position context</td></tr>
+  <tr><td><code>reasoning.raw</code></td><td>edit, expand, annotate</td><td>Raw reasoning: free text, emotional state, sources</td></tr>
+  <tr><td><code>claims</code></td><td>expand, restructure</td><td>Claims extracted from reasoning</td></tr>
+  <tr><td><code>tracking</code></td><td>expand, restructure</td><td>Tracking threads per claim (bull/bear/perspective)</td></tr>
+  <tr><td><code>reactions</code></td><td>expand, annotate</td><td>User reaction records</td></tr>
+  <tr><td><code>position.outcome</code></td><td>edit, annotate</td><td>Position/outcome: entry, exit, P&amp;L</td></tr>
+  <tr><td><code>postmortem</code></td><td>edit, expand</td><td>Post-trade review</td></tr>
+</table>
+
+<p>HTML builders for domain objects: <code>buildClaimHTML</code>, <code>buildThreadHTML</code> (bull/bear/perspective), <code>buildFindingHTML</code>, <code>buildReactionHTML</code>, <code>buildPositionSummaryHTML</code>. Domain metadata attributes: <code>data-domain="trading.private"</code>, <code>data-trading-session-id</code>, <code>data-claim-id</code>, <code>data-finding-id</code>.</p>
+
+<h3>1.2 <code>trading/trading-events.cjs</code> <span class="tag tag-new">276 lines</span></h3>
+<p>Trading domain event layer. Uses dependency injection (DI) pattern — receives the server's <code>recordEvent</code>, <code>generateEventId</code>, <code>createId</code> functions via <code>initialize(deps)</code>. All trading events are written through the same <code>recordEvent()</code> into <code>logs/sessions/*/events.jsonl</code>, coexisting with existing Anchor events and differentiated by the <code>kind: "trading.*"</code> prefix.</p>
+
+<p>Event kinds (11 total):</p>
+<table>
+  <tr><th>Constant</th><th>kind</th><th>Trigger</th></tr>
+  <tr><td><code>SESSION_STARTED</code></td><td><code>trading.session_started</code></td><td>Trading session created</td></tr>
+  <tr><td><code>REASONING_DECLARED</code></td><td><code>trading.reasoning_declared</code></td><td>User declares trading reasoning</td></tr>
+  <tr><td><code>CLAIM_EXTRACTED</code></td><td><code>trading.claim_extracted</code></td><td>Claim extracted from reasoning</td></tr>
+  <tr><td><code>SUBAGENT_SPAWNED</code></td><td><code>trading.subagent_spawned</code></td><td>Tracking subagent launched</td></tr>
+  <tr><td><code>FINDING_ADDED</code></td><td><code>trading.finding_added</code></td><td>Subagent submits finding</td></tr>
+  <tr><td><code>HUMAN_REACTION</code></td><td><code>trading.human_reaction</code></td><td>User reacts to finding</td></tr>
+  <tr><td><code>CLAIM_UPDATED</code></td><td><code>trading.claim_updated</code></td><td>User modifies claim</td></tr>
+  <tr><td><code>TRADE_EXECUTED</code></td><td><code>trading.trade_executed</code></td><td>Trade executed</td></tr>
+  <tr><td><code>POSITION_UNWOUND</code></td><td><code>trading.position_unwound</code></td><td>Position unwound</td></tr>
+  <tr><td><code>POSTMORTEM_ADDED</code></td><td><code>trading.postmortem_added</code></td><td>Postmortem note added</td></tr>
+  <tr><td><code>POLICY_REJECTED</code></td><td><code>trading.policy_rejected</code></td><td>Policy gate rejection</td></tr>
+</table>
+
+<p>Every event payload carries <code>trading_session_id</code>, <code>actor</code>, and <code>visibility: "private"</code>. Provides <code>replayTradingSession(events, tradingSessionId)</code> to rebuild business state from the event stream.</p>
+
+<h3>1.3 <code>trading/trading-routes.cjs</code> <span class="tag tag-new">361 lines</span></h3>
+<p>Express route handlers mounted at <code>/trading/*</code>. Each route validates the request body, records a trading domain event, and returns JSON:</p>
+
+<table>
+  <tr><th>Method</th><th>Path</th><th>Event</th></tr>
+  <tr><td>POST</td><td><code>/trading/session/start</code></td><td>trading.session_started</td></tr>
+  <tr><td>GET</td><td><code>/trading/session/:id/events</code></td><td>— (query)</td></tr>
+  <tr><td>POST</td><td><code>/trading/reasoning</code></td><td>trading.reasoning_declared</td></tr>
+  <tr><td>POST</td><td><code>/trading/claim/extract</code></td><td>trading.claim_extracted</td></tr>
+  <tr><td>POST</td><td><code>/trading/claim/update</code></td><td>trading.claim_updated</td></tr>
+  <tr><td>POST</td><td><code>/trading/finding/add</code></td><td>trading.finding_added (via policy gate)</td></tr>
+  <tr><td>POST</td><td><code>/trading/reaction</code></td><td>trading.human_reaction</td></tr>
+  <tr><td>POST</td><td><code>/trading/trade/execute</code></td><td>trading.trade_executed</td></tr>
+  <tr><td>POST</td><td><code>/trading/position/unwind</code></td><td>trading.position_unwound</td></tr>
+  <tr><td>POST</td><td><code>/trading/postmortem</code></td><td>trading.postmortem_added</td></tr>
+  <tr><td>POST</td><td><code>/trading/subagent/spawn</code></td><td>trading.subagent_spawned</td></tr>
+</table>
+
+<h3>1.4 <code>trading/policy-gate.cjs</code> <span class="tag tag-new">113 lines</span></h3>
+<p>Policy validation for findings before write. Checks:</p>
+<ol>
+  <li>Must bind to <code>claim_id</code></li>
+  <li>Must declare <code>stance</code> (supports / rebuts / complicates)</li>
+  <li>Must include <code>evidence</code> or <code>observed_at</code></li>
+  <li><code>visibility</code> must be <code>"private"</code></li>
+  <li>Must not contain direct buy/sell advice (regex match against buy/sell patterns)</li>
+</ol>
+<p>Returns <code>{ ok: boolean, violations: string[] }</code>. Violations produce a <code>trading.policy_rejected</code> event instead of writing the finding.</p>
+
+<hr class="divider">
+
+<h2>2. Modified Files</h2>
+
+<h3>2.1 <code>mcp/server.cjs</code> <span class="tag tag-mod">+65 / −5 lines</span></h3>
+<p>5 surgical changes, all gated behind domain checks:</p>
+
+<table>
+  <tr><th>#</th><th>Location</th><th>Type</th><th>Change</th></tr>
+  <tr>
+    <td>a</td><td>Line 45–48</td><td>Require</td>
+    <td><code>require()</code> 4 trading modules</td>
+  </tr>
+  <tr>
+    <td>b</td><td>Line 679–708</td><td>Extension</td>
+    <td><code>POST /workspace/file</code>: when <code>req.body.domain === 'trading.private'</code>, auto-generate trading canvas HTML, initialize trading session, store domain metadata in workspace file context</td>
+  </tr>
+  <tr>
+    <td>c</td><td>Line 1001–1019</td><td>Extension</td>
+    <td>Browser WS envelope handler: after <code>recordEvent('user.intent')</code> — when <code>envelope.domain.namespace === 'trading.private'</code>, call <code>tradingEvents.recordTradingEvent()</code> to record the corresponding trading domain event</td>
+  </tr>
+  <tr>
+    <td>d</td><td>Line 1973</td><td>Extension</td>
+    <td>SCHEMA_STUB: add optional field <code>domain: { type: ['object', 'null'] }</code></td>
+  </tr>
+  <tr>
+    <td>e</td><td>Line 2290–2304</td><td>Init</td>
+    <td>Bootstrap (inside <code>httpServer.listen</code> callback): initialize <code>tradingEvents</code> via DI, mount <code>tradingRoutes</code></td>
+  </tr>
+</table>
+
+<h3>2.2 <code>bridge/webview/anchor-client.js</code> <span class="tag tag-mod">+63 / 0 lines</span></h3>
+
+<table>
+  <tr><th>#</th><th>Location</th><th>Change</th></tr>
+  <tr>
+    <td>a</td><td>Line 59, 73–82</td>
+    <td>New <code>_initHomeSuggestions()</code>: clicking home suggestion buttons fills the prompt input</td>
+  </tr>
+  <tr>
+    <td>b</td><td>Line 1034–1046</td>
+    <td><code>buildEnvelope()</code> extension: detect target anchor's <code>data-domain</code> attribute; if <code>"trading.private"</code>, build <code>domain</code> object (namespace, action, trading_session_id, claim_id, finding_id)</td>
+  </tr>
+  <tr>
+    <td>c</td><td>Line 1055–1095</td>
+    <td>New <code>_inferTradingAction(op, el)</code>: maps Anchor op code + target anchor ID to trading domain action</td>
+  </tr>
+</table>
+
+<p>Action mapping rules:</p>
+<pre>edit + trade.intent  → DECLARE_REASONING
+edit + reasoning.raw → DECLARE_REASONING
+annotate + claim.*   → UPDATE_CLAIM
+annotate + finding.* → REACT_TO_FINDING
+edit + position.*    → EXECUTE_TRADE
+expand + claims      → EXTRACT_CLAIMS
+expand + tracking    → SPAWN_TRACKER
+branch + thread.*    → SPAWN_TRACKER</pre>
+
+<hr class="divider">
+
+<h2>3. Architecture Decisions</h2>
+
+<h3>Dependency Injection</h3>
+<p>Trading modules do not directly <code>require('mcp/server.cjs')</code> (which would cause circular dependencies). Instead, they receive server function references via <code>initialize(deps)</code>. <code>currentSession</code> is passed as a getter to always read the live reference rather than a snapshot at require time.</p>
+
+<h3>Event Coexistence</h3>
+<p>Trading domain events are written through the same <code>recordEvent()</code> into the same <code>events.jsonl</code>, coexisting with existing Anchor events. Discrimination: event <code>kind</code> prefix — <code>"trading.*"</code> vs. existing <code>"user.*" / "agent.*" / "system.*"</code>. <code>replayTradingSession()</code> scans all events and filters by <code>trading_session_id</code>.</p>
+
+<h3>Zero-Regression Safeguards</h3>
+<table>
+  <tr><th>Guard Point</th><th>Mechanism</th></tr>
+  <tr><td>Envelope validation</td><td><code>domain</code> field type is <code>['object', 'null']</code>; absent or null → no extra validation</td></tr>
+  <tr><td>recordEvent()</td><td>Function body unchanged; callers pass different <code>kind</code> prefix only</td></tr>
+  <tr><td>deliverOp()</td><td>Function body unchanged; trading ops route through existing processor pool</td></tr>
+  <tr><td>Workspace API</td><td>Trading template and session only injected when <code>req.body.domain === 'trading.private'</code></td></tr>
+  <tr><td>Browser WS handler</td><td>Trading logic in isolated <code>if</code> block; else branch behavior unchanged</td></tr>
+  <tr><td>CSS / HTML</td><td>Uses existing Bloom CSS classes only (<code>anc-section</code>, <code>anc-pill</code>, etc.); no new CSS or icon libraries</td></tr>
+  <tr><td>Routes</td><td>All new routes under <code>/trading/*</code> prefix; no existing routes renamed or removed</td></tr>
+</table>
+
+<hr class="divider">
+
+<h2>4. Data Flow</h2>
+<div class="flow">Browser: user clicks data-anc="trade.intent"
+  └→ anchor-client.js buildEnvelope() detects data-domain, adds domain field
+     └→ WebSocket {type:"envelope", envelope:{
+          ...,
+          domain:{namespace:"trading.private", action:"DECLARE_REASONING", trading_session_id:"trd_...", ...}
+        }}
+        └→ server.cjs wssBrowser handler
+           ├→ validateEnvelope() — passes (domain is optional)
+           ├→ recordEvent('user.intent', envelope) → events.jsonl
+           ├→ tradingEvents.recordTradingEvent('trading.reasoning_declared', payload) → same events.jsonl
+           └→ deliverOp() → processor pool → CC agent → anchor_patch → browser</div>
+
+<hr class="divider">
+
+<h2>5. Verification</h2>
+<table>
+  <tr><th>Test Item</th><th>Result</th></tr>
+  <tr><td>All 6 files <code>node --check</code> syntax check</td><td class="check">PASS</td></tr>
+  <tr><td><code>trading-canvas-renderer.cjs</code> HTML generation (all 7 anchors + domain attrs)</td><td class="check">PASS</td></tr>
+  <tr><td><code>trading-events.cjs</code> init → record → state replay</td><td class="check">PASS</td></tr>
+  <tr><td><code>policy-gate.cjs</code> valid/invalid finding validation</td><td class="check">PASS</td></tr>
+  <tr><td><code>trading-routes.cjs</code> exports + Express route mounting</td><td class="check">PASS</td></tr>
+  <tr><td>Server bootstrap (DI init, route registration)</td><td class="check">PASS</td></tr>
+  <tr><td><code>mcp/server.cjs</code> syntax check (post-edit)</td><td class="check">PASS</td></tr>
+  <tr><td><code>anchor-client.js</code> syntax check (post-edit)</td><td class="check">PASS</td></tr>
+</table>
+
+<hr class="divider">
+
+<h2>6. Next Phases</h2>
+<table>
+  <tr><th>Phase</th><th>Scope</th><th>Depends On</th></tr>
+  <tr><td>Phase 3</td><td>Claim extraction: generate structured claims from raw reasoning with source_type, direction, status</td><td>Phase 1–2</td></tr>
+  <tr><td>Phase 4</td><td>Mock tracking threads: generate bull/bear/perspective mock findings for each active claim; materializer updates Canvas</td><td>Phase 3</td></tr>
+  <tr><td>Phase 5</td><td>Reaction + Replay: user reactions to findings; full replay view showing reasoning → claims → findings → reactions → trades → postmortems</td><td>Phase 4</td></tr>
+  <tr><td>Phase 6</td><td>Real subagents + Hands Proxy: trading-bull/bear/perspective subagents, external data via Hands Proxy, full Policy Gate enforcement</td><td>Phase 5</td></tr>
+</table>
+
+</body>
+</html>

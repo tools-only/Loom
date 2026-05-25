@@ -105,9 +105,21 @@ function create(opts) {
   const MAX_TOKENS = parseInt(process.env.ANCHOR_INPROC_MAX_TOKENS) || 4096;
 
   async function runOne(op) {
+    const opKind = op?.intent?.op || '(unknown)';
+    if (opKind === 'debate' || opKind === 'debate_abort') {
+      const target = op?.intent?.target_ref || op?.target || '__debate__';
+      const opId = 'iop_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+      const ctx = { opId, target, opKind, opPayload: op, opConsumed: false, completed: false, aborted: false,
+        parentEventId: op?.provenance?.event_id || null };
+      if (opKind === 'debate_abort') { ctx.aborted = true; return; }
+      log(`in-process agent: routing to debate-orchestrator opId=${opId}`);
+      autoExecLog({ event: 'inproc_debate_start', opId, target });
+      const orch = require('./debate-orchestrator.cjs');
+      return orch.runDebate(op, ctx, { client, model, toolRegistry, log, autoExecLog });
+    }
+
     const opId = 'iop_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
     const target = op?.intent?.target_ref || op?.target || '(unknown)';
-    const opKind = op?.intent?.op || '(unknown)';
     const startedAt = Date.now();
 
     const ctx = {

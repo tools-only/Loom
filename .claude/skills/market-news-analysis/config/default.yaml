@@ -41,11 +41,6 @@ conflict_penalties:
   unresolved_conflict: 0.50
   conflicts_with_official_source: 0.25
 
-reversal_trigger:
-  require_typed: true
-  allow_text_fallback: true
-  require_typed_at_depths: [deep, institutional]
-
 profiles:
   market_regime:
     enabled_modules:
@@ -57,7 +52,6 @@ profiles:
       - volatility_options
       - earnings_valuation
       - event_risk
-      - cross_asset_confirmation
     driver_weights:
       macro: 0.90
       rates: 1.00
@@ -117,85 +111,6 @@ profiles:
       policy_regulatory: 0.60
       sentiment: 0.30
       news_event: 0.75
-
-cross_asset_matrix:
-  reference: references/cross-asset-matrix.md
-  regimes:
-    - label: risk_on_confirmed
-      spx: up
-      hyg: up
-      dxy: down
-      yield_2y: stable_or_modest_up
-      vix: down
-    - label: risk_on_unconfirmed
-      spx: up
-      hyg: flat_or_down
-      dxy: up
-      yield_2y: sharply_up
-      vix: elevated_or_up
-    - label: risk_off_confirmed
-      spx: down
-      hyg: down
-      dxy: up
-      yield_2y: down_flight
-      vix: up
-    - label: defensive_rotation
-      spx: down_modest
-      hyg: flat
-      dxy: flat
-      yield_2y: down_modest
-      vix: modest_up
-    - label: liquidity_squeeze
-      spx: down
-      hyg: sharply_down
-      dxy: sharply_up
-      yield_2y: sharply_up
-      vix: sharply_up
-
-conflict_resolution_matrix:
-  reference: references/conflict-resolution.md
-  rules:
-    # (evidence_class_a, evidence_class_b) -> resolution_rule
-    # Resolution rules: prefer_a | prefer_b | surface_both | flag_for_review
-    - class_a: official_data
-      class_b: sentiment_source
-      rule: prefer_a
-      note: A-tier official data always outranks E-tier sentiment signals
-    - class_a: official_data
-      class_b: secondary_commentary
-      rule: prefer_a
-      note: A-tier official data always outranks F-tier commentary
-    - class_a: vendor_data
-      class_b: sentiment_source
-      rule: prefer_a
-      note: B-tier structured data outranks E-tier sentiment
-    - class_a: vendor_data
-      class_b: news_event
-      rule: surface_both
-      note: B-tier data and C-tier news may tell complementary stories; show both
-    - class_a: news_event
-      class_b: secondary_commentary
-      rule: prefer_a
-      note: C-tier news facts outrank F-tier interpretive commentary
-    - class_a: industry_source
-      class_b: sentiment_source
-      rule: prefer_a
-      note: D-tier industry data outranks E-tier sentiment
-    - class_a: official_data
-      class_b: official_data
-      rule: flag_for_review
-      note: When two A-tier sources conflict (e.g., revised vs initial FRED release), surface both and flag for review; prefer the more recent release if revision is confirmed
-    - class_a: vendor_data
-      class_b: vendor_data
-      rule: surface_both
-      note: When two B-tier vendors disagree, surface both with methodology note
-  evidence_classes:
-    official_data: [A_official_original]
-    vendor_data: [B_market_data_vendor]
-    news_event: [C_mainstream_financial_news]
-    industry_source: [D_industry_source]
-    sentiment_source: [E_sentiment_source]
-    secondary_commentary: [F_secondary_commentary]
 
 external_resources:
   ingestion_policy:

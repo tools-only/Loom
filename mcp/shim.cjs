@@ -218,7 +218,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['thinking', 'tool_call', 'partial_render', 'decision', 'complete', 'error'] },
+        type: { type: 'string', enum: ['thinking', 'tool_call', 'partial_render', 'decision', 'complete', 'error', 'debate'] },
         payload: { type: 'object' }
       },
       required: ['type']
@@ -231,6 +231,50 @@ const TOOLS = [
       type: 'object',
       properties: { session_id: { type: 'string' }, up_to_event_id: { type: 'string' } },
       required: ['session_id']
+    }
+  },
+  {
+    name: 'anchor_inbox_push',
+    description: 'Push a notification to the user inbox and update hero card badges. Use this to proactively surface findings, alerts, or insights without waiting for the user to ask.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain:  { type: 'string', enum: ['market', 'position', 'target'] },
+        title:   { type: 'string', description: 'Short notification title (max ~60 chars)' },
+        summary: { type: 'string', description: 'One-sentence summary shown in the inbox list' },
+        payload: { type: 'object', description: 'Optional structured data attached to the notification' }
+      },
+      required: ['domain', 'title', 'summary']
+    }
+  },
+  {
+    name: 'anchor_inbox_list',
+    description: 'Read items from the user inbox, optionally filtered by domain or unread status.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        domain: { type: 'string', enum: ['market', 'position', 'target'] },
+        unread: { type: 'boolean', description: 'If true, return only unread items' }
+      }
+    }
+  },
+  {
+    name: 'anchor_schedule',
+    description: 'Register a recurring cron-based push schedule. Fires into the push broker at the given cron expression. Set enabled:false to pause without deleting.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id:       { type: 'string', description: 'Stable identifier, e.g. "market-morning-brief"' },
+        name:     { type: 'string', description: 'Human-readable schedule name' },
+        cron:     { type: 'string', description: 'Cron expression, e.g. "0 9 * * 1-5"' },
+        domain:   { type: 'string', enum: ['market', 'position', 'target'] },
+        title:    { type: 'string', description: 'Notification title when schedule fires' },
+        summary:  { type: 'string', description: 'Notification summary when schedule fires' },
+        ccPrompt: { type: 'string', description: 'If set, spawns CC with this prompt to enrich the notification' },
+        timezone: { type: 'string', description: 'Timezone string, default Asia/Shanghai' },
+        enabled:  { type: 'boolean', description: 'Whether the schedule is active (default true)' }
+      },
+      required: ['id', 'cron', 'domain', 'title']
     }
   },
   {
@@ -419,6 +463,39 @@ async function callTool(id, name, args) {
       case 'anchor_get_html': {
         const r = await sendCmd({ type: 'get_html' });
         rpcResult(id, r.html || '(empty)');
+        break;
+      }
+
+      // ── anchor_inbox_push ─────────────────────────────────────────────
+      case 'anchor_inbox_push': {
+        const r = await post('/push/manual', {
+          domain: args.domain, title: args.title, summary: args.summary,
+          payload: args.payload || {}, source: 'agent'
+        }, 8000);
+        const parsed = typeof r.body === 'string' ? JSON.parse(r.body) : r.body;
+        rpcResult(id, parsed.ok
+          ? `Pushed to ${args.domain} inbox: "${args.title}" (id: ${parsed.item?.id})`
+          : `Error: ${parsed.error}`);
+        break;
+      }
+
+      // ── anchor_inbox_list ─────────────────────────────────────────────
+      case 'anchor_inbox_list': {
+        const qs = new URLSearchParams();
+        if (args.domain) qs.set('domain', args.domain);
+        if (args.unread) qs.set('unread', 'true');
+        const r = await get(`/inbox?${qs}`, 5000);
+        rpcResult(id, r.body);
+        break;
+      }
+
+      // ── anchor_schedule ───────────────────────────────────────────────
+      case 'anchor_schedule': {
+        const r = await post('/schedules', args, 5000);
+        const parsed = typeof r.body === 'string' ? JSON.parse(r.body) : r.body;
+        rpcResult(id, parsed.ok
+          ? `Schedule "${args.id}" registered (${args.cron})`
+          : `Error: ${parsed.error}`);
         break;
       }
 
