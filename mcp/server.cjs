@@ -51,6 +51,9 @@ const tradingCanvasRenderer = require('../trading/trading-canvas-renderer.cjs');
 
 const inbox              = require('./inbox.cjs');
 const { PushBroker }     = require('./push-broker.cjs');
+
+const ANTHROPIC_SDK_PATH = path.join(BRIDGE_NM, '..', 'node_modules', '@anthropic-ai', 'sdk');
+let inprocAgent = null;
 const scheduler          = require('./scheduler.cjs');
 const connectorRegistry  = require('./connectors/index.cjs');
 
@@ -1711,10 +1714,75 @@ function clearPendingFallback() {
   try { if (fs.existsSync(PENDING_OP_JSON)) fs.unlinkSync(PENDING_OP_JSON); } catch {}
 }
 
+function initInprocAgent() {
+  if (inprocAgent) return inprocAgent;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+  let Anthropic;
+  try {
+    const sdk = require(ANTHROPIC_SDK_PATH);
+    Anthropic = sdk.default || sdk;
+  } catch (e) {
+    log('[inproc] SDK load failed: ' + e.message);
+    return null;
+  }
+  const inprocMod = require('./inproc-agent.cjs');
+  const model = process.env.ANCHOR_INPROC_MODEL || 'claude-haiku-4-5-20251001';
+  const toolRegistry = {
+    anchor_get_pending_op: async (input, ctx) => {
+      if (ctx.opConsumed) return JSON.stringify({ pending: false });
+      ctx.opConsumed = true;
+      const op = ctx.opPayload;
+      const subtree = op?.render_state?.relevant_subtree || null;
+      const opKind = op?.intent?.op || '';
+      const needsFull = ['restructure', 'branch', 'expand'].includes(opKind) || !subtree;
+      return JSON.stringify({
+        pending: true, op,
+        relevant_subtree: subtree || undefined,
+        current_html: needsFull ? currentHtml : undefined,
+      });
+    },
+    anchor_get_html: async () => currentHtml,
+    anchor_emit_event: async (input, ctx) => {
+      const { type, payload } = input;
+      broadcastAgentEvent({ type, target_anchor: ctx.target, ...(payload || {}) });
+      if (type === 'complete') ctx.completed = true;
+      return 'ok';
+    },
+    anchor_patch: async (input, ctx) => {
+      const { patches } = input;
+      if (!Array.isArray(patches) || patches.length === 0) return 'no patches';
+      broadcastPatches(patches);
+      ctx.completed = true;
+      return 'patched ' + patches.length + ' node(s)';
+    },
+  };
+  try {
+    inprocAgent = inprocMod.create({
+      Anthropic, apiKey, model, toolRegistry,
+      log: (msg) => log('[inproc] ' + msg),
+      autoExecLog: (evt) => addSpawnEvent({
+        status: evt.event === 'inproc_complete' ? 'done' : 'start',
+        msg: `inproc op=${evt.opKind||''} target=${evt.target||''}`,
+      }),
+      concurrency: parseInt(process.env.ANCHOR_INPROC_CONCURRENCY || '3'),
+    });
+    log('[inproc] agent initialized model=' + model);
+    return inprocAgent;
+  } catch (e) {
+    log('[inproc] init failed: ' + e.message);
+    return null;
+  }
+}
+
 function notifyPendingChanged() {
-  // When ops are buffered and no idle processor is available, spawn a new CC processor.
+  if (pendingOps.length === 0) return;
   const idleCount = Array.from(processorPool.values()).filter(e => e.ws && e.ws.readyState === 1).length;
-  if (pendingOps.length > 0 && idleCount === 0) {
+  if (idleCount > 0) return;
+  const agent = initInprocAgent();
+  if (agent) {
+    while (pendingOps.length > 0) agent.enqueue(pendingOps.shift());
+  } else {
     setTimeout(spawnCCProcessor, 150);
   }
 }
@@ -2227,12 +2295,18 @@ const SCHEMA_STUB = {
         transient_override: { type: 'boolean' },
         subagent_id: { type: ['string', 'null'] },
         context_mode: { type: ['string', 'null'] },
-        file_id: { type: ['string', 'null'] }
+        file_id: { type: ['string', 'null'] },
+        card_anchor_ids: { type: 'array' }
       }
     },
     render_state: {
       type: 'object',
-      properties: { anchor_tree: { type: 'array' }, dom_signature: { type: 'string' } }
+      properties: {
+        anchor_tree: { type: 'array' },
+        dom_signature: { type: 'string' },
+        anchor_index: { type: 'object' },
+        selected_subtrees: { type: 'object' }
+      }
     },
     provenance: {
       type: 'object',
@@ -2254,7 +2328,30 @@ function formatEnvelopeAsPrompt(envelope) {
   const MAX_HTML = 15000;
 
   if (intent.op === 'initial_render') {
-    return `## Anchor Initial Render Request\n\n**Instruction**: ${intent.instruction || '(none)'}\n\n${anchorLayoutContract()}\n\nGenerate a complete Anchor HTML page and call \`anchor_render(html)\`.\n`;
+    let prompt = `## Anchor Initial Render Request\n\n**Instruction**: ${intent.instruction || '(none)'}\n\n`;
+
+    // Include selected card anchors if present
+    const cardIds = bundle.card_anchor_ids || [];
+    const cardSubtrees = rs.selected_subtrees || {};
+    if (cardIds.length > 0) {
+      prompt += '### Selected Card Anchors (User Context)\n';
+      cardIds.forEach(id => { prompt += '- **`' + id + '`**\n'; });
+      prompt += '\n';
+      Object.entries(cardSubtrees).forEach(([id, subtree]) => {
+        if (subtree && subtree.target_html) {
+          const limit = 3000;
+          const html = subtree.target_html.length > limit
+            ? subtree.target_html.substring(0, limit) + '\n... (truncated)'
+            : subtree.target_html;
+          prompt += '**`' + id + '`**:\n```html\n' + html + '\n```\n\n';
+        }
+      });
+      prompt += 'The user has selected these ' + cardIds.length +
+        ' card(s) as reference context. Consider their content when generating your response.\n\n';
+    }
+
+    prompt += anchorLayoutContract() + '\n\nGenerate a complete Anchor HTML page and call `anchor_render(html)`.\n';
+    return prompt;
   }
 
   const subagentId = bundle.subagent_id || null;
@@ -2305,6 +2402,26 @@ function formatEnvelopeAsPrompt(envelope) {
   if (skl.length) out += '**Skills**: ' + skl.map(id => '`' + id + '`').join(', ') + '\n';
   if (res.length) out += '**Resources**: ' + res.map(id => '`' + id + '`').join(', ') + '\n';
   if (bundle.file_id || mem.length || skl.length || res.length) out += '\n';
+
+  // Card anchor context (user-selected page content)
+  const cardAnchorIds = bundle.card_anchor_ids || [];
+  const selectedSubtrees = rs.selected_subtrees || {};
+  if (cardAnchorIds.length > 0) {
+    out += '### Selected Card Anchors (User Context)\n';
+    cardAnchorIds.forEach(id => { out += '- **`' + id + '`**\n'; });
+    out += '\n';
+    Object.entries(selectedSubtrees).forEach(([id, subtree]) => {
+      if (subtree && subtree.target_html) {
+        const limit = 3000;
+        const html = subtree.target_html.length > limit
+          ? subtree.target_html.substring(0, limit) + '\n... (truncated)'
+          : subtree.target_html;
+        out += '**`' + id + '`**:\n```html\n' + html + '\n```\n\n';
+      }
+    });
+    out += 'The user has selected these ' + cardAnchorIds.length +
+      ' card(s) as reference context. Consider their content when generating your response.\n\n';
+  }
 
   const subtree = rs.relevant_subtree || null;
   const targetNodeHtml = subtree && subtree.target_html ? subtree.target_html : null;
