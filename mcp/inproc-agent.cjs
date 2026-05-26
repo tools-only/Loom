@@ -144,13 +144,34 @@ function create(opts) {
     try {
       while (turn < MAX_TURNS) {
         turn++;
-        const resp = await client.messages.create({
+
+        let streamedText = '';
+        const isFirstTurn = turn === 1;
+
+        const stream = client.messages.stream({
           model,
           max_tokens: MAX_TOKENS,
           system: SYSTEM_PROMPT,
           tools: TOOL_DEFS,
           messages,
         });
+
+        if (isFirstTurn) {
+          stream.on('text', (delta) => {
+            streamedText += delta;
+            if (streamedText.trimStart().startsWith('<')) {
+              const handler = toolRegistry.anchor_emit_event;
+              if (handler) {
+                handler({ type: 'partial_render', payload: {
+                  target_anchor: ctx.target,
+                  html_fragment: streamedText,
+                }}, ctx).catch(() => {});
+              }
+            }
+          });
+        }
+
+        const resp = await stream.finalMessage();
         stopReason = resp.stop_reason;
 
         const toolUses = (resp.content || []).filter(b => b.type === 'tool_use');

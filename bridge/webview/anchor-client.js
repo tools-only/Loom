@@ -815,11 +815,17 @@ const Anchor = {
         this.toast('Error: ' + msg.message);
         this.clearProcessing();
         break;
-      case 'agent_event':
-        if (window.TimelinePanel) TimelinePanel.append(msg.event);
-        if (window.DebateOverlay && msg.event && (msg.event.kind || '').startsWith('agent.debate')) DebateOverlay.append(msg.event);
-        this._handleAgentEvent(msg.event);
+      case 'agent_event': {
+        const evt = msg.event;
+        if (evt && evt.payload && evt.payload.type === 'partial_render') {
+          const { target_anchor, html_fragment } = evt.payload;
+          if (target_anchor && html_fragment) this._showStreamingOverlay(target_anchor, html_fragment);
+        }
+        if (window.TimelinePanel) TimelinePanel.append(evt);
+        if (window.DebateOverlay && evt && (evt.kind || '').startsWith('agent.debate')) DebateOverlay.append(evt);
+        this._handleAgentEvent(evt);
         break;
+      }
       case 'shutdown':
         this.shuttingDown = true;
         this.setStatus('', msg.message || 'Shutting down...');
@@ -956,6 +962,7 @@ const Anchor = {
         this.injectHandlesIn(newEl);
         this.injectCollapseIn(newEl);
         this._mountAnnotations(p.anchor_id);
+        this._clearStreamingOverlay(p.anchor_id);
       }
     });
 
@@ -1749,6 +1756,31 @@ const Anchor = {
         el.appendChild(wrap);
       })
       .catch(() => {});
+  },
+
+  _showStreamingOverlay(anchorId, html) {
+    const sel = '[data-anc="' + anchorId.replace(/"/g, '\\"') + '"]';
+    const el = this.container.querySelector(sel);
+    if (!el) return;
+    let overlay = el._streamOverlay;
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'anc-stream-overlay';
+      overlay.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.85);z-index:10;pointer-events:none;overflow:hidden;border-radius:inherit;padding:inherit;';
+      el.style.position = 'relative';
+      el.appendChild(overlay);
+      el._streamOverlay = overlay;
+    }
+    overlay.innerHTML = html;
+  },
+
+  _clearStreamingOverlay(anchorId) {
+    const sel = '[data-anc="' + anchorId.replace(/"/g, '\\"') + '"]';
+    const el = this.container.querySelector(sel);
+    if (el && el._streamOverlay) {
+      el._streamOverlay.remove();
+      el._streamOverlay = null;
+    }
   },
 
   // ── Queue management ─────────────────────────────────────────────
