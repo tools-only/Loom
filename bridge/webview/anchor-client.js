@@ -955,6 +955,7 @@ const Anchor = {
       if (newEl) {
         this.injectHandlesIn(newEl);
         this.injectCollapseIn(newEl);
+        this._mountAnnotations(p.anchor_id);
       }
     });
 
@@ -1707,6 +1708,47 @@ const Anchor = {
     } else {
       this.toast('Connection lost — reconnecting...');
     }
+  },
+
+  _handleAnnotateOp(anchorId, text) {
+    fetch('/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ anchor_id: anchorId, text }),
+    })
+    .then(r => r.json())
+    .then(() => this._mountAnnotations(anchorId))
+    .catch(() => {});
+  },
+
+  _mountAnnotations(anchorId) {
+    fetch('/annotations?anchor_id=' + encodeURIComponent(anchorId))
+      .then(r => r.json())
+      .then(data => {
+        const sel = '[data-anc="' + anchorId.replace(/"/g, '\\"') + '"]';
+        const el = this.container.querySelector(sel);
+        if (!el) return;
+        const existing = el.querySelector('.anc-annotations');
+        if (existing) existing.remove();
+        const annotations = data.items || [];
+        if (annotations.length === 0) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'anc-annotations';
+        annotations.forEach(ann => {
+          const pill = document.createElement('span');
+          pill.className = 'anc-annotation-pill';
+          pill.innerHTML = _escHtml(ann.text) +
+            '<span class="remove-anno" data-ann-id="' + _escHtml(ann.id) + '" title="删除注解">×</span>';
+          pill.querySelector('.remove-anno').addEventListener('click', (e) => {
+            e.stopPropagation();
+            fetch('/annotations/' + ann.id, { method: 'DELETE' })
+              .then(() => this._mountAnnotations(anchorId));
+          });
+          wrap.appendChild(pill);
+        });
+        el.appendChild(wrap);
+      })
+      .catch(() => {});
   },
 
   // ── Queue management ─────────────────────────────────────────────
@@ -3112,6 +3154,11 @@ window.SelectionToolbar = {
   },
 
   _doDispatch(op, targetKind, targetRef, instruction, meta) {
+    if (op === 'annotate') {
+      this.anchor._handleAnnotateOp(targetRef, instruction);
+      this.hide();
+      return;
+    }
     const envelope = this.anchor.buildEnvelope({
       op, target_kind: targetKind, target_ref: targetRef, instruction, selection: meta
     });

@@ -542,6 +542,44 @@ app.post('/inbox/:id/read', (req, res) => {
   res.json({ ok });
 });
 
+// ── Annotations store ─────────────────────────────────────────────
+const ANNOTATIONS_FILE = path.join(WORKSPACE_DIR, 'annotations.json');
+
+function _loadAnnotations() {
+  try { return JSON.parse(fs.readFileSync(ANNOTATIONS_FILE, 'utf8')); } catch { return []; }
+}
+function _saveAnnotations(items) {
+  try { fs.writeFileSync(ANNOTATIONS_FILE, JSON.stringify(items, null, 2), 'utf8'); } catch {}
+}
+
+app.get('/annotations', (req, res) => {
+  const { anchor_id } = req.query;
+  let items = _loadAnnotations();
+  if (anchor_id) items = items.filter(a => a.anchor_id === anchor_id);
+  res.json({ items });
+});
+
+app.post('/annotations', (req, res) => {
+  const { anchor_id, text } = req.body || {};
+  if (!anchor_id || !text) return res.status(400).json({ error: 'anchor_id and text required' });
+  const items = _loadAnnotations();
+  const ann = {
+    id: 'ann_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6),
+    anchor_id, text,
+    ts: new Date().toISOString(),
+  };
+  items.push(ann);
+  _saveAnnotations(items);
+  res.json(ann);
+});
+
+app.delete('/annotations/:id', (req, res) => {
+  let items = _loadAnnotations();
+  items = items.filter(a => a.id !== req.params.id);
+  _saveAnnotations(items);
+  res.json({ ok: true });
+});
+
 app.post('/push/manual', (req, res) => {
   const event = req.body;
   if (!event || !event.domain || !event.title) {
