@@ -50,6 +50,7 @@ const Anchor = {
 
     // Wire up workspace + Phase 1/3/4 modules
     if (window.WorkspacePanel)   WorkspacePanel.init(this);
+    if (window.PromptPanel)      PromptPanel.init(this);
     if (window.ContextPanel)     ContextPanel.init(this);
     if (window.SelectionToolbar) SelectionToolbar.init(this);
     if (window.TimelinePanel)    TimelinePanel.init(this);
@@ -62,6 +63,7 @@ const Anchor = {
     this._initPromptBar();
     this._initHomeSuggestions();
     this._initHashRouting();
+    this._initAnchorSelect();
   },
 
   _initHashRouting() {
@@ -624,9 +626,10 @@ const Anchor = {
       });
     });
 
-    // Floating trigger tabs — click to expand, mouseleave to collapse
+    // Floating trigger tabs — hover to expand, mouseleave to collapse
     this._initFloatingTrigger('trigger-context', 'anchor-context-panel');
     this._initFloatingTrigger('trigger-timeline', 'anchor-timeline-panel');
+    this._initFloatingTrigger('trigger-inbox', 'anchor-inbox-panel');
 
     // Resize handles
     this._initPanelResize('anchor-context-panel');
@@ -651,24 +654,20 @@ const Anchor = {
       trigger.style.pointerEvents = '';
     };
 
-    trigger.addEventListener('click', () => {
-      if (panel.classList.contains('collapsed')) showPanel();
-      else hidePanel();
+    // Hover trigger tab → show; leave trigger or panel → hide
+    trigger.addEventListener('mouseenter', () => {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      showPanel();
     });
-
-    // Click on stage area collapses panels
-    document.getElementById('anchor-stage')?.addEventListener('click', (e) => {
-      if (!panel.classList.contains('collapsed') && !panel.contains(e.target) && e.target !== trigger) {
-        hidePanel();
-      }
+    trigger.addEventListener('mouseleave', () => {
+      hideTimer = setTimeout(hidePanel, 400);
     });
 
     panel.addEventListener('mouseenter', () => {
       if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
     });
-
     panel.addEventListener('mouseleave', () => {
-      hideTimer = setTimeout(hidePanel, 500);
+      hideTimer = setTimeout(hidePanel, 400);
     });
   },
 
@@ -829,7 +828,10 @@ const Anchor = {
       case 'pong':
         break;
       case 'inbox_updated':
-        if (window.InboxPanel) InboxPanel.applyServerCounts(msg.counts);
+        if (window.InboxPanel) {
+          InboxPanel.applyServerCounts(msg.counts);
+          InboxPanel._fetchItems();
+        }
         break;
     }
   },
@@ -909,6 +911,7 @@ const Anchor = {
     this.injectCollapse();
     this.infoEl.textContent = this.countAnchors() + ' anchors';
     if (window.WorkspacePanel) WorkspacePanel.persistCurrentHtml(html);
+    if (window.PromptPanel) PromptPanel.clearSelection();
     this._syncHomeVisibility();
   },
 
@@ -983,6 +986,7 @@ const Anchor = {
       HistoryPanel.save(prevHtml, this.countAnchors());
     }
     if (window.WorkspacePanel) WorkspacePanel.persistCurrentHtml(this.currentHtml);
+    if (window.PromptPanel) PromptPanel.clearSelection();
     this.clearProcessing();
     // Sync currentHtml back to leader so it stays in sync with DOM truth
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -1618,6 +1622,38 @@ const Anchor = {
     const hasHtml = !!(this.currentHtml && this.currentHtml.trim());
     home.classList.toggle('is-hidden', hasHtml);
     shell.classList.toggle('has-content', hasHtml);
+
+    // Show/hide prompt panel trigger based on content
+    const trigger = document.getElementById('trigger-prompt');
+    if (trigger) {
+      trigger.style.display = hasHtml ? '' : 'none';
+      if (!hasHtml && window.PromptPanel) window.PromptPanel.hide();
+    }
+  },
+
+  // Multi-select card anchors — click to toggle context reference
+  _initAnchorSelect() {
+    this.container.addEventListener('click', (e) => {
+      if (e.target.closest('.anc-handle, .anc-handle-popup, .anc-op-btn, ' +
+        'a, button, input, textarea, select, .anc-collapse-caret, ' +
+        '.prompt-chip, .chip-remove')) return;
+
+      const anchorEl = e.target.closest('[data-anc]');
+      if (!anchorEl) return;
+
+      // Only select card-level anchors, not nested field-level ones
+      const isCard = anchorEl.classList.contains('blog-card') ||
+                     anchorEl.classList.contains('anc-section--gc');
+      if (!isCard) return;
+
+      if (!window.PromptPanel) return;
+
+      const anchorId = anchorEl.getAttribute('data-anc');
+      const titleEl = anchorEl.querySelector('.blog-card-title, h1, h2, h3, [data-anc$=".title"]');
+      const label = titleEl ? titleEl.textContent.trim().substring(0, 60) : anchorId;
+
+      window.PromptPanel.toggleAnchor(anchorId, label, anchorEl.outerHTML);
+    });
   },
 
   // Collect the target node's HTML + forward/reverse dependency subtrees.
@@ -3419,16 +3455,37 @@ const InboxPanel = {
       }).catch(() => {});
     });
 
-    // item click → mark read + open domain
+    // item click → mark read + toggle inline detail
     this._list.addEventListener('click', (e) => {
+      if (e.target.closest('.inbox-item-detail')) return;
       const item = e.target.closest('.inbox-item');
       if (!item) return;
       const id = item.dataset.id;
       const domain = item.dataset.domain;
+      const wasExpanded = item.classList.contains('inbox-item--expanded');
       fetch('/inbox/' + id + '/read', { method: 'POST' }).catch(() => {});
       const found = this._items.find(it => it.id === id);
-      if (found) { found.read = true; this._renderList(); }
-      if (domain) _openDomain(domain);
+      if (found) { found.read = true; }
+      this._renderList();
+      if (!wasExpanded) {
+        const freshItem = this._list.querySelector('[data-id="' + CSS.escape(id) + '"]');
+        if (freshItem && found) {
+          freshItem.classList.add('inbox-item--expanded');
+          const detail = document.createElement('div');
+          detail.className = 'inbox-item-detail';
+          const ts = found.timestamp ? new Date(found.timestamp).toLocaleString('zh-CN') : '';
+          const payloadStr = found.payload ? JSON.stringify(found.payload, null, 2) : '(no payload)';
+          detail.innerHTML =
+            `<div class="inbox-detail-meta">${_escHtml(found.source || '')} · ${_escHtml(ts)}</div>` +
+            `<pre class="inbox-detail-payload">${_escHtml(payloadStr)}</pre>` +
+            (domain ? `<button class="btn btn--sm btn--ghost inbox-detail-nav" data-domain="${_escHtml(domain)}">查看详情页 →</button>` : '');
+          detail.querySelector('.inbox-detail-nav')?.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            _openDomain(domain);
+          });
+          freshItem.appendChild(detail);
+        }
+      }
     });
 
     this._fetchCounts();

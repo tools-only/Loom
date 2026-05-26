@@ -431,26 +431,33 @@ tr:hover td { background: rgba(122,90,248,0.04); }
   box-shadow: none;
 }
 .home-prompt-submit {
-  width: 46px;
-  height: 46px;
-  padding: 0;
-  justify-content: center;
-  flex: 0 0 46px;
-  box-shadow: 0 12px 28px -16px rgba(122,90,248,0.88);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: var(--fw-semi);
+  white-space: nowrap;
 }
 
 .home-suggestions {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 18px;
+  width: min(760px, 100%);
+  margin-left: auto;
+  margin-right: auto;
 }
 .home-suggestions button {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  min-height: 32px;
-  padding: 6px 12px;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 18px;
   border-radius: var(--r-pill);
   background: rgba(255,255,255,0.54);
   border: 1px solid rgba(20,21,43,0.07);
@@ -1540,9 +1547,9 @@ tr:hover td { background: rgba(122,90,248,0.04); }
   width: 7px;
 }
 
-/* Collapsed state — slide off-screen to right */
+/* Collapsed state — slide fully off-screen to right (extra offset for right:56px panels) */
 .anc-side-panel.collapsed {
-  transform: translateX(calc(100% + 30px));
+  transform: translateX(calc(100% + 90px));
   opacity: 0;
   pointer-events: none;
 }
@@ -1992,7 +1999,6 @@ tr:hover td { background: rgba(122,90,248,0.04); }
 @media (max-width: 480px) {
   .home-inner h1 { font-size: 42px; }
   .home-prompt { gap: 8px; padding: 9px 10px 9px 14px; }
-  .home-prompt-submit { width: 42px; height: 42px; flex-basis: 42px; }
   .toolbar-brand { font-size: 17px; }
   .toolbar-status { padding-inline: 9px; }
   .toolbar-logo { width: 30px; height: 30px; }
@@ -2436,6 +2442,276 @@ tr:hover td { background: rgba(122,90,248,0.04); }
   border-bottom: 1px solid var(--border, #e5e7eb);
 }
 
+/* ============================================================
+   AI-native Prompt Panel (left side, below toolbar)
+   ============================================================ */
+
+/* Trigger kept in DOM for JS compat but never shown */
+.prompt-panel-trigger { display: none !important; }
+
+/* ── Left-edge auto-hide sidebar (Windows taskbar style) ── */
+
+/* Invisible hover zone at left edge — triggers panel to appear */
+.prompt-hover-zone {
+  position: fixed;
+  left: 0;
+  top: 58px;
+  bottom: 0;
+  width: 12px;
+  z-index: 1609;
+  cursor: default;
+}
+
+.prompt-panel {
+  position: fixed;
+  left: 0;
+  top: 58px;
+  bottom: 0;
+  z-index: 1610;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(250,248,255,0.97);
+  border-right: 1px solid rgba(122,90,248,0.14);
+  box-shadow: 2px 0 24px rgba(122,90,248,0.10);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  transform: translateX(-300px);
+  transition: transform 0.28s cubic-bezier(0.25, 1, 0.5, 1);
+  pointer-events: none;
+}
+.prompt-panel:not(.collapsed) {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+/* Strip element no longer needed — hidden */
+.prompt-panel-strip { display: none; }
+
+/* Full panel content — always visible when panel is open */
+.prompt-panel-full {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Content areas: no permanent offset; shift 300px when panel is open */
+#anchor-home,
+#anchor-shell {
+  transition: margin-left 0.28s cubic-bezier(0.25, 1, 0.5, 1);
+}
+body.ask-panel-open #anchor-home,
+body.ask-panel-open #anchor-shell {
+  margin-left: 300px;
+}
+
+/* Hide ask panel submit button — Ctrl+Enter is the submit */
+#prompt-panel-submit { display: none; }
+
+/* Input takes full width with no gap */
+.prompt-panel-input-row { gap: 0; padding: 12px 14px 16px; }
+
+/* Spacer pushes input to bottom */
+.prompt-panel-spacer { flex: 1; }
+
+/* Header */
+.prompt-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(20,21,43,0.06);
+  flex-shrink: 0;
+}
+.prompt-panel-title {
+  font-weight: var(--fw-bold);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-1);
+}
+.prompt-panel-title i { color: var(--accent-iris); }
+.prompt-panel-actions { display: flex; gap: 4px; }
+.prompt-panel-pin-btn,
+.prompt-panel-toggle {
+  width: 28px; height: 28px;
+  border: none; border-radius: var(--r-pill);
+  background: transparent;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--fg-3);
+  font-size: 14px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.prompt-panel-pin-btn:hover,
+.prompt-panel-toggle:hover {
+  background: rgba(20,21,43,0.06);
+  color: var(--fg-1);
+}
+.prompt-panel-pin-btn.is-pinned { color: var(--accent-iris); }
+
+/* Chips container */
+.prompt-panel-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px 14px;
+  max-height: 160px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  min-height: 36px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+.prompt-panel-chips:has(.prompt-chip) {
+  border-bottom-color: rgba(20,21,43,0.06);
+}
+.prompt-chips-placeholder {
+  font-size: 12px;
+  color: var(--fg-3);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+/* Individual anchor chip */
+.prompt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--r-pill);
+  background: rgba(122,90,248,0.10);
+  border: 1px solid rgba(122,90,248,0.2);
+  font-size: 11px;
+  font-weight: var(--fw-medium);
+  color: var(--accent-iris);
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.prompt-chip:hover { background: rgba(122,90,248,0.18); }
+.prompt-chip .chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prompt-chip .chip-remove {
+  width: 16px; height: 16px;
+  border: none; border-radius: 50%;
+  background: rgba(122,90,248,0.2);
+  color: var(--accent-iris);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: background 0.15s ease;
+}
+.prompt-chip .chip-remove:hover { background: rgba(122,90,248,0.35); }
+
+/* Input row */
+.prompt-panel-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px 14px 14px;
+  flex-shrink: 0;
+}
+.prompt-panel-input {
+  flex: 1;
+  border: 1.5px solid rgba(20,21,43,0.1);
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-family: var(--font-body-cjk);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  background: rgba(255,255,255,0.7);
+  color: var(--fg-1);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  min-height: 96px;
+  max-height: 260px;
+}
+.prompt-panel-input:focus {
+  border-color: var(--accent-iris);
+  box-shadow: 0 0 0 3px rgba(122,90,248,0.1);
+}
+.prompt-panel-input::placeholder { color: var(--fg-3); }
+#prompt-panel-submit {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* Selected anchor card visual indicator */
+.anc-element.anc-selected {
+  outline: 2px solid var(--accent-iris);
+  outline-offset: 2px;
+  border-radius: inherit;
+  position: relative;
+}
+.anc-element.anc-selected::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(122,90,248,0.06);
+  pointer-events: none;
+  z-index: 0;
+}
+.anc-element.anc-selected::after {
+  content: '\2713';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--accent-iris);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(122,90,248,0.35);
+}
+
+/* Higher specificity — override anc-section background bleed-through */
+.anc-section--gc.anc-selected::before {
+  background: rgba(122,90,248,0.08);
+}
+
+/* Ctrl+click flash feedback */
+@keyframes ancCtrlFlash {
+  0%   { outline: 2px solid rgba(122,90,248,0.8); outline-offset: 2px; }
+  100% { outline: 2px solid transparent; outline-offset: 6px; }
+}
+.anc-ctrl-flash {
+  animation: ancCtrlFlash 0.5s ease-out forwards;
+}
+
+/* Inline editing via double-click */
+[data-anc-editing] {
+  outline: 2px dashed rgba(122,90,248,0.5);
+  outline-offset: 3px;
+  border-radius: 4px;
+  cursor: text;
+  background: rgba(122,90,248,0.04);
+}
+
+/* Responsive — on small screens, panel overlays instead of pushing */
+@media (max-width: 700px) {
+  .prompt-panel:not(.collapsed) { width: calc(100vw - 60px); }
+  body.ask-panel-open #anchor-home,
+  body.ask-panel-open #anchor-shell { margin-left: 44px; }
+}
+
 /* 2-column card grid */
 .blog-card-grid {
   display: grid;
@@ -2698,11 +2974,6 @@ body::before {
 .home-prompt-input {
   min-width: 0;
   font-size: 15px;
-}
-.home-prompt-submit {
-  width: 42px;
-  height: 42px;
-  flex-basis: 42px;
 }
 
 .home-domain-grid {
@@ -3196,11 +3467,6 @@ body::before {
   .home-prompt {
     border-radius: 16px;
   }
-  .home-prompt-submit {
-    width: 40px;
-    height: 40px;
-    flex-basis: 40px;
-  }
   .blog-header.anc-section--gc,
   .blog-header,
   .blog-header--aurora,
@@ -3278,7 +3544,7 @@ body::before {
 
 .home-copy .home-prompt {
   width: 100%;
-  max-width: 720px;
+  max-width: 780px;
   min-width: 0;
   margin-top: 2px;
   border-radius: 16px;
@@ -3286,35 +3552,50 @@ body::before {
   background: rgba(255, 255, 255, 0.92);
 }
 
-.home-suggestions {
+.home-inner--daydream .home-suggestions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
-  max-width: 720px;
+  width: min(720px, 100%);
   margin: 0;
 }
 
-.home-suggestions button,
+.home-inner--daydream .home-suggestions button,
 .question-grid button,
 .command-step {
   font: inherit;
   cursor: pointer;
 }
 
-.home-suggestions button {
-  min-height: 34px;
-  padding: 8px 12px;
+.home-inner--daydream .home-suggestions button {
+  position: relative;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 18px;
   border: 1px solid var(--day-line);
   border-radius: 999px;
   color: var(--day-ink);
   background: rgba(255, 255, 255, 0.76);
-  transition: transform var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
+  overflow: hidden;
+  white-space: normal;
+  display: flex;
+  align-items: center;
+  transition: transform var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+/* Remove ::after that was pushing the arrow icon left */
+.home-inner--daydream .home-suggestions button::after { display: none; }
+
+/* Arrow icon always flush to right */
+.home-inner--daydream .home-suggestions button i {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
-.home-suggestions button:hover,
-.home-suggestions button:focus-visible {
-  transform: translateY(-1px);
+.home-inner--daydream .home-suggestions button:hover,
+.home-inner--daydream .home-suggestions button:focus-visible {
+  transform: translateY(-2px);
   background: var(--day-accent);
+  box-shadow: 0 14px 32px -18px rgba(16, 19, 31, 0.38);
   outline: none;
 }
 
@@ -3534,20 +3815,7 @@ body::before {
 }
 
 .home-inner--daydream > .home-domain-grid {
-  grid-column: 2;
-  grid-row: 3;
-  align-self: stretch;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.home-inner--daydream > .home-domain-grid::before {
-  grid-column: 1 / -1;
-  content: "Workspace lanes";
-}
-
-.home-inner--daydream .home-domain-card {
-  min-height: 116px;
+  display: none;
 }
 
 @media (max-width: 1100px) {
@@ -3899,3 +4167,9 @@ body::before {
     radial-gradient(circle at 50% 50%, #ffffff 0%, #ffffff 22%, rgba(255,255,255,0.96) 46%, rgba(255,255,255,0.70) 68%, transparent 84%),
     linear-gradient(135deg, #ecc8a8 0%, #f6e8e0 20%, #ffffff 38% 62%, #f4e0e8 80%, #e4b0c4 100%);
 }
+
+/* ── Inbox item detail expansion ── */
+.inbox-item--expanded { background: var(--paper-2, #f8f8f8); }
+.inbox-item-detail { padding: 8px 12px; border-top: 1px solid var(--border, #e0e0e0); }
+.inbox-detail-meta { font-size: 11px; color: var(--fg-3, #888); margin-bottom: 6px; }
+.inbox-detail-payload { font-size: 11px; font-family: var(--ff-mono, monospace); white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; margin: 0 0 8px; }
