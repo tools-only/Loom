@@ -4,6 +4,7 @@ logs/
 output/
 anchor-output/
 dist/
+.worktrees/
 .claude/plans/
 .claude/memory/
 .claude/debug/
