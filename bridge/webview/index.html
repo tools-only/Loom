@@ -41,6 +41,9 @@
   <button id="anchor-debate-trigger" type="button" title="Launch structured adversarial debate to produce a PRD">
     <i class="ph-bold ph-sword"></i> Debate
   </button>
+  <button class="toolbar-loom-config" id="anchor-hands-config-btn" title="Settings" type="button">
+    <i class="ph-bold ph-gear-six"></i>
+  </button>
   <button class="toolbar-shutdown" id="anchor-shutdown" title="Shutdown Anchor services" type="button">
     <i class="ph-bold ph-power"></i>
   </button>
@@ -52,9 +55,23 @@
       <h1>Think it. Live it.</h1>
       <div class="home-prompt" role="search">
         <i class="ph-bold ph-magnifying-glass"></i>
-        <input id="anchor-prompt-input" class="anchor-prompt-input home-prompt-input" type="text" placeholder="Ask for a market brief, portfolio review, target tracker...">
+        <input id="anchor-prompt-input" class="anchor-prompt-input home-prompt-input" type="text" placeholder="选择一个工作模式开始...">
         <button id="anchor-prompt-submit" class="btn btn--brand home-prompt-submit" type="button" title="Generate">
-          <i class="ph-bold ph-arrow-right"></i>
+          <i class="ph-bold ph-arrow-right"></i><span>Generate</span>
+        </button>
+      </div>
+      <div class="home-branch-chips" aria-label="Branch selector" id="home-branch-chips">
+        <button class="branch-chip" type="button" data-branch="market" data-placeholder="今日市场研判：宏观信号、板块轮动、风险事件..." data-prompt="哪些宏观和新闻事件正在改变本周风险偏好？">
+          <i class="ph-bold ph-newspaper"></i><span>市场研判</span>
+        </button>
+        <button class="branch-chip" type="button" data-branch="position" data-placeholder="仓位管理：持仓复盘、风险敞口、调仓建议..." data-prompt="基于我的仓位生成一份交易复盘，并标出需要 agent 继续跟进的节点">
+          <i class="ph-bold ph-briefcase"></i><span>仓位管理</span>
+        </button>
+        <button class="branch-chip" type="button" data-branch="target" data-placeholder="投资逻辑：标的跟踪、论文维护、催化剂监控..." data-prompt="为关注标的建立一个触发器：价格、新闻、财报、情绪同时跟踪">
+          <i class="ph-bold ph-crosshair"></i><span>投资逻辑</span>
+        </button>
+        <button class="branch-chip" type="button" data-branch="sentiment" data-placeholder="情绪追踪：Fear & Greed、持仓极值、社媒信号..." data-prompt="把市场情绪、Reddit、Stocktwits 和 Fear & Greed 指标合成一个情绪摘要">
+          <i class="ph-bold ph-pulse"></i><span>情绪追踪</span>
         </button>
       </div>
       <div class="home-suggestions" aria-label="Prompt starters">
@@ -166,6 +183,51 @@
   <div id="workspace-tree" class="workspace-tree"></div>
 </aside>
 
+<!-- Invisible hover zone at left edge — triggers ask panel to slide in -->
+<div class="prompt-hover-zone" id="prompt-hover-zone"></div>
+
+<!-- AI-native prompt panel trigger — kept for JS compat -->
+<div class="prompt-panel-trigger" id="trigger-prompt" hidden></div>
+
+<!-- AI-native prompt panel (left-edge auto-hide sidebar) -->
+<aside id="anchor-prompt-panel" class="prompt-panel collapsed">
+  <!-- Full panel content -->
+  <div class="prompt-panel-full">
+    <div class="prompt-panel-header">
+      <span class="prompt-panel-title">
+        <i class="ph-bold ph-sparkle"></i> Ask AI
+      </span>
+      <div class="prompt-panel-actions">
+        <button class="prompt-panel-pin-btn" id="prompt-pin-btn" title="Pin panel">
+          <i class="ph-bold ph-push-pin"></i>
+        </button>
+        <button class="prompt-panel-toggle" data-target="anchor-prompt-panel" title="Close">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="prompt-panel-chips" id="prompt-chips">
+      <span class="prompt-chips-placeholder">Ctrl+click any content to add context</span>
+    </div>
+
+    <div class="prompt-panel-spacer"></div>
+
+    <div class="prompt-panel-input-row">
+      <textarea
+        id="prompt-panel-input"
+        class="prompt-panel-input"
+        placeholder="Ask about the selected content... (Ctrl+Enter to send)"
+        rows="5"
+        maxlength="4000"
+      ></textarea>
+      <button id="prompt-panel-submit" class="btn btn--brand btn--sm" type="button" title="Send prompt (Ctrl+Enter)">
+        <i class="ph-bold ph-paper-plane-right"></i>
+      </button>
+    </div>
+  </div>
+</aside>
+
 <!-- Floating trigger tabs (right edge, stacked) -->
 <div class="anc-panel-trigger" id="trigger-context" title="Context">
   <i class="ph-bold ph-stack"></i><span>Context</span>
@@ -247,6 +309,7 @@
   </div>
 </aside>
 
+
 <div id="anchor-shell">
 
   <!-- Center: rendered anchor content -->
@@ -312,8 +375,147 @@
   <div class="debate-history-list" id="debate-history-list"></div>
 </div>
 
+<!-- Settings modal (Models / Connector) -->
+<div id="loom-hands-modal" class="loom-modal-backdrop" hidden>
+  <div class="loom-modal" role="dialog" aria-modal="true" aria-labelledby="loom-modal-title">
+    <div class="loom-modal-header">
+      <span id="loom-modal-title" class="loom-modal-title">
+        <i class="ph-bold ph-gear-six"></i> Settings
+      </span>
+      <button id="loom-modal-close" class="loom-modal-close-btn" type="button" title="关闭"><i class="ph-bold ph-x"></i></button>
+    </div>
+    <div class="loom-modal-tabs">
+      <button class="loom-modal-tab loom-modal-tab--active" data-tab="models" type="button">Models</button>
+      <button class="loom-modal-tab" data-tab="connector" type="button">Connector</button>
+    </div>
+    <div class="loom-modal-body">
+      <div id="loom-modal-status" class="loom-modal-status" style="display:none"></div>
+
+      <!-- Models tab: Brain (top) + Hands (bottom) -->
+      <div class="loom-tab-panel" data-panel="models">
+
+        <!-- Brain section -->
+        <div class="loom-section-label">Brain <span class="loom-hint">· inproc agent</span></div>
+        <div class="loom-grid-2">
+          <div class="loom-fg">
+            <label>Provider</label>
+            <select id="br-provider">
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI-compat (GPT / Ollama / OpenCode)</option>
+            </select>
+          </div>
+          <div class="loom-fg">
+            <label>Model</label>
+            <input id="br-model" type="text" placeholder="claude-haiku-4-5-20251001">
+          </div>
+          <div class="loom-fg" id="br-baseurl-group" style="grid-column:span 2">
+            <label>Base URL <span class="loom-hint">(only for OpenAI-compat)</span></label>
+            <input id="br-baseurl" type="text" placeholder="http://localhost:11434/v1">
+          </div>
+        </div>
+        <div id="br-active" class="settings-active" style="margin-top:8px">-</div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button id="br-save" class="btn btn--brand btn--sm" type="button">Save &amp; Apply</button>
+          <button id="br-reset" class="btn btn--ghost btn--sm" type="button">Reset to Defaults</button>
+        </div>
+        <div id="br-msg" class="loom-modal-msg" style="margin-top:6px"></div>
+
+        <hr class="anc-divider" style="margin:18px 0 14px">
+
+        <!-- Hands section -->
+        <div class="loom-preset-row">
+          <span class="loom-preset-label">Hands 快速预设</span>
+          <button class="loom-preset-btn" type="button" data-provider="anthropic" data-model="claude-haiku-4-5-20251001">Anthropic · Haiku</button>
+          <button class="loom-preset-btn" type="button" data-provider="anthropic" data-model="claude-sonnet-4-6">Anthropic · Sonnet</button>
+          <button class="loom-preset-btn" type="button" data-provider="deepseek" data-model="deepseek-chat">DeepSeek V3</button>
+          <button class="loom-preset-btn" type="button" data-provider="xai" data-model="grok-3">xAI · Grok 3</button>
+          <button class="loom-preset-btn" type="button" data-provider="gemini" data-model="gemini-2.0-flash">Gemini Flash</button>
+        </div>
+        <div class="loom-section-label" style="margin-top:12px">Hands <span class="loom-hint">· 全局默认</span></div>
+        <div class="loom-grid-2">
+          <div class="loom-fg">
+            <label>供应商</label>
+            <select id="lm-def-provider">
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+              <option value="xai">xAI (Grok)</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="gemini">Gemini</option>
+              <option value="custom">自定义</option>
+            </select>
+          </div>
+          <div class="loom-fg">
+            <label>模型名</label>
+            <input id="lm-def-model" type="text" placeholder="claude-haiku-4-5-20251001">
+          </div>
+          <div class="loom-fg">
+            <label>API Key <span class="loom-hint">（空 = 读取环境变量）</span></label>
+            <input id="lm-def-apikey" type="password" placeholder="sk-ant-…">
+          </div>
+          <div class="loom-fg">
+            <label>Base URL <span class="loom-hint">（空 = 供应商默认）</span></label>
+            <input id="lm-def-baseurl" type="text" placeholder="https://…">
+          </div>
+        </div>
+        <div class="loom-section-label" style="margin-top:14px">各 Hand 单独配置 <span class="loom-hint">空字段继承全局默认</span></div>
+        <div class="loom-hand-table">
+          <div class="loom-hand-header">
+            <span>Hand</span><span>供应商</span><span>模型</span><span>API Key</span><span>Base URL</span>
+          </div>
+          <div class="loom-hand-row">
+            <span>📊 市场研判</span>
+            <select id="lm-market-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+            <input id="lm-market-model" type="text" placeholder="（继承默认）">
+            <input id="lm-market-apikey" type="password" placeholder="（继承默认）">
+            <input id="lm-market-baseurl" type="text" placeholder="（继承默认）">
+          </div>
+          <div class="loom-hand-row">
+            <span>🌡️ 情绪追踪</span>
+            <select id="lm-sentiment-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+            <input id="lm-sentiment-model" type="text" placeholder="（继承默认）">
+            <input id="lm-sentiment-apikey" type="password" placeholder="（继承默认）">
+            <input id="lm-sentiment-baseurl" type="text" placeholder="（继承默认）">
+          </div>
+          <div class="loom-hand-row">
+            <span>🎯 标的 Thesis</span>
+            <select id="lm-target-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+            <input id="lm-target-model" type="text" placeholder="（继承默认）">
+            <input id="lm-target-apikey" type="password" placeholder="（继承默认）">
+            <input id="lm-target-baseurl" type="text" placeholder="（继承默认）">
+          </div>
+          <div class="loom-hand-row">
+            <span>💼 持仓管理</span>
+            <select id="lm-position-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+            <input id="lm-position-model" type="text" placeholder="（继承默认）">
+            <input id="lm-position-apikey" type="password" placeholder="（继承默认）">
+            <input id="lm-position-baseurl" type="text" placeholder="（继承默认）">
+          </div>
+        </div>
+      </div>
+
+      <!-- Connector tab -->
+      <div class="loom-tab-panel loom-tab-panel--hidden" data-panel="connector">
+        <div id="loom-connector-list" class="schedule-list">
+          <div class="schedule-empty">加载中...</div>
+        </div>
+      </div>
+    </div>
+    <div class="loom-modal-footer">
+      <span id="loom-modal-msg" class="loom-modal-msg"></span>
+      <div class="loom-modal-actions">
+        <button id="loom-modal-open-panel" class="btn btn--ghost btn--sm" type="button"><i class="ph-bold ph-arrow-square-out"></i> 完整面板</button>
+        <button id="loom-modal-cancel" class="btn btn--ghost btn--sm" type="button">取消</button>
+        <button id="loom-modal-save" class="btn btn--brand btn--sm" type="button"><i class="ph-bold ph-floppy-disk"></i> 保存 Hands</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="anchor-client.js"></script>
+<script src="prompt-panel.js"></script>
 <script src="anchor-debate-overlay.js"></script>
+<script src="hand-feedback-widget.js"></script>
+<script src="hand-settings-panel.js"></script>
 
 <!-- Global Execute All button -->
 <div id="anchor-execute-all" class="hidden">

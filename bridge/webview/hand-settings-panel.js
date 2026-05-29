@@ -1,0 +1,151 @@
+// Hand Settings Panel — self-mounts gear button on [data-anc^="loom-"] sections
+// Reads/writes http://127.0.0.1:3001/hand/:id/config
+// Uses Bloom tokens only. No new CSS introduced.
+
+(function () {
+  const BRAIN_URL = 'http://127.0.0.1:3001';
+  const ATTR = 'data-hsp-mounted';
+
+  const SCHEMA_LABELS = {
+    market:    { watched_sectors: '关注板块', kol_feeds: 'KOL RSS 列表', macro_themes: '宏观主题' },
+    sentiment: { reddit_subs: 'Reddit 社区', watched_tickers: '关注标的' },
+    target:    { tickers: '目标标的' },
+    position:  { risk_profile: '风险偏好', positions: '持仓数据' },
+  };
+
+  function extractHandId(ancId) {
+    return ancId.startsWith('loom-') ? ancId.slice(5) : ancId;
+  }
+
+  function buildPanel(el) {
+    const ancId = el.getAttribute('data-anc') || '';
+    const handId = extractHandId(ancId);
+    if (!handId || !SCHEMA_LABELS[handId]) return;
+
+    // Gear button — insert into first h2/h3 if present, else prepend to section
+    const heading = el.querySelector('h2, h3');
+    const gearBtn = document.createElement('button');
+    gearBtn.className = 'btn btn--icon btn--sm';
+    gearBtn.title = `${handId} 设置`;
+    gearBtn.style.cssText = 'float:right;margin-left:8px;color:var(--ink-3)';
+    gearBtn.innerHTML = '<i class="ph-bold ph-gear-six"></i>';
+
+    if (heading) {
+      heading.style.display = 'flex';
+      heading.style.alignItems = 'center';
+      heading.style.justifyContent = 'space-between';
+      heading.appendChild(gearBtn);
+    } else {
+      el.prepend(gearBtn);
+    }
+
+    // Settings panel (hidden by default)
+    const panel = document.createElement('div');
+    panel.className = 'anc-section anc-section--gc hsp-panel';
+    panel.style.cssText = 'display:none;margin-top:12px;padding:14px 16px;background:var(--surface-1,rgba(0,0,0,.03));border-radius:12px;';
+    panel.innerHTML = `
+      <div class="hsp-fields" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn--brand btn--sm hsp-save">保存</button>
+        <button class="btn btn--ghost btn--sm hsp-cancel">取消</button>
+        <span class="hsp-status" style="font-size:12px;color:var(--ink-3);align-self:center;display:none"></span>
+      </div>
+    `;
+
+    let currentConfig = {};
+
+    async function loadConfig() {
+      try {
+        const r = await fetch(`${BRAIN_URL}/hand/${handId}/config`);
+        if (r.ok) currentConfig = (await r.json()).config || {};
+      } catch (_) { currentConfig = {}; }
+      renderFields();
+    }
+
+    function renderFields() {
+      const fieldsEl = panel.querySelector('.hsp-fields');
+      fieldsEl.innerHTML = '';
+      const schema = SCHEMA_LABELS[handId] || {};
+      for (const [key, label] of Object.entries(schema)) {
+        const val = currentConfig[key];
+        const isArray = Array.isArray(val) || (val === undefined && key !== 'risk_profile');
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        lbl.style.cssText = 'font-size:12px;font-weight:600;color:var(--ink-2)';
+        const inp = document.createElement('textarea');
+        inp.dataset.key = key;
+        inp.rows = isArray ? 3 : 2;
+        inp.style.cssText = 'padding:8px 10px;border-radius:8px;border:1px solid var(--surface-2,rgba(0,0,0,.12));background:var(--paper);font-size:13px;color:var(--ink);resize:vertical;font-family:inherit;';
+        inp.placeholder = isArray ? '每行一个值' : '输入描述';
+        inp.value = isArray
+          ? (Array.isArray(val) ? val.join('\n') : '')
+          : (val || '');
+        wrapper.appendChild(lbl);
+        wrapper.appendChild(inp);
+        fieldsEl.appendChild(wrapper);
+      }
+    }
+
+    function collectConfig() {
+      const out = { ...currentConfig };
+      const schema = SCHEMA_LABELS[handId] || {};
+      panel.querySelectorAll('textarea[data-key]').forEach(inp => {
+        const key = inp.dataset.key;
+        const isArray = Array.isArray(currentConfig[key]) || (currentConfig[key] === undefined && key !== 'risk_profile');
+        out[key] = isArray
+          ? inp.value.split('\n').map(s => s.trim()).filter(Boolean)
+          : inp.value.trim();
+      });
+      return out;
+    }
+
+    gearBtn.addEventListener('click', async () => {
+      const isOpen = panel.style.display !== 'none';
+      panel.style.display = isOpen ? 'none' : 'block';
+      if (!isOpen) await loadConfig();
+    });
+
+    panel.querySelector('.hsp-save').addEventListener('click', async () => {
+      const config = collectConfig();
+      const status = panel.querySelector('.hsp-status');
+      try {
+        const r = await fetch(`${BRAIN_URL}/hand/${handId}/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        });
+        if (r.ok) {
+          currentConfig = config;
+          status.textContent = '✓ 已保存';
+          status.style.display = '';
+          setTimeout(() => { status.style.display = 'none'; }, 2000);
+        }
+      } catch (_) {
+        status.textContent = '保存失败';
+        status.style.display = '';
+      }
+    });
+
+    panel.querySelector('.hsp-cancel').addEventListener('click', () => {
+      panel.style.display = 'none';
+    });
+
+    el.appendChild(panel);
+    el.setAttribute(ATTR, '1');
+  }
+
+  function mountAll(root) {
+    (root || document).querySelectorAll('[data-anc^="loom-"]:not([' + ATTR + '])').forEach(buildPanel);
+  }
+
+  const observer = new MutationObserver(() => mountAll());
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => mountAll());
+  } else {
+    mountAll();
+  }
+})();
