@@ -1,0 +1,28 @@
+"""In-memory agent adapter registry."""
+
+from __future__ import annotations
+
+from .base import AgentAdapter
+
+
+class AgentAdapterRegistry:
+    def __init__(self) -> None:
+        self._adapters: list[AgentAdapter] = []
+
+    def register(self, adapter: AgentAdapter) -> None:
+        if any(existing.id == adapter.id for existing in self._adapters):
+            raise ValueError(f"agent adapter already registered: {adapter.id}")
+        self._adapters.append(adapter)
+
+    def list(self) -> list[AgentAdapter]:
+        return list(self._adapters)
+
+    def find_by_capability(self, capability: str) -> AgentAdapter | None:
+        for adapter in self._adapters:
+            if capability in adapter.capabilities:
+                return adapter
+        return None
+
+
+def create_adapter_registry() -> AgentAdapterRegistry:
+    return AgentAdapterRegistry()
