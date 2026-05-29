@@ -23,13 +23,18 @@ const PROMPTS_DIR  = path.join(ROOT, 'prompts');
 const LOGS_DIR     = path.join(ROOT, 'logs');
 const RUNTIME_DIR  = path.join(LOGS_DIR, 'runtime');
 const WORKSPACE_DIR = path.join(LOGS_DIR, 'workspace');
-const SESSIONS_DIR = path.join(LOGS_DIR, 'sessions');
-const SCHEMAS_DIR  = path.join(__dirname, 'schemas');
+const HISTORY_DIR   = path.join(WORKSPACE_DIR, 'history');
+const SESSIONS_DIR  = path.join(LOGS_DIR, 'sessions');
+const BRANCHES_DIR  = path.join(ROOT, 'branches');
+const CONFIG_DIR    = path.join(ROOT, 'config');
+const ACTIVE_BRANCH_FILE = path.join(CONFIG_DIR, 'active-branch.json');
+const SCHEMAS_DIR   = path.join(__dirname, 'schemas');
 const CURRENT_HTML   = path.join(OUTPUT_DIR, 'current.html');
 const PENDING_PROMPT = path.join(PROMPTS_DIR, 'pending.md');
 const PENDING_OP_JSON = path.join(PROMPTS_DIR, 'pending-op.json');
 const OPS_LOG      = path.join(LOGS_DIR, 'ops.jsonl');
 const TIMELINE_LOG = path.join(LOGS_DIR, 'timeline.log');
+const PROJECT_HISTORY_FILE = path.join(LOGS_DIR, 'project-history.jsonl');
 const PROCESS_REGISTRY = path.join(RUNTIME_DIR, 'anchor-processes.json');
 const SHUTDOWN_LOG = path.join(RUNTIME_DIR, 'shutdown.log');
 const WORKSPACE_FILE = path.join(WORKSPACE_DIR, 'workspace.json');
@@ -51,8 +56,12 @@ const tradingCanvasRenderer = require('../trading/trading-canvas-renderer.cjs');
 
 const inbox              = require('./inbox.cjs');
 const { PushBroker }     = require('./push-broker.cjs');
+const configStore        = require('./lib/config-store.cjs');
+const {
+  buildDomainManifestResponse,
+  loadDomainManifests,
+} = require('./lib/domain-registry.cjs');
 
-const ANTHROPIC_SDK_PATH = path.join(BRIDGE_NM, '..', 'node_modules', '@anthropic-ai', 'sdk');
 let inprocAgent = null;
 const scheduler          = require('./scheduler.cjs');
 const connectorRegistry  = require('./connectors/index.cjs');
@@ -72,6 +81,12 @@ const processorPool = new Map();  // agentId → { ws, ops: [...] } — one entr
 let processorSeq = 0;            // increments per spawn; used to generate unique agentIds
 let ccSpawnLock  = false;        // prevent concurrent spawnCCProcessor calls
 const spawningPartitions = new Set(); // partitions currently being spawned (per-partition lock)
+
+// ── Spawn rate limiting ───────────────────────────────────────────────
+const spawnCooldowns = new Map();  // partitionId → { lastSpawn, failCount }
+const SPAWN_BASE_DELAY = 5000;     // initial cooldown ms
+const SPAWN_MAX_DELAY = 60000;    // max cooldown ms (after backoff)
+const SPAWN_MAX_FAILS = 5;        // max consecutive failures before abort
 const agentRegistry = new Map();  // agentId → { ws, subagentId, label, connectedAt }
 let loopEnabled = true;
 let shuttingDown = false;
@@ -89,8 +104,9 @@ let manifestCache = { data: null, ts: 0 };
 const MANIFEST_CACHE_MS = 5000;
 let _tl = null;
 
-if (!process.env.ANCHOR_FRESH_START && fs.existsSync(CURRENT_HTML)) {
-  currentHtml = fs.readFileSync(CURRENT_HTML, 'utf8');
+if (!process.env.ANCHOR_FRESH_START) {
+  const _startHtml = getCurrentHtmlPath();
+  if (fs.existsSync(_startHtml)) currentHtml = fs.readFileSync(_startHtml, 'utf8');
 }
 
 function log(msg) { process.stderr.write(`[anchor] ${msg}\n`); }
@@ -202,8 +218,8 @@ function normalizeHistoryEntry(entry) {
     id: entry.id || createId('hist', entry.summary || 'entry'),
     timestamp: entry.timestamp || ts,
     anchorCount: Number(entry.anchorCount || entry.anchor_count || 0),
-    html: String(entry.html || ''),
     summary: String(entry.summary || 'Saved version')
+    // html intentionally omitted — stored on disk at HISTORY_DIR/<file_id>/<entry_id>.html
   };
 }
 
@@ -465,7 +481,7 @@ app.post('/html', (req, res) => {
   const html = req.body.html || '';
   if (!html.trim()) return res.status(400).json({ error: 'empty html' });
   currentHtml = html;
-  fs.writeFileSync(CURRENT_HTML, html, 'utf8');
+  writeCurrentHtml(html);
   broadcast(html);
   log(`HTML via POST (${html.length} bytes), ${webviewClients.size} client(s)`);
   res.json({ ok: true });
@@ -580,6 +596,62 @@ app.delete('/annotations/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Provider config ─────────────────────────────────────────────────
+app.get('/config', (req, res) => {
+  const cfg = configStore.load();
+  res.json({
+    provider: cfg.provider,
+    model: cfg.model,
+    baseUrl: cfg.baseUrl || '',
+    apiKeySet: configStore.hasApiKey(),
+    configPath: configStore.getConfigPath(),
+  });
+});
+
+app.post('/config', express.json(), (req, res) => {
+  const { provider, model, baseUrl } = req.body || {};
+  try {
+    const cfg = configStore.save({ provider, model, baseUrl });
+    reinitInprocAgent();
+    res.json({ ok: true, provider: cfg.provider, model: cfg.model, baseUrl: cfg.baseUrl });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/config/reload', (req, res) => {
+  const agent = reinitInprocAgent();
+  const cfg = configStore.load();
+  res.json({ ok: !!agent, provider: cfg.provider, model: cfg.model });
+});
+
+app.post('/config/reset', (req, res) => {
+  const cfg = configStore.reset();
+  reinitInprocAgent();
+  res.json({ ok: true, provider: cfg.provider, model: cfg.model, baseUrl: cfg.baseUrl });
+});
+
+// ── Loom Hands config (proxied to avoid CORS; reads/writes loom/loom-config.json) ──
+const LOOM_CONFIG_PATH = path.join(ROOT, 'loom', 'loom-config.json');
+app.get('/loom/config', (req, res) => {
+  try {
+    const raw = fs.existsSync(LOOM_CONFIG_PATH)
+      ? fs.readFileSync(LOOM_CONFIG_PATH, 'utf8')
+      : '{}';
+    res.json(JSON.parse(raw));
+  } catch (e) {
+    res.json({ default: {}, hands: {} });
+  }
+});
+app.put('/loom/config', express.json(), (req, res) => {
+  try {
+    fs.writeFileSync(LOOM_CONFIG_PATH, JSON.stringify(req.body, null, 2), 'utf8');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 app.post('/push/manual', (req, res) => {
   const event = req.body;
   if (!event || !event.domain || !event.title) {
@@ -644,7 +716,42 @@ app.delete('/schedules/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+app.patch('/schedules/:id', (req, res) => {
+  try {
+    const enabled = req.body?.enabled !== false;
+    const spec = scheduler.toggle(req.params.id, enabled);
+    res.json({ ok: true, spec });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
+// ── Connector routes ──────────────────────────────────────────────────
+
+app.get('/connectors', (req, res) => {
+  res.json({ ok: true, connectors: connectorRegistry.list() });
+});
+
+app.patch('/connectors/:id', (req, res) => {
+  try {
+    const enabled = req.body?.enabled !== false;
+    const result = connectorRegistry.toggle(req.params.id, enabled);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
 // ── Domain workspace page ─────────────────────────────────────────────
+
+// Read-only domain metadata. Existing domain routes remain mounted separately.
+app.get('/domains', (req, res) => {
+  try {
+    res.json(buildDomainManifestResponse(loadDomainManifests(ROOT)));
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 const DOMAIN_META = {
   market:    { icon: '📊', label: '市场情报', color: 'aurora' },
@@ -652,6 +759,104 @@ const DOMAIN_META = {
   target:    { icon: '🎯', label: '标的跟踪', color: 'warm'   },
   sentiment: { icon: '🌡️', label: '市场情绪', color: 'flame'  }
 };
+
+// ── Branch isolation helpers ──────────────────────────────────────────
+
+const BRANCH_CLAUDE_MD = {
+  market: `# Market Intelligence Branch
+You are an expert financial analyst focused on market intelligence and macro research.
+Skills: macro analysis, news synthesis, sector rotation, risk assessment.
+Context: this branch is for market research, news briefings, and macro commentary only.
+Do not reference portfolio positions or investment decisions in this context.`,
+
+  position: `# Portfolio Management Branch
+You are a portfolio manager focused on position analysis and risk management.
+Skills: position sizing, P&L analysis, risk/reward assessment, rebalancing decisions.
+Context: this branch is for portfolio review, position management, and trade analysis only.
+Do not mix market commentary with position-specific analysis.`,
+
+  target: `# Target Tracking Branch
+You are an investment researcher focused on individual stock and asset monitoring.
+Skills: fundamental analysis, valuation, catalyst tracking, technical levels.
+Context: this branch is for tracking specific investment targets and maintaining research.
+Each target should have its own section with thesis, levels, and catalysts.`,
+
+  sentiment: `# Market Sentiment Branch
+You are a sentiment analyst monitoring market psychology and positioning data.
+Skills: sentiment indicators, flow analysis, positioning extremes, contrarian signals.
+Context: this branch tracks market sentiment, fear/greed, and positioning only.`
+};
+
+function getActiveBranch() {
+  try {
+    const data = JSON.parse(fs.readFileSync(ACTIVE_BRANCH_FILE, 'utf8'));
+    return data.branch || null;
+  } catch { return null; }
+}
+
+function setActiveBranch(branch) {
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  fs.writeFileSync(ACTIVE_BRANCH_FILE, JSON.stringify({ branch, updated_at: new Date().toISOString() }, null, 2), 'utf8');
+  // Ensure branch directory and CLAUDE.md exist
+  const branchDir = path.join(BRANCHES_DIR, branch);
+  const claudeMdPath = path.join(branchDir, 'CLAUDE.md');
+  fs.mkdirSync(path.join(branchDir, 'history'), { recursive: true });
+  fs.mkdirSync(path.join(branchDir, 'output'), { recursive: true });
+  if (!fs.existsSync(claudeMdPath)) {
+    const content = BRANCH_CLAUDE_MD[branch] || `# ${branch} Branch\nContext: ${branch} application branch.`;
+    fs.writeFileSync(claudeMdPath, content, 'utf8');
+  }
+}
+
+function getBranchContext(branch) {
+  if (!branch) return null;
+  const claudeMdPath = path.join(BRANCHES_DIR, branch, 'CLAUDE.md');
+  try { return fs.readFileSync(claudeMdPath, 'utf8'); } catch { return null; }
+}
+
+// Returns branch-specific current.html path, or global fallback when no branch active.
+function getCurrentHtmlPath() {
+  const branch = getActiveBranch();
+  if (branch) return path.join(BRANCHES_DIR, branch, 'output', 'current.html');
+  return CURRENT_HTML;
+}
+
+// Returns branch-specific history dir, or global fallback.
+function getHistoryDir() {
+  const branch = getActiveBranch();
+  if (branch) return path.join(BRANCHES_DIR, branch, 'history');
+  return HISTORY_DIR;
+}
+
+// Writes html to the active branch's current.html (or global fallback), ensuring the dir exists.
+function writeCurrentHtml(html) {
+  const p = getCurrentHtmlPath();
+  try {
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, html, 'utf8');
+  } catch (e) { log('current.html write failed: ' + e.message); }
+}
+
+// Fire-and-forget append to project-level cross-branch history log.
+function appendProjectHistory(op, meta) {
+  const entry = JSON.stringify({ ts: new Date().toISOString(), branch: getActiveBranch() || 'global', op, ...meta }) + '\n';
+  fs.appendFile(PROJECT_HISTORY_FILE, entry, () => {});
+}
+
+app.get('/branch/active', (req, res) => {
+  res.json({ branch: getActiveBranch() });
+});
+
+app.post('/branch/activate', (req, res) => {
+  const branch = String(req.body?.branch || '').trim();
+  if (!branch) return res.status(400).json({ ok: false, error: 'branch required' });
+  const known = Object.keys(DOMAIN_META);
+  if (!known.includes(branch)) return res.status(400).json({ ok: false, error: `unknown branch: ${branch}. known: ${known.join(', ')}` });
+  setActiveBranch(branch);
+  log(`branch activated: ${branch}`);
+  broadcastBrowserMessage({ type: 'branch_activated', branch });
+  res.json({ ok: true, branch });
+});
 
 function buildDomainStubHtml(domain) {
   const meta  = DOMAIN_META[domain] || { icon: '📄', label: domain, color: 'arctic' };
@@ -708,11 +913,64 @@ app.get('/workspace/domain/:domain', (req, res) => {
 
   ws.current_file_id = file.id;
   currentHtml = html;
-  try { fs.writeFileSync(CURRENT_HTML, html, 'utf8'); } catch {}
+  writeCurrentHtml(html);
   saveWorkspace(ws);
   broadcastBrowserMessage({ type: 'workspace_current', file });
   broadcast(html);
   res.json({ ok: true, fileId: file.id });
+});
+
+// ── Loom — Python Brain integration ──────────────────────────────────
+
+// GET /data/:connector_id — Python harness pulls recent inbox items by connector source
+app.get('/data/:connector_id', (req, res) => {
+  const connId = req.params.connector_id;
+  const limit = parseInt(req.query.limit || '30', 10);
+  const all = inbox.list({});
+  const items = all.filter(i => i.source === connId).slice(0, limit);
+  res.json({ ok: true, connector_id: connId, count: items.length, items });
+});
+
+// GET /loom/thesis/:ticker — read thesis-store.jsonl (Python writes, server reads)
+app.get('/loom/thesis/:ticker', (req, res) => {
+  const ticker = req.params.ticker.toUpperCase();
+  const thesisFile = path.join(ROOT, 'logs', 'thesis-store.jsonl');
+  if (!fs.existsSync(thesisFile)) return res.json({ ok: true, thesis: null });
+  try {
+    const lines = fs.readFileSync(thesisFile, 'utf8').split('\n').filter(Boolean);
+    const entries = [];
+    for (const line of lines) {
+      try { const e = JSON.parse(line); if (e.ticker === ticker) entries.push(e); } catch {}
+    }
+    res.json({ ok: true, thesis: entries[entries.length - 1] || null });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// POST /loom/run — proxy to Python Brain (port 3001)
+app.post('/loom/run', express.json(), (req, res) => {
+  const axios = require(path.join(BRIDGE_NM, 'axios'));
+  axios.post('http://127.0.0.1:3001/run', req.body, { timeout: 90000 })
+    .then(r => res.json(r.data))
+    .catch(e => {
+      const notRunning = e.code === 'ECONNREFUSED' || e.code === 'ECONNRESET';
+      const msg = notRunning
+        ? 'Loom Brain not running. Start with: cd loom && python main.py'
+        : e.message;
+      res.status(notRunning ? 503 : 502).json({ ok: false, error: msg });
+    });
+});
+
+// GET /loom — Loom testing panel
+app.get('/loom', (req, res) => {
+  const panelFile = path.join(ROOT, 'loom', 'panel.html');
+  if (fs.existsSync(panelFile)) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(fs.readFileSync(panelFile, 'utf8'));
+  } else {
+    res.status(404).send('Loom panel not found at loom/panel.html');
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────
@@ -963,7 +1221,7 @@ app.post('/workspace/file', (req, res) => {
   ws.current_file_id = id;
   if (effectiveHtml) {
     currentHtml = effectiveHtml;
-    try { fs.writeFileSync(CURRENT_HTML, effectiveHtml, 'utf8'); } catch {}
+    writeCurrentHtml(effectiveHtml);
   }
   saveWorkspace(ws);
   const filePath = path.join(TARGET_PATH, title + '.html');
@@ -991,7 +1249,7 @@ app.patch('/workspace/file/:id', (req, res) => {
   if (req.body?.set_current) {
     ws.current_file_id = file.id;
     currentHtml = file.html || '';
-    try { fs.writeFileSync(CURRENT_HTML, currentHtml, 'utf8'); } catch {}
+    writeCurrentHtml(currentHtml);
     broadcastBrowserMessage({ type: 'workspace_current', file });
   }
   file.updated_at = ts;
@@ -1023,12 +1281,35 @@ app.post('/workspace/file/:id/history', (req, res) => {
   const ws = ensureWorkspace();
   const file = ws.files[req.params.id];
   if (!file) return res.status(404).json({ ok: false, error: 'file not found' });
+  const body = req.body || {};
+  const entry = normalizeHistoryEntry(body);
+  // Offload HTML to disk; keep only metadata in workspace.json
+  if (body.html) {
+    const histDir = path.join(getHistoryDir(), file.id);
+    fs.mkdirSync(histDir, { recursive: true });
+    fs.writeFile(path.join(histDir, entry.id + '.html'), body.html, 'utf8', () => {});
+  }
   file.history = Array.isArray(file.history) ? file.history : [];
-  file.history.unshift(normalizeHistoryEntry(req.body || {}));
+  file.history.unshift(entry);
   file.history = file.history.slice(0, 50);
   file.updated_at = nowIso();
   saveWorkspace(ws);
   res.json({ ok: true, history: file.history });
+});
+
+app.get('/workspace/file/:id/history/:entryId', (req, res) => {
+  const ws = ensureWorkspace();
+  const file = ws.files[req.params.id];
+  if (!file) return res.status(404).json({ ok: false, error: 'file not found' });
+  const entry = (file.history || []).find(e => e.id === req.params.entryId);
+  if (!entry) return res.status(404).json({ ok: false, error: 'entry not found' });
+  // Try disk first (new format), fall back to inline html (old format)
+  const htmlPath = path.join(getHistoryDir(), file.id, entry.id + '.html');
+  let html = null;
+  try { html = fs.readFileSync(htmlPath, 'utf8'); } catch {}
+  if (!html && entry.html) html = entry.html;
+  if (!html) return res.status(404).json({ ok: false, error: 'html not found on disk' });
+  res.json({ ok: true, entry: { id: entry.id, timestamp: entry.timestamp, anchorCount: entry.anchorCount, summary: entry.summary }, html });
 });
 
 app.post('/skills/register', (req, res) => {
@@ -1084,8 +1365,8 @@ app.get('/pending-op', (req, res) => {
   clearPendingFallback();
   const subtree = op?.render_state?.relevant_subtree || null;
   const opKind = op?.intent?.op || '';
-  const HEAVY = ['restructure', 'branch', 'expand'];
-  const needsFull = HEAVY.includes(opKind) || !subtree;
+  // Only restructure/branch genuinely need full-page context; all other ops work from relevant_subtree
+  const needsFull = ['restructure', 'branch'].includes(opKind) || !subtree;
   res.json({
     pending: true, op,
     relevant_subtree: subtree || undefined,
@@ -1237,6 +1518,7 @@ wssBrowser.on('connection', (ws) => {
 
       if (msg.type === 'op') {
         logOp(msg.op);
+        if (!msg.op._recvTs) msg.op._recvTs = Date.now();
         wsTrace('recv', 'browser', 'op', { op: msg.op?.intent?.op, target: msg.op?.intent?.target_ref || msg.op?.target_ref });
         const delivered = deliverOp(msg.op);
         if (!delivered) {
@@ -1288,6 +1570,7 @@ wssBrowser.on('connection', (ws) => {
             fs.writeFileSync(PENDING_OP_JSON, JSON.stringify(msg.envelope), 'utf8');
           }
         } catch {}
+        if (!msg.envelope._recvTs) msg.envelope._recvTs = Date.now();
         const delivered = deliverOp(msg.envelope);
         if (!delivered) pendingOps.push(msg.envelope);
         notifyPendingChanged();
@@ -1320,7 +1603,7 @@ wssBrowser.on('connection', (ws) => {
         const syncedHtml = msg.html || '';
         if (syncedHtml) {
           currentHtml = syncedHtml;
-          try { fs.writeFileSync(CURRENT_HTML, currentHtml, 'utf8'); } catch {}
+          writeCurrentHtml(currentHtml);
           recordEvent('agent.html_synced', { html_size: currentHtml.length, sig: msg.sig || '' });
         }
 
@@ -1391,7 +1674,7 @@ wssAgent.on('connection', (ws, req, agentId) => {
       // Check if we need to respawn: remaining ops but no idle processors
       if (pendingOps.length > 0) {
         const idleCount = Array.from(processorPool.values()).filter(e => e.ws && e.ws.readyState === 1).length;
-        if (idleCount === 0) setTimeout(spawnCCProcessor, 300);
+        if (idleCount === 0) _scheduleSpawnWithBackoff(procId, false);
       }
     });
 
@@ -1534,9 +1817,10 @@ function handleAgentMessage(ws, msg, agentId) {
     wsTrace('recv', label, 'render', { html_len: html.length });
     if (!html.trim()) { ack(false, { error: 'empty html' }); return; }
     currentHtml = html;
-    try { fs.writeFileSync(CURRENT_HTML, html, 'utf8'); } catch (e) { log('render write failed: ' + e.message); }
+    writeCurrentHtml(html);
     broadcast(html);
     if (currentSession) recordEvent('agent.render', { html_size: html.length });
+    appendProjectHistory('render', { size: html.length });
     log(`[${label}] render ${html.length} bytes → ${webviewClients.size} browser(s)`);
     wsTrace('send', 'browser', 'html', { html_len: html.length, clients: webviewClients.size });
     ack(true);
@@ -1645,9 +1929,8 @@ function broadcastPatches(patches) {
     if (nextHtml !== currentHtml) { currentHtml = nextHtml; appliedCount++; }
   }
   if (appliedCount > 0) {
-    try { fs.writeFileSync(CURRENT_HTML, currentHtml, 'utf8'); } catch (e) {
-      log('patch sync write failed: ' + e.message);
-    }
+    writeCurrentHtml(currentHtml);
+    appendProjectHistory('patch', { anchors: patches.map(p => p.anchor_id), count: appliedCount });
   } else if (beforeHtml) {
     log('patch sync skipped: no matching anchors in currentHtml');
   }
@@ -1754,26 +2037,30 @@ function clearPendingFallback() {
 
 function initInprocAgent() {
   if (inprocAgent) return inprocAgent;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  let Anthropic;
-  try {
-    const sdk = require(ANTHROPIC_SDK_PATH);
-    Anthropic = sdk.default || sdk;
-  } catch (e) {
-    log('[inproc] SDK load failed: ' + e.message);
+  const cfg = configStore.load();
+  const apiKey = configStore.getApiKey();
+  if (!apiKey) {
+    log('[inproc] no API key configured (set ANCHOR_API_KEY or ANTHROPIC_API_KEY)');
     return null;
   }
+  const providerAdapter = require('./lib/provider-adapter.cjs');
+  const result = providerAdapter.createFromEnv({ provider: cfg.provider, model: cfg.model, baseUrl: cfg.baseUrl, apiKey });
+  if (!result) {
+    log('[inproc] provider-adapter: failed to create client');
+    return null;
+  }
+  const { client: provider, model, provider: providerName } = result;
   const inprocMod = require('./inproc-agent.cjs');
-  const model = process.env.ANCHOR_INPROC_MODEL || 'claude-haiku-4-5-20251001';
   const toolRegistry = {
     anchor_get_pending_op: async (input, ctx) => {
       if (ctx.opConsumed) return JSON.stringify({ pending: false });
       ctx.opConsumed = true;
+      if (!ctx._opStart) ctx._opStart = Date.now();
       const op = ctx.opPayload;
       const subtree = op?.render_state?.relevant_subtree || null;
       const opKind = op?.intent?.op || '';
-      const needsFull = ['restructure', 'branch', 'expand'].includes(opKind) || !subtree;
+      // Only restructure/branch genuinely need full-page context; all other ops work from relevant_subtree
+      const needsFull = ['restructure', 'branch'].includes(opKind) || !subtree;
       return JSON.stringify({
         pending: true, op,
         relevant_subtree: subtree || undefined,
@@ -1784,20 +2071,51 @@ function initInprocAgent() {
     anchor_emit_event: async (input, ctx) => {
       const { type, payload } = input;
       broadcastAgentEvent({ type, target_anchor: ctx.target, ...(payload || {}) });
-      if (type === 'complete') ctx.completed = true;
+      if (type === 'thinking' && !ctx._opStart) {
+        ctx._opStart = Date.now();
+      }
+      if (type === 'complete') {
+        ctx.completed = true;
+        const now = Date.now();
+        const totalGen = ctx._opStart ? now - ctx._opStart : null;
+        const patchMs = ctx._patchMs || null;
+        const op = ctx.opPayload || {};
+        const recvTs = op._recvTs || null;
+        // Which agent context handled this op
+        const branch = getActiveBranch();
+        const agentCtx = branch ? 'branch:' + branch : 'content-agent';
+        broadcastAgentEvent({
+          type: 'timing',
+          target_anchor: ctx.target,
+          ms_claude_gen: totalGen,
+          ms_op_to_resolve: recvTs && ctx._opStart ? ctx._opStart - recvTs : null,
+          ms_broadcast: patchMs,
+          agent_context: agentCtx,
+        });
+      }
       return 'ok';
     },
     anchor_patch: async (input, ctx) => {
       const { patches } = input;
       if (!Array.isArray(patches) || patches.length === 0) return 'no patches';
+      const fullLen = currentHtml ? currentHtml.length : 0;
+      for (const p of patches) {
+        if (p.html_fragment && fullLen > 0 && p.html_fragment.length > fullLen) {
+          log(`anchor_patch REJECTED: fragment for ${p.anchor_id} (${p.html_fragment.length}B) exceeds full-page size (${fullLen}B)`);
+          return `error: html_fragment for "${p.anchor_id}" is larger than the full page — LLM likely returned full HTML instead of just the target node outerHTML`;
+        }
+      }
+      if (!ctx._opStart) ctx._opStart = Date.now();
+      const patchStart = Date.now();
       broadcastPatches(patches);
+      ctx._patchMs = Date.now() - patchStart;
       ctx.completed = true;
       return 'patched ' + patches.length + ' node(s)';
     },
   };
   try {
     inprocAgent = inprocMod.create({
-      Anthropic, apiKey, model, toolRegistry,
+      provider, model, toolRegistry,
       log: (msg) => log('[inproc] ' + msg),
       autoExecLog: (evt) => addSpawnEvent({
         status: evt.event === 'inproc_complete' ? 'done' : 'start',
@@ -1805,7 +2123,7 @@ function initInprocAgent() {
       }),
       concurrency: parseInt(process.env.ANCHOR_INPROC_CONCURRENCY || '3'),
     });
-    log('[inproc] agent initialized model=' + model);
+    log('[inproc] agent initialized provider=' + providerName + ' model=' + model);
     return inprocAgent;
   } catch (e) {
     log('[inproc] init failed: ' + e.message);
@@ -1813,16 +2131,39 @@ function initInprocAgent() {
   }
 }
 
+function reinitInprocAgent() {
+  if (inprocAgent) {
+    log('[inproc] hot-reloading provider — draining queued ops');
+    const stats = inprocAgent.stats();
+    if (stats.queued > 0) log('[inproc] draining ' + stats.queued + ' queued op(s)');
+  }
+  inprocAgent = null;
+  return initInprocAgent();
+}
+
+function injectBranchContext(op) {
+  const branch = getActiveBranch();
+  if (!branch) return op;
+  const branchAgentPath = path.join(BRANCHES_DIR, branch, 'CLAUDE.md');
+  let systemPrompt = null;
+  try { systemPrompt = fs.readFileSync(branchAgentPath, 'utf8'); } catch {}
+  if (!systemPrompt) return op;
+  return { ...op, systemPrompt };
+}
+
 function notifyPendingChanged() {
   if (pendingOps.length === 0) return;
   const idleCount = Array.from(processorPool.values()).filter(e => e.ws && e.ws.readyState === 1).length;
   if (idleCount > 0) return;
-  const agent = initInprocAgent();
-  if (agent) {
-    while (pendingOps.length > 0) agent.enqueue(pendingOps.shift());
-  } else {
-    setTimeout(spawnCCProcessor, 150);
+  const cfg = configStore.load();
+  if (cfg.processingMode === 'inproc' && configStore.hasApiKey()) {
+    const agent = initInprocAgent();
+    if (agent) {
+      while (pendingOps.length > 0) agent.enqueue(injectBranchContext(pendingOps.shift()));
+      return;
+    }
   }
+  setTimeout(spawnCCProcessor, 150);
 }
 
 // ── Option C: auto-spawn CC processor ────────────────────────────────
@@ -1833,32 +2174,6 @@ function notifyPendingChanged() {
 
 // Build a per-op prompt for `claude -p`. The output is raw HTML written to
 // stdout — no tools needed. Server reads stdout and applies the patch directly.
-function buildOpPrompt(op) {
-  const kind      = op.intent?.op || '';
-  const target    = op.intent?.target_ref || '';
-  const instr     = op.intent?.instruction || '';
-  const targetHtml = op.render_state?.relevant_subtree?.target_html || currentHtml;
-
-  if (kind === 'initial_render') {
-    return (
-      `Generate a complete Anchor HTML page.\n` +
-      `Request: ${instr}\n\n` +
-      `${anchorLayoutContract()}\n\n` +
-      `Follow the Anchor HTML protocol and Bloom CSS classes from CLAUDE.md.\n` +
-      `Output ONLY the raw <!DOCTYPE html> document. No markdown fences, no explanation.`
-    );
-  }
-
-  return (
-    `Op: ${kind} | Target: data-anc="${target}" | Instruction: "${instr}"\n\n` +
-    `Current HTML:\n${targetHtml}\n\n` +
-    `Reply with ONLY the replacement outerHTML for data-anc="${target}". ` +
-    `Keep data-anc/data-handles/data-deps. Use Bloom CSS. ` +
-    `${anchorLayoutContract()} ` +
-    `NO preamble, NO explanation, NO markdown fences. ` +
-    `First character of your response must be '<'.`
-  );
-}
 
 function stripCodeFence(text) {
   // Extract HTML from a code fence anywhere in the output (CC often adds preamble)
@@ -1929,6 +2244,38 @@ function psQuote(s) {
   return "'" + String(s).replace(/'/g, "''") + "'";
 }
 
+// ── Spawn rate limiting helper ────────────────────────────────────────
+// Prevents crash loops when spawned processors keep failing. Applies
+// exponential backoff per partition and aborts after SPAWN_MAX_FAILS.
+function _scheduleSpawnWithBackoff(partitionId, success) {
+  const now = Date.now();
+  let cd = spawnCooldowns.get(partitionId);
+  if (!cd) {
+    cd = { lastSpawn: 0, failCount: 0 };
+    spawnCooldowns.set(partitionId, cd);
+  }
+
+  if (!success) {
+    cd.failCount++;
+  } else {
+    cd.failCount = 0;  // reset on success
+  }
+
+  cd.lastSpawn = now;
+
+  if (cd.failCount >= SPAWN_MAX_FAILS) {
+    log(`[spawn] ABORT partition=${partitionId} — ${cd.failCount} consecutive failures`);
+    // Reset fail count so a future op can still trigger a spawn
+    cd.failCount = 0;
+    return;
+  }
+
+  const delay = Math.min(SPAWN_BASE_DELAY * Math.pow(2, cd.failCount - 1), SPAWN_MAX_DELAY);
+  const nextDelay = cd.failCount > 0 ? delay : 300;
+  log(`[spawn] backoff partition=${partitionId} failCount=${cd.failCount} delay=${nextDelay}ms`);
+  setTimeout(spawnCCProcessor, nextDelay);
+}
+
 function spawnCCProcessor() {
   if (ccSpawnLock) return;
   const allOps = pendingOps.slice();
@@ -1971,6 +2318,15 @@ function spawnCCProcessor() {
   }
 
   if (partitions.length === 0) return;
+
+  // Drain assigned ops from pendingOps — they are now owned by partition queues.
+  // Without this, the exit handler sees pendingOps non-empty and re-spawns indefinitely.
+  for (const { ops } of partitions) {
+    for (const op of ops) {
+      const idx = pendingOps.indexOf(op);
+      if (idx >= 0) pendingOps.splice(idx, 1);
+    }
+  }
 
   // Spawn one processor per partition in parallel (no global lock during spawn)
   for (const { id: partitionId, ops } of partitions) {
@@ -2060,7 +2416,7 @@ function spawnProcessorPartition(partitionId, ops, onDone) {
 
     if (remainingAll.length > 0) {
       const idleCount = Array.from(processorPool.values()).filter(e => e.ws && e.ws.readyState === 1).length;
-      if (idleCount === 0) setTimeout(spawnCCProcessor, 300);
+      if (idleCount === 0) _scheduleSpawnWithBackoff(procId, false);
     }
     if (onDone) onDone();
   });
@@ -2110,17 +2466,19 @@ connectorRegistry.loadAll(pushBroker, scheduler);
 
 function watchHtmlFile() {
   let lastMtime = 0;
-  try { lastMtime = fs.statSync(CURRENT_HTML).mtimeMs; } catch {}
+  let lastWatchedPath = '';
   setInterval(() => {
+    const watchPath = getCurrentHtmlPath();
+    if (watchPath !== lastWatchedPath) { lastWatchedPath = watchPath; lastMtime = 0; }
     let mtime;
-    try { mtime = fs.statSync(CURRENT_HTML).mtimeMs; } catch { return; }
+    try { mtime = fs.statSync(watchPath).mtimeMs; } catch { return; }
     if (mtime === lastMtime) return;
     lastMtime = mtime;
     let html;
-    try { html = fs.readFileSync(CURRENT_HTML, 'utf8'); } catch { return; }
+    try { html = fs.readFileSync(watchPath, 'utf8'); } catch { return; }
     if (html === currentHtml) return;
     currentHtml = html;
-    log(`file-watcher: reloaded ${html.length} bytes from output/current.html`);
+    log(`file-watcher: reloaded ${html.length} bytes from ${watchPath}`);
     broadcast(html);
   }, 500);
 }
@@ -2181,14 +2539,15 @@ function recordEvent(kind, payload, opts) {
   };
   if (kind === 'user.intent') {
     const envPath = path.join(currentSession.dir, 'envelopes', eventId + '.json');
-    try { fs.writeFileSync(envPath, JSON.stringify(payload, null, 2), 'utf8'); } catch {}
+    fs.writeFile(envPath, JSON.stringify(payload, null, 2), 'utf8', () => {});
   }
-  try { fs.appendFileSync(currentSession.eventsPath, JSON.stringify(event) + '\n', 'utf8'); } catch {}
+  fs.appendFile(currentSession.eventsPath, JSON.stringify(event) + '\n', 'utf8', () => {});
   currentSession._flushCounter = (currentSession._flushCounter || 0) + 1;
   currentSession.manifest.event_count = (currentSession.manifest.event_count || 0) + 1;
   if (currentSession._flushCounter >= MANIFEST_FLUSH_INTERVAL) {
     currentSession._flushCounter = 0;
-    try { fs.writeFileSync(currentSession.manifestPath, JSON.stringify(currentSession.manifest, null, 2), 'utf8'); } catch {}
+    const manifestSnap = JSON.stringify(currentSession.manifest, null, 2);
+    fs.writeFile(currentSession.manifestPath, manifestSnap, 'utf8', () => {});
   }
   return eventId;
 }
@@ -2633,10 +2992,8 @@ function loadResourcesManifest() {
 // ── Logging ───────────────────────────────────────────────────────────
 
 function logOp(op) {
-  try {
-    const line = JSON.stringify({ t: new Date().toISOString(), ...op }) + '\n';
-    fs.appendFileSync(OPS_LOG, line, 'utf8');
-  } catch (e) { log('logOp failed: ' + e.message); }
+  const line = JSON.stringify({ t: new Date().toISOString(), ...op }) + '\n';
+  fs.appendFile(OPS_LOG, line, 'utf8', (e) => { if (e) log('logOp failed: ' + e.message); });
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────
@@ -2694,4 +3051,27 @@ httpServer.listen(PORT, () => {
   recoverPendingFallback();
   maybeAutoOpenBrowser();
   watchHtmlFile();
+  migrateLegacyDomainContent();
 });
+
+// One-time migration: copy existing domain file HTML into branches/<domain>/output/current.html
+// Runs silently on startup; no-ops if already migrated or no content to migrate.
+function migrateLegacyDomainContent() {
+  try {
+    const ws = readJsonFile(WORKSPACE_FILE, null);
+    if (!ws || !ws.files) return;
+    Object.values(ws.files).forEach(file => {
+      const domain = file.domain;
+      if (!domain || !DOMAIN_META[domain] || !file.html) return;
+      const outDir = path.join(BRANCHES_DIR, domain, 'output');
+      const outFile = path.join(outDir, 'current.html');
+      if (fs.existsSync(outFile)) return; // already migrated
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.writeFile(outFile, file.html, 'utf8', (e) => {
+        if (!e) log(`migrated: branches/${domain}/output/current.html`);
+      });
+    });
+  } catch (e) {
+    log('migration warning: ' + e.message);
+  }
+}

@@ -20,6 +20,14 @@ function loadDomainManifests(rootDir) {
     });
 }
 
+function buildDomainManifestResponse(manifests) {
+  return {
+    ok: true,
+    domains: manifests.map(({ manifestPath, ...manifest }) => manifest),
+  };
+}
+
 module.exports = {
+  buildDomainManifestResponse,
   loadDomainManifests,
 };

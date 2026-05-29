@@ -2,7 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { loadDomainManifests } = require('./lib/domain-registry.cjs');
+const {
+  buildDomainManifestResponse,
+  loadDomainManifests,
+} = require('./lib/domain-registry.cjs');
 
 const ROOT = path.join(__dirname, '..');
 const manifestPath = path.join(ROOT, 'domains', 'loom-fin', 'manifest.json');
@@ -38,4 +41,14 @@ test('domain registry loads loom-fin manifest with compatibility flags', () => {
   assert.equal(loomFin.compatibility.preserveExistingExperience, true);
   assert.equal(loomFin.compatibility.preserveCssTemplates, true);
   assert.equal(loomFin.paths.legacyConnectors, '../../mcp/connectors');
+});
+
+test('domain registry builds public manifest response', () => {
+  const response = buildDomainManifestResponse(loadDomainManifests(ROOT));
+  const loomFin = response.domains.find(manifest => manifest.id === 'loom-fin');
+
+  assert.equal(response.ok, true);
+  assert.ok(loomFin, 'loom-fin manifest should be exposed');
+  assert.equal(loomFin.manifestPath, undefined);
+  assert.equal(loomFin.compatibility.preserveExistingExperience, true);
 });
