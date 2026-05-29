@@ -1,0 +1,40 @@
+{
+  "id": "loom-fin",
+  "name": "Loom Fin",
+  "runtime": "local-desktop-single-user",
+  "version": "0.1.0",
+  "description": "Finance domain pack for market judgment, target thesis tracking, sentiment scanning, and personal position review.",
+  "routes": [
+    "overview",
+    "market",
+    "target",
+    "sentiment",
+    "position",
+    "trading.private"
+  ],
+  "capabilities": [
+    "market.regime.review",
+    "ticker.thesis.review",
+    "sentiment.scan",
+    "position.review",
+    "thesis.debate"
+  ],
+  "compatibility": {
+    "preserveExistingExperience": true,
+    "preserveCssTemplates": true,
+    "preserveUiDesign": true,
+    "preserveColorSystem": true,
+    "preserveConcreteFunctions": true
+  },
+  "paths": {
+    "legacyPythonBrain": "../../loom",
+    "legacyConnectors": "../../mcp/connectors",
+    "legacyTrading": "../../trading",
+    "legacyBranchPrompts": "../../branches",
+    "resources": "./resources",
+    "policies": "./policies",
+    "ui": "./ui",
+    "harness": "./harness",
+    "agents": "./agents"
+  }
+}
