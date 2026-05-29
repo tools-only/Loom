@@ -13,6 +13,8 @@ The first implementation target is a **local desktop single-user product**. The 
 
 This redesign must not break the basic interaction capability that already works today.
 
+It must also preserve the existing CSS templates, UI design language, color system, and concrete product functions. Architecture cleanup is only successful if the current user-facing experience continues to feel and behave like the current Loom.
+
 The migration is not a big-bang rewrite. Existing webview rendering, anchor operations, patching, workspace interaction, and agent feedback loops must remain runnable while the boundaries are being separated.
 
 ## Current Problem
@@ -377,6 +379,8 @@ During migration:
 - Existing `/op`, `/envelope`, `/patch`, `/html`, workspace, WebSocket, and webview behavior must continue to work.
 - Existing `data-anc`, `data-handles`, and anchor patch semantics must not change.
 - Existing rendered HTML should remain patchable.
+- Existing CSS templates, UI kits, spacing, typography, color tokens, component treatments, and visual style must not be rewritten as part of the architecture split.
+- Existing concrete functions must keep their current behavior unless a later implementation plan explicitly scopes and verifies a product change.
 - Current finance pages can continue to exist while they are moved behind `loom-fin`.
 - Legacy routes can proxy into the new modules until the UI is fully migrated.
 - No direct replacement of the working interaction loop should happen without a compatibility adapter and regression tests.
@@ -449,4 +453,3 @@ The architecture is successful when:
 - Finance agents run through adapter contracts instead of direct Core-owned LLM calls.
 - Human feedback and agent artifacts are recorded as replayable harness events.
 - Core source files no longer hardcode market, target, sentiment, position, or trading-specific logic.
-
