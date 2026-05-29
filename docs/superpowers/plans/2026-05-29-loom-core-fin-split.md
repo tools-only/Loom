@@ -2,6 +2,8 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
+> **Status:** Superseded by `docs/superpowers/plans/2026-05-29-loom-python-core-fin-split.md`. The original plan assumed new Core packages would be implemented in Node/CommonJS. The current architecture directive is Python-first Core, with JavaScript reserved for Electron/webview and local service gateway compatibility.
+
 **Goal:** Separate Loom Core from Loom Fin without breaking the existing interaction loop, CSS templates, UI design, color system, or concrete product functions.
 
 **Architecture:** Use a compatibility-first modular monolith. First introduce domain-pack metadata and adapter/protocol boundaries while all existing routes and files keep working. Only after behavior is covered by tests should finance-specific code move behind `domains/loom-fin`.
@@ -315,4 +317,3 @@ Start server with existing command and confirm:
 **Step 4: Commit any verification-only doc update if needed**
 
 Only commit if verification reveals a necessary docs clarification.
-

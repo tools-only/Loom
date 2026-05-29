@@ -9,6 +9,8 @@ Restructure Loom from a mixed prototype into two clear layers:
 
 The first implementation target is a **local desktop single-user product**. The architecture should not introduce cloud collaboration, multi-tenant auth, remote sync, or distributed infrastructure in this phase.
 
+The core code framework is **Python-first**. JavaScript should be used only where it is the right boundary technology: Electron, browser/webview interaction, static asset serving, and local HTTP/WebSocket gateway compatibility.
+
 ## Non-Goal
 
 This redesign must not break the basic interaction capability that already works today.
@@ -59,23 +61,29 @@ apps/
   desktop/
     Electron shell and local launcher
   webview/
-    generic Loom interactive workspace UI
+    browser-side interactive workspace UI
 
-packages/
-  core-runtime/
-    local HTTP/WebSocket daemon, process manager, route composition
+services/
+  web-gateway/
+    JavaScript HTTP/WebSocket gateway for Electron/webview compatibility
+
+loom_core/
+  runtime/
+    Python local daemon, orchestration, process manager
   workspace/
     files, rendered artifacts, history, anchor index
-  interaction-protocol/
+  interaction_protocol/
     human intent envelope, selection snapshot, op schema, feedback schema
-  render-protocol/
+  render_protocol/
     HTML/block/patch contracts for agent-rendered workspaces
-  harness-core/
+  harness/
     event log, replay, feedback compiler, eval ledger, claim/evidence primitives
-  agent-adapters/
+  agent_adapters/
     adapters for cc, codex, openclaw, herms, opencode, and local command workers
-  domain-sdk/
+  domain_sdk/
     APIs for registering domain routes, panels, agents, resources, and policies
+  storage/
+    SQLite/JSONL local persistence
 
 domains/
   loom-fin/
@@ -95,9 +103,10 @@ The first version remains local and single-user:
 
 ```text
 Electron Desktop App
-  -> Local Loom Core daemon
+  -> JavaScript webview gateway
+  -> Python Loom Core daemon
   -> Local workspace/event stores
-  -> Agent adapter process manager
+  -> Python agent adapter process manager
   -> External agent CLI workers
   -> Agent artifacts
   -> Render/patch stream
@@ -110,7 +119,7 @@ No remote service is required.
 
 Loom Core owns:
 
-- Local daemon lifecycle.
+- Python local daemon lifecycle.
 - WebSocket patch/event stream.
 - Workspace files, rendered artifacts, anchor history, and current document state.
 - Human intent capture: operations, selections, annotations, feedback, review requests.
@@ -120,6 +129,8 @@ Loom Core owns:
 - Generic event log and replay model.
 - Generic claim/evidence/feedback data model.
 - Generic harness signals and feedback compiler.
+
+The JavaScript gateway may forward HTTP/WebSocket traffic, serve the webview, and preserve legacy `/op`, `/patch`, `/html`, workspace, and domain routes during migration. New core behavior should be implemented in Python unless it is browser/Electron/gateway-specific.
 
 Loom Core must not own:
 
@@ -162,15 +173,18 @@ Supported agent families should include:
 - Local command agents
 - Future provider-specific wrappers
 
-Core only sees an adapter contract:
+Core only sees a Python adapter contract:
 
-```ts
-interface AgentAdapter {
-  id: string;
-  capabilities: string[];
-  invoke(task: AgentTaskEnvelope): AsyncIterable<AgentEvent>;
-  cancel(runId: string): Promise<void>;
-}
+```python
+class AgentAdapter(Protocol):
+    id: str
+    capabilities: list[str]
+
+    async def invoke(self, task: AgentTaskEnvelope) -> AsyncIterator[AgentEvent]:
+        ...
+
+    async def cancel(self, run_id: str) -> None:
+        ...
 ```
 
 The adapter translates Loom's structured task into the target agent's native execution model.
@@ -315,13 +329,13 @@ The first pass may use wrappers rather than physical moves if direct movement ri
 
 ### Phase 2: Extract Protocols
 
-Extract current op envelope, patch, selection, feedback, and render contracts into `packages/interaction-protocol` and `packages/render-protocol`.
+Extract current op envelope, patch, selection, feedback, and render contracts into Python modules under `loom_core/interaction_protocol` and `loom_core/render_protocol`.
 
 Existing behavior should keep using the same JSON shapes until tests verify compatibility.
 
 ### Phase 3: Modularize Core Runtime
 
-Split `mcp/server.cjs` into modules without changing endpoints:
+Move core runtime responsibilities into Python modules without changing endpoints. `mcp/server.cjs` should become a compatibility gateway rather than the place where new core behavior is added:
 
 - core HTTP/WebSocket bootstrap
 - workspace routes
