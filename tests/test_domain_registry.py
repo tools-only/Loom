@@ -9,7 +9,7 @@ from loom_core.domain_sdk.registry import (
 
 class DomainRegistryTests(unittest.TestCase):
     def test_loads_loom_fin_manifest(self):
-        root = Path(__file__).resolve().parents[2]
+        root = Path(__file__).resolve().parents[1]
         manifests = load_domain_manifests(root)
         loom_fin = next(item for item in manifests if item["id"] == "loom-fin")
 
@@ -18,7 +18,7 @@ class DomainRegistryTests(unittest.TestCase):
         self.assertIn("market.regime.review", loom_fin["capabilities"])
 
     def test_public_response_omits_manifest_path(self):
-        root = Path(__file__).resolve().parents[2]
+        root = Path(__file__).resolve().parents[1]
         response = build_domain_manifest_response(load_domain_manifests(root))
 
         self.assertIs(response["ok"], True)
@@ -28,3 +28,4 @@ class DomainRegistryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

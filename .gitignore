@@ -9,3 +9,5 @@ dist/
 .claude/memory/
 .claude/debug/
 *.env
+__pycache__/
+*.pyc
