@@ -23,6 +23,12 @@ class AgentAdapterRegistry:
                 return adapter
         return None
 
+    def find_by_id(self, adapter_id: str) -> AgentAdapter | None:
+        for adapter in self._adapters:
+            if adapter.id == adapter_id:
+                return adapter
+        return None
+
 
 def create_adapter_registry() -> AgentAdapterRegistry:
     return AgentAdapterRegistry()

@@ -3,7 +3,8 @@
   "name": "Loom Fin",
   "runtime": "local-desktop-single-user",
   "version": "0.1.0",
-  "description": "Finance domain pack for market judgment, target thesis tracking, sentiment scanning, and personal position review.",
+  "description": "Finance task pack for market judgment, target thesis tracking, sentiment scanning, and personal position review through concrete external agents.",
+  "interface": "loom-agent-adapter",
   "routes": [
     "overview",
     "market",
@@ -19,6 +20,43 @@
     "position.review",
     "thesis.debate"
   ],
+  "agentTasks": [
+    {
+      "id": "market.regime.review",
+      "label": "Market regime review",
+      "agent": "fin-market-agent",
+      "adapter": "codex",
+      "artifactContract": "mixed"
+    },
+    {
+      "id": "ticker.thesis.review",
+      "label": "Ticker thesis review",
+      "agent": "fin-target-agent",
+      "adapter": "codex",
+      "artifactContract": "claim_bundle"
+    },
+    {
+      "id": "sentiment.scan",
+      "label": "Sentiment scan",
+      "agent": "fin-sentiment-agent",
+      "adapter": "cc",
+      "artifactContract": "claim_bundle"
+    },
+    {
+      "id": "position.review",
+      "label": "Position review",
+      "agent": "fin-position-agent",
+      "adapter": "cc",
+      "artifactContract": "mixed"
+    },
+    {
+      "id": "thesis.debate",
+      "label": "Thesis debate",
+      "agent": "fin-thesis-debate-agent",
+      "adapter": "opencode",
+      "artifactContract": "mixed"
+    }
+  ],
   "compatibility": {
     "preserveExistingExperience": true,
     "preserveCssTemplates": true,
@@ -27,14 +65,10 @@
     "preserveConcreteFunctions": true
   },
   "paths": {
-    "legacyPythonBrain": "../../loom",
-    "legacyConnectors": "../../mcp/connectors",
-    "legacyTrading": "../../trading",
-    "legacyBranchPrompts": "../../branches",
+    "agentTasks": "./agent-tasks",
     "resources": "./resources",
     "policies": "./policies",
     "ui": "./ui",
-    "harness": "./harness",
-    "agents": "./agents"
+    "harness": "./harness"
   }
 }

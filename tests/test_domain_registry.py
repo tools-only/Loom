@@ -14,8 +14,14 @@ class DomainRegistryTests(unittest.TestCase):
         loom_fin = next(item for item in manifests if item["id"] == "loom-fin")
 
         self.assertEqual(loom_fin["runtime"], "local-desktop-single-user")
+        self.assertEqual(loom_fin["interface"], "loom-agent-adapter")
         self.assertIs(loom_fin["compatibility"]["preserveExistingExperience"], True)
         self.assertIn("market.regime.review", loom_fin["capabilities"])
+        self.assertIn(
+            "market.regime.review",
+            {task["id"] for task in loom_fin["agentTasks"]},
+        )
+        self.assertNotIn("legacyPythonBrain", loom_fin["paths"])
 
     def test_public_response_omits_manifest_path(self):
         root = Path(__file__).resolve().parents[1]
@@ -28,4 +34,3 @@ class DomainRegistryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

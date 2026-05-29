@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Move Loom toward a Python-first Core framework while preserving the existing webview interaction, CSS templates, UI design, color system, and concrete product functions.
+**Goal:** Move Loom toward a Python-first Core framework that connects finance tasks to concrete external agents through Loom adapters/interfaces while preserving the existing webview interaction, CSS templates, UI design, color system, and concrete product functions.
 
-**Architecture:** Python owns Core runtime, harness, protocol models, domain SDK, storage, and agent adapters. JavaScript remains the Electron/webview/gateway layer for serving UI, forwarding HTTP/WebSocket messages, and preserving legacy routes during migration.
+**Architecture:** Python owns Core runtime, harness, protocol models, task registry, storage, and agent adapters. JavaScript remains the Electron/webview/gateway layer for serving UI, forwarding HTTP/WebSocket messages, and preserving legacy routes during migration. Loom Fin tasks are not mounted into Core; each Fin task is assigned to a concrete cc/codex/openclaw/herms/opencode agent and connected to Loom through an adapter/interface.
 
 **Tech Stack:** Python 3, standard-library dataclasses/typing/json/pathlib/unittest, optional FastAPI later for the Python daemon, existing Node/Electron/webview JavaScript only as compatibility service and UI shell.
 
@@ -13,20 +13,22 @@
 ## Ground Rules
 
 - New Loom Core framework code goes under `loom_core/` in Python.
+- Fin-specific work enters Loom as task envelopes routed to concrete external agents.
+- Do not add Fin business logic to `loom_core/`.
 - JavaScript changes are allowed only for gateway compatibility, Electron/webview UI, or preserving existing routes.
 - Do not rewrite CSS templates, UI kits, spacing, typography, color tokens, or component treatments.
 - Do not change existing `data-anc`, `data-handles`, patch semantics, or current route behavior.
 - Do not move working finance files until compatibility wrappers and focused tests exist.
 - Commit only files touched for the current task. Avoid `git commit --only` for files that already have unrelated working-tree changes.
 
-## Task 1: Keep Loom Fin Domain Manifest
+## Task 1: Keep Loom Fin Task Manifest
 
 **Files:**
 - Existing: `domains/loom-fin/manifest.json`
 - Existing: `domains/loom-fin/README.md`
 - Existing: `mcp/domain-manifest.test.cjs`
 
-**Purpose:** The already-created Loom Fin manifest remains valid as a compatibility boundary. It records current Fin routes/capabilities without moving working code.
+**Purpose:** The Loom Fin manifest remains valid as a compatibility boundary. It records current Fin routes/capabilities and declares agent-routable tasks without moving working code into Core.
 
 **Verification:**
 
@@ -192,7 +194,7 @@ Document:
 
 - Python owns Core.
 - JS is gateway/UI compatibility only.
-- Loom Fin is a domain pack.
+- Loom Fin is a task pack whose tasks are routed to concrete external agents.
 - Existing behavior and visual design are protected.
 
 **Verification:**
@@ -204,4 +206,3 @@ python -m unittest discover tests
 ```
 
 Expected: PASS.
-

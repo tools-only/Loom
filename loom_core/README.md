@@ -1,13 +1,13 @@
 # Loom Core
 
-Loom Core is the Python-first framework for local human-agent interaction, rendered workspaces, harness data, domain loading, and external agent orchestration.
+Loom Core is the Python-first framework for local human-agent interaction, rendered workspaces, harness data, task routing, and external agent orchestration.
 
 ## Language Boundary
 
 Core framework code belongs in Python:
 
 - runtime orchestration
-- domain SDK
+- task registry and adapter interface
 - interaction and render protocols
 - harness and feedback compilation
 - local storage
@@ -34,8 +34,10 @@ The Core / Fin split must preserve the current Loom experience:
 - existing `data-anc` and `data-handles` semantics
 - existing patch behavior
 
-The first migration phase creates boundaries and contracts. It does not move working finance code until compatibility wrappers and focused tests exist.
+The first migration phase creates boundaries and contracts. It does not move working finance code into Core.
 
-## Domain Packs
+## Task Packs
 
-Loom Fin is the first domain pack. Its manifest lives at `domains/loom-fin/manifest.json` and currently points to legacy implementation paths while the Python Core boundary is introduced.
+Loom Fin is the first task pack. Its manifest lives at `domains/loom-fin/manifest.json` and declares finance tasks that should be routed to concrete external agents through Loom's adapter/interface.
+
+Core should not import or execute finance business logic directly. It should package human intent into task envelopes, invoke the chosen agent adapter, receive the returned artifact, patch the workspace, and record harness signals.

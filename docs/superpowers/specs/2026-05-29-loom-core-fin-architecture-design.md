@@ -5,7 +5,7 @@
 Restructure Loom from a mixed prototype into two clear layers:
 
 - **Loom Core**: a local-first human-agent interaction and harness framework.
-- **Loom Fin**: a finance domain pack for market judgment, thesis tracking, and personal position management.
+- **Loom Fin**: a finance task pack that declares finance task capabilities and routes them to concrete external agents through Loom's adapter/interface.
 
 The first implementation target is a **local desktop single-user product**. The architecture should not introduce cloud collaboration, multi-tenant auth, remote sync, or distributed infrastructure in this phase.
 
@@ -85,11 +85,10 @@ loom_core/
   storage/
     SQLite/JSONL local persistence
 
-domains/
+tasks/
   loom-fin/
     manifest.json
-    agents/
-    connectors/
+    agent-tasks/
     resources/
     policies/
     ui/
@@ -143,21 +142,21 @@ Loom Core must not own:
 
 ## Boundary: Loom Fin
 
-Loom Fin is a domain pack loaded by Loom Core.
+Loom Fin is a finance task pack interpreted by Loom Core. It does not become part of Loom Core, and its implementation is not mounted into Core.
 
 Loom Fin owns:
 
-- Finance domain manifest.
-- Market, target, sentiment, position, thesis, and private trading capabilities.
-- Finance data connectors.
+- Finance task manifest.
+- Market, target, sentiment, position, thesis, and private trading task definitions.
+- Concrete finance agent definitions, prompts, tool permissions, and execution profiles.
+- Finance data connectors when a specific finance agent needs them.
 - Finance source registry and trust tiers.
 - Financial source policy and safety boundaries.
 - Finance-specific UI panels, tabs, cards, dashboards, and settings.
 - Finance-specific harness rules.
 - Thesis, position, and source-quality ledgers.
-- Agent definitions for market judgment, target tracking, sentiment analysis, position review, and thesis debate.
 
-Loom Fin may use Core services, but Core should not import Fin implementation details.
+Loom Fin tasks connect to Loom only through the adapter/interface contract. Core can route a task to an agent and consume the returned artifact, but it should not import or execute Fin business logic directly.
 
 ## Agent Model
 
@@ -187,7 +186,7 @@ class AgentAdapter(Protocol):
         ...
 ```
 
-The adapter translates Loom's structured task into the target agent's native execution model.
+The adapter translates Loom's structured task into the target agent's native execution model. For Loom Fin, this means a finance task such as `market.regime.review` or `position.review` is assigned to a concrete cc/codex/openclaw/herms/opencode agent, and Loom receives the resulting artifact through the same adapter interface as any other domain.
 
 ## Core Protocols
 
@@ -276,23 +275,27 @@ JSONL is acceptable for early migration when append-only auditing matters more t
 
 ## Domain Pack Manifest
 
-Each domain pack registers itself with Core:
+Each task pack declares the tasks it can route through Core:
 
 ```json
 {
   "id": "loom-fin",
   "name": "Loom Fin",
   "version": "0.1.0",
+  "interface": "loom-agent-adapter",
   "routes": ["market", "target", "sentiment", "position", "trading.private"],
-  "capabilities": [
-    "market.regime.review",
-    "ticker.thesis.review",
-    "sentiment.scan",
-    "position.review",
-    "thesis.debate"
+  "tasks": [
+    {
+      "id": "market.regime.review",
+      "agent": "fin-market-agent",
+      "adapter": "codex"
+    },
+    {
+      "id": "position.review",
+      "agent": "fin-position-agent",
+      "adapter": "cc"
+    }
   ],
-  "agents": "./agents",
-  "connectors": "./connectors",
   "resources": "./resources",
   "policies": "./policies",
   "ui": "./ui",
@@ -300,15 +303,15 @@ Each domain pack registers itself with Core:
 }
 ```
 
-Core reads the manifest and mounts the domain. Domain code can register routes and UI panels through the domain SDK, but Core does not hardcode the domain.
+Core reads the manifest, exposes the task capabilities, and routes task envelopes to the specified agent adapters. It does not mount finance implementation code.
 
 ## Migration Strategy
 
 The migration must preserve behavior at every step.
 
-### Phase 1: Name the Existing Finance Layer
+### Phase 1: Name the Existing Finance Task Layer
 
-Move or alias current finance-specific code under `domains/loom-fin/` while preserving existing imports through compatibility modules.
+Declare current finance capabilities under `tasks/loom-fin/` while preserving existing imports and routes through compatibility modules.
 
 Candidates:
 
@@ -325,7 +328,7 @@ Candidates:
 - `skills/market-news-analysis`
 - finance-specific routes and rendering inside `bridge/webview/anchor-client.js`
 
-The first pass may use wrappers rather than physical moves if direct movement risks breaking startup.
+The first pass may use wrappers rather than physical moves if direct movement risks breaking startup. The target is not to mount old Fin code into Core; the target is to route Fin tasks to concrete agents through adapters.
 
 ### Phase 2: Extract Protocols
 
@@ -342,7 +345,7 @@ Move core runtime responsibilities into Python modules without changing endpoint
 - context manifest routes
 - agent adapter routes
 - event/session routes
-- domain route mounting
+- task capability routing
 - compatibility routes
 
 Public routes should remain stable during the split.
@@ -361,11 +364,11 @@ Split `bridge/webview/anchor-client.js` into:
 
 The visible interaction model should remain the same.
 
-### Phase 5: Replace Direct LLM Hands With Agent Adapters
+### Phase 5: Replace Direct LLM Hands With Concrete Agent Adapters
 
-Keep the finance hands working through a legacy adapter first.
+Keep the finance hands working through a legacy adapter first only as a compatibility bridge.
 
-Then migrate each finance hand into an external agent definition that can be run through cc/codex/openclaw/herms/opencode adapters.
+Then migrate each finance task into a concrete external agent definition that can be run through cc/codex/openclaw/herms/opencode adapters. Loom should invoke those agents through its interface and consume returned artifacts; it should not own the finance reasoning implementation.
 
 ### Phase 6: Introduce Harness Ledger
 
@@ -431,13 +434,13 @@ Rationale: scenario agents should be independent and swappable. Core should harn
 
 Trade-off: adapters require a stable task/artifact protocol.
 
-### Decision 3: Finance logic becomes a domain pack
+### Decision 3: Finance logic belongs to external task agents
 
-All market, position, thesis, source, and connector logic belongs to Loom Fin.
+Market, position, thesis, source, and connector logic belongs to concrete finance agents, not Loom Core.
 
-Rationale: this keeps Loom Core reusable for non-finance workflows and makes the finance product easier to evolve independently.
+Rationale: this keeps Loom Core reusable for non-finance workflows and makes finance analysis independently replaceable by cc/codex/openclaw/herms/opencode agents.
 
-Trade-off: some current files need compatibility wrappers during migration.
+Trade-off: the task envelope and artifact contract must be precise enough for heterogeneous agents.
 
 ### Decision 4: Event log is the source of harness learning
 
@@ -452,7 +455,7 @@ Trade-off: schemas need to be maintained carefully.
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | Migration breaks working interaction behavior | Loss of current product capability | Use compatibility routes and wrappers; split modules before changing protocols |
-| Core remains polluted by Fin imports | Architecture separation fails | Domain manifest and SDK must be the only Core-to-Fin boundary |
+| Core remains polluted by Fin imports | Architecture separation fails | Fin tasks must cross Core only through agent adapter/interface contracts |
 | Agent adapters become too generic to be useful | Weak execution quality | Keep task/artifact contracts precise; allow adapter-specific metadata |
 | Event log grows without clear use | Storage noise | Start with minimal event set tied to replay and feedback compilation |
 | Fin UI still lives in generic webview | Core UI remains coupled | Add domain UI slots, then move Fin panels into `domains/loom-fin/ui` |
@@ -461,9 +464,9 @@ Trade-off: schemas need to be maintained carefully.
 
 The architecture is successful when:
 
-- A new non-finance domain can be registered without editing Core runtime internals.
-- Loom Fin can be disabled without breaking the generic workspace.
+- A new non-finance task pack can be registered without editing Core runtime internals.
+- Loom Fin task routing can be disabled without breaking the generic workspace.
 - Existing interactive rendering and patching still work.
-- Finance agents run through adapter contracts instead of direct Core-owned LLM calls.
+- Finance tasks run through concrete agent adapter contracts instead of direct Core-owned LLM calls or mounted Fin business logic.
 - Human feedback and agent artifacts are recorded as replayable harness events.
 - Core source files no longer hardcode market, target, sentiment, position, or trading-specific logic.

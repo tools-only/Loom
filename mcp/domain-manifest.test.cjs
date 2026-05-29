@@ -12,6 +12,7 @@ test('loom-fin domain manifest declares current finance routes and capabilities'
 
   assert.equal(manifest.id, 'loom-fin');
   assert.equal(manifest.runtime, 'local-desktop-single-user');
+  assert.equal(manifest.interface, 'loom-agent-adapter');
   assert.deepEqual(manifest.compatibility.preserveExistingExperience, true);
 
   for (const route of ['overview', 'market', 'target', 'sentiment', 'position', 'trading.private']) {
@@ -26,5 +27,10 @@ test('loom-fin domain manifest declares current finance routes and capabilities'
     'thesis.debate',
   ]) {
     assert.ok(manifest.capabilities.includes(capability), `missing capability ${capability}`);
+    assert.ok(
+      manifest.agentTasks.some(task => task.id === capability && task.agent && task.adapter),
+      `missing agent task mapping for ${capability}`,
+    );
   }
+  assert.equal(manifest.paths.legacyPythonBrain, undefined);
 });
