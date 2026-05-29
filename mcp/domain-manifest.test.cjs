@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { loadDomainManifests } = require('./lib/domain-registry.cjs');
 
 const ROOT = path.join(__dirname, '..');
 const manifestPath = path.join(ROOT, 'domains', 'loom-fin', 'manifest.json');
@@ -27,4 +28,14 @@ test('loom-fin domain manifest declares current finance routes and capabilities'
   ]) {
     assert.ok(manifest.capabilities.includes(capability), `missing capability ${capability}`);
   }
+});
+
+test('domain registry loads loom-fin manifest with compatibility flags', () => {
+  const manifests = loadDomainManifests(ROOT);
+  const loomFin = manifests.find(manifest => manifest.id === 'loom-fin');
+
+  assert.ok(loomFin, 'loom-fin manifest should be loaded');
+  assert.equal(loomFin.compatibility.preserveExistingExperience, true);
+  assert.equal(loomFin.compatibility.preserveCssTemplates, true);
+  assert.equal(loomFin.paths.legacyConnectors, '../../mcp/connectors');
 });
