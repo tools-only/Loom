@@ -81,6 +81,8 @@ for _hid, _hand in HANDS.items():
     except ValueError:
         pass
 
+from loom_core.agent_adapters.cloud_bootstrap import register_cloud_adapters
+register_cloud_adapters(_adapter_registry, _core, _ROOT)
 
 app = FastAPI(title="Loom Brain", version="0.2.0")
 
@@ -113,10 +115,12 @@ async def run(req: RunRequest):
         if adapter is None:
             return {"ok": False, "error": f"unknown runtime adapter: {runtime}"}
         wiki_dir = info.get("wiki_dir", "")
+        hand_dir = str(Path(wiki_dir).parent) if wiki_dir else ""
         envelope = {
             "task": req.task,
             "context": req.context,
             "hand_id": req.hand_id,
+            "hand_dir": hand_dir,
             "wiki_dir": wiki_dir,
             "resource_api": "http://127.0.0.1:3001/resources",
             "feedback_log": str(_ROOT / "logs" / "feedback.jsonl"),

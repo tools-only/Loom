@@ -52,15 +52,10 @@ Available resource IDs (call resource_api to get current list if unsure):
 
 ## Output
 
-Write ONLY this JSON to stdout (no other text):
+Write ONLY this JSON line to stdout (no other text, no newlines inside):
 
 ```json
-{
-  "metadata": {
-    "confidence": 0.75,
-    "gaps": ["data gap descriptions"],
-    "key_claims": ["judgment 1", "judgment 2"]
-  },
-  "narrative": "2-4 paragraph Chinese market assessment"
-}
+{"type": "run.artifact", "artifact": {"metadata": {"confidence": 0.75, "gaps": ["data gap descriptions"], "key_claims": ["judgment 1", "judgment 2"]}, "narrative": "2-4 paragraph Chinese market assessment"}}
 ```
+
+The outer `{"type":"run.artifact","artifact":{...}}` wrapper is required. Loom Core reads it to extract the artifact. Do not emit any other text on stdout.

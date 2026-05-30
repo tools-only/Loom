@@ -30,9 +30,10 @@ Tier E/F sources provide context only — never override Tier A/B data.
 
 ## Output
 
+Write ONLY this JSON line to stdout (no other text):
+
 ```json
-{
-  "metadata": {"confidence": 0.7, "gaps": [], "key_claims": []},
-  "narrative": "2-3 paragraph Chinese sentiment assessment"
-}
+{"type": "run.artifact", "artifact": {"metadata": {"confidence": 0.7, "gaps": [], "key_claims": []}, "narrative": "2-3 paragraph Chinese sentiment assessment"}}
 ```
+
+The outer `{"type":"run.artifact","artifact":{...}}` wrapper is required. Do not emit any other text on stdout.

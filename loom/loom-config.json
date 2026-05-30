@@ -1,0 +1,34 @@
+{
+  "default": {
+    "provider": "custom",
+    "model": "MiniMax-M2.7",
+    "api_key": "sk-cp-sP4hj_mKcYEB3T6mo3ergGEnbNqctpaHIHNEWjGrF9XlWWelsfNAZsXkCPdK734UY2Oo-zmqsg8AlMZuPjooVFumAYQkbTYxbtOa1wnxXC4HO-tWVAmSfsw",
+    "base_url": "https://api.minimaxi.com/anthropic"
+  },
+  "hands": {
+    "market": {
+      "provider": "",
+      "model": "",
+      "api_key": "",
+      "base_url": ""
+    },
+    "sentiment": {
+      "provider": "",
+      "model": "",
+      "api_key": "",
+      "base_url": ""
+    },
+    "target": {
+      "provider": "",
+      "model": "",
+      "api_key": "",
+      "base_url": ""
+    },
+    "position": {
+      "provider": "",
+      "model": "",
+      "api_key": "",
+      "base_url": ""
+    }
+  }
+}

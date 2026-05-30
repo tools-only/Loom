@@ -64,3 +64,146 @@ All UI uses CSS variables from `resource/colors_and_type.css`. Never hard-code c
 | KPI card | `anc-kpi anc-kpi--aurora` (7 gradient themes) |
 | Status pill | `anc-pill anc-pill--active` |
 | Button | `btn btn--brand` |
+
+---
+
+## Loom Fin — Hand Agents
+
+Loom Fin connects **hand agents** — independent AI processes that handle specific trading analysis domains (market, sentiment, target, position). Each hand runs as its own agent process with a persistent wiki-style memory.
+
+```
+POST /run  →  Loom Brain (port 3001)  →  AgentAdapterRegistry
+                                                  │
+                              ┌───────────────────┼───────────────────┐
+                              ▼                   ▼                   ▼
+                        Local Subprocess    HTTP Cloud Agent    In-Process SDK
+                        (claude -p, codex)  (openclaw, custom)  (legacy)
+```
+
+### Mounting a Local Hand Agent (claude / codex / openclaw)
+
+Run hand agents as local subprocesses — the agent reads a task envelope from stdin, works in its own directory with a persistent wiki, and returns a JSON event stream.
+
+**1. Set the runtime in `loom/hand_registry.py`:**
+
+```python
+REGISTRY = {
+    "market": {
+        "runtime": "cc",          # "cc" | "codex" | "openclaw" | "sdk"
+        "wiki_dir": str(ROOT.parent / "hands" / "market" / "wiki"),
+        ...
+    }
+}
+```
+
+**2. Prepare the hand workspace** (`hands/<id>/`):
+
+```
+hands/market/
+  CLAUDE.md          ← agent instructions + wiki schema
+  config.json        ← user settings (watched sectors, KOL feeds, etc.)
+  wiki/
+    index.md         ← persistent context across runs
+    macro.md
+```
+
+**3. Trigger a run:**
+
+```bash
+curl -X POST http://127.0.0.1:3001/run \
+  -H "Content-Type: application/json" \
+  -d '{"hand_id": "market", "task": "分析当前市场环境", "runtime": "cc"}'
+```
+
+The Brain spawns `claude -p <envelope>` in `hands/market/` as the working directory. The agent reads `wiki/`, calls `/resources` for live data, writes updated wiki pages, and outputs `{"type":"run.artifact","artifact":{...}}` on stdout. The artifact is patched into the webview at the `loom-market` anchor.
+
+**Supported local runtimes:**
+
+| `runtime` value | Command | Notes |
+|---|---|---|
+| `cc` | `claude -p` | Claude Code CLI |
+| `codex` | `codex run` | OpenAI Codex CLI |
+| `openclaw` | `openclaw run` | OpenClaw CLI |
+| `sdk` | in-process Python | Legacy SDK path, no subprocess |
+
+> **Full guide:** [`docs/loom-hand-agent-guide.md`](docs/loom-hand-agent-guide.md)
+
+---
+
+### Mounting a Cloud-Deployed Hand Agent
+
+Run hand agents as remote HTTPS services — Loom Core sends a self-contained snapshot envelope (wiki, config, recent feedback, pre-fetched resources) and receives back a streaming NDJSON response. No tunnel or port exposure needed.
+
+```
+Brain  →  POST https://your-agent.example.com/run
+               Authorization: Bearer <token>
+               Body: { task, wiki_snapshot, config, feedback_recent, resources }
+
+Agent  →  NDJSON stream:
+               {"type":"wiki.write","path":"macro.md","content":"..."}  ← applied locally
+               {"type":"run.artifact","artifact":{...}}                 ← patches webview
+```
+
+**1. Declare the endpoint** in `config/cloud-agents.json` (safe to commit — no secrets):
+
+```json
+{
+  "openclaw-cloud": {
+    "endpoint": "https://api.openclaw.ai/v1/run",
+    "capabilities": ["market.analysis"],
+    "timeout_s": 120,
+    "token_env": "OPENCLAW_CLOUD_TOKEN",
+    "require_auth": true
+  }
+}
+```
+
+**2. Set the token** in `.env` (gitignored):
+
+```bash
+OPENCLAW_CLOUD_TOKEN=your-token-here
+```
+
+**3. Point a hand at the cloud adapter:**
+
+```python
+# loom/hand_registry.py
+"market": {
+    "runtime": "openclaw-cloud",   # matches the key in cloud-agents.json
+    ...
+}
+```
+
+**4. (Optional) Declare resources to pre-fetch** in `hands/market/cloud.json`:
+
+```json
+{
+  "include_wiki_snapshot": true,
+  "prefetch_resources": ["fred", "reuters-rss"]
+}
+```
+
+**5. Restart Brain and trigger a run** — the adapter is auto-registered:
+
+```bash
+curl -X POST http://127.0.0.1:3001/run \
+  -d '{"hand_id":"market","task":"分析当前市场环境"}'
+```
+
+**Cloud agent NDJSON protocol** — your agent endpoint must accept the snapshot body and return a stream:
+
+| Event type | Direction | Meaning |
+|---|---|---|
+| `run.artifact` | agent → Loom | **Required.** Final analysis result. |
+| `wiki.write` | agent → Loom | Write a file to `hands/<id>/wiki/`. Applied locally; not forwarded to webview. |
+| `feedback.signal` | agent → Loom | Append an event to the feedback log. |
+| `run.error` | agent → Loom | Signal failure; Brain returns an error response. |
+| `run.started` / `run.completed` | agent → Loom | Optional bookkeeping events. |
+
+**Security notes:**
+- Loom Core stays bound to `127.0.0.1` — it is never exposed to the public internet.
+- Cloud agents cannot call back into `localhost`; all data is shipped in the envelope.
+- Paths in `wiki.write` events containing `..` are silently rejected (path traversal guard).
+- Tokens live only in `.env`; `cloud-agents.json` contains no secrets.
+
+> **Full protocol reference:** [`docs/loom-hand-agent-guide.md`](docs/loom-hand-agent-guide.md) §10–13

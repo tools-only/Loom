@@ -1,0 +1,92 @@
+{
+  "fred": {
+    "resource_id": "fred",
+    "description": "FRED 宏观数据 — CPI、利率、就业、货币供应、GDP",
+    "tier": "A",
+    "domains": ["macro", "rates", "liquidity"]
+  },
+  "marketwatch-rss": {
+    "resource_id": "marketwatch-rss",
+    "description": "MarketWatch 市场快讯 — 盘前盘后新闻、指数动态",
+    "tier": "C",
+    "domains": ["news", "market"]
+  },
+  "reuters-rss": {
+    "resource_id": "reuters-rss",
+    "description": "路透社金融新闻 — 宏观政策、企业事件",
+    "tier": "C",
+    "domains": ["news", "macro"]
+  },
+  "cnbc-rss": {
+    "resource_id": "cnbc-rss",
+    "description": "CNBC 商业新闻 — 市场评论、财经资讯",
+    "tier": "C",
+    "domains": ["news", "market"]
+  },
+  "fear-greed": {
+    "resource_id": "fear-greed",
+    "description": "CNN Fear & Greed Index — 综合恐惧贪婪指数（0-100）",
+    "tier": "E",
+    "domains": ["sentiment"]
+  },
+  "aaii": {
+    "resource_id": "aaii",
+    "description": "AAII 散户情绪调查 — 看涨/看跌/中性百分比（周度）",
+    "tier": "E",
+    "domains": ["sentiment", "survey"]
+  },
+  "naaim": {
+    "resource_id": "naaim",
+    "description": "NAAIM 基金经理仓位调查 — 主动基金股票仓位（周度）",
+    "tier": "E",
+    "domains": ["sentiment", "positioning"]
+  },
+  "cftc-cot": {
+    "resource_id": "cftc-cot",
+    "description": "CFTC COT 持仓报告 — 大户期货多空净持仓",
+    "tier": "B",
+    "domains": ["sentiment", "positioning"]
+  },
+  "sec-edgar": {
+    "resource_id": "sec-edgar",
+    "description": "SEC EDGAR — 公司财报、8-K 披露、内幕交易",
+    "tier": "A",
+    "domains": ["fundamentals", "filings"]
+  },
+  "finnhub": {
+    "resource_id": "finnhub",
+    "description": "Finnhub — 基本面数据、盈利预期、情绪评分",
+    "tier": "B",
+    "domains": ["fundamentals", "estimates"]
+  },
+  "yahoo-finance": {
+    "resource_id": "yahoo-finance",
+    "description": "Yahoo Finance — 股价、行业分类、财务摘要",
+    "tier": "B",
+    "domains": ["price", "fundamentals"]
+  },
+  "kol-rss": {
+    "resource_id": "kol-rss",
+    "description": "KOL RSS — Lyn Alden、Damodaran 等观点聚合",
+    "tier": "F",
+    "domains": ["commentary", "narrative"]
+  },
+  "investing-calendar": {
+    "resource_id": "investing-calendar",
+    "description": "财经日历 — 经济数据发布、财报日程",
+    "tier": "B",
+    "domains": ["events", "calendar"]
+  },
+  "stocktwits": {
+    "resource_id": "stocktwits",
+    "description": "StockTwits 社交情绪 — 散户讨论情绪标签",
+    "tier": "E",
+    "domains": ["sentiment", "social"]
+  },
+  "reddit": {
+    "resource_id": "reddit",
+    "description": "Reddit — r/wallstreetbets 等论坛讨论",
+    "tier": "E",
+    "domains": ["sentiment", "social"]
+  }
+}

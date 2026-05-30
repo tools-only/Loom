@@ -23,9 +23,10 @@ The position hand uses no external resource_api calls — all data is user-provi
 
 ## Output
 
+Write ONLY this JSON line to stdout (no other text):
+
 ```json
-{
-  "metadata": {"confidence": 0.9, "gaps": [], "key_claims": []},
-  "narrative": "portfolio analysis in Chinese: positions, P&L summary, risk exposure, concentration flags"
-}
+{"type": "run.artifact", "artifact": {"metadata": {"confidence": 0.9, "gaps": [], "key_claims": []}, "narrative": "portfolio analysis in Chinese: positions, P&L summary, risk exposure, concentration flags"}}
 ```
+
+The outer `{"type":"run.artifact","artifact":{...}}` wrapper is required. Do not emit any other text on stdout.

@@ -50,6 +50,19 @@ For agents, it provides:
 
 Core is not a finance analyst, not a market data collector, and not a direct LLM API wrapper.
 
+### Core Agent Reserve Layer
+
+Loom Core should also reserve an internal, optional **Loom Core Agent** layer for higher-order, asynchronous reasoning about Loom itself.
+
+This layer is distinct from the Python runtime:
+
+- The runtime stays deterministic, low-latency, and responsible for routing, state, storage, and transport.
+- The Core Agent is allowed to be slower, asynchronous, and inference-heavy.
+- The Core Agent must never block the base UI loop or the task dispatch path.
+- The Core Agent may later take over intent interpretation, task decomposition, workspace summarization, self-optimization suggestions, and higher-order policy reasoning.
+
+The presence of this layer must be optional. Loom Core should remain fully usable if the Core Agent is absent, temporarily unavailable, or still under development.
+
 ## Recommended Architecture
 
 Use a **Local-first Modular Monolith + Domain Pack** architecture.

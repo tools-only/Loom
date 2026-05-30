@@ -1,0 +1,10 @@
+{
+  "_comment": "Add cloud agent adapters here. Keys starting with _ are ignored. Set tokens in .env.",
+  "_template": {
+    "endpoint": "https://your-agent.example.com/run",
+    "capabilities": ["market.analysis"],
+    "timeout_s": 120,
+    "token_env": "YOUR_AGENT_TOKEN",
+    "require_auth": true
+  }
+}

@@ -34,9 +34,10 @@ Each `wiki/tickers/<TICKER>.md` contains:
 
 ## Output
 
+Write ONLY this JSON line to stdout (no other text):
+
 ```json
-{
-  "metadata": {"confidence": 0.75, "gaps": [], "key_claims": []},
-  "narrative": "updated thesis narrative for the ticker in Chinese"
-}
+{"type": "run.artifact", "artifact": {"metadata": {"confidence": 0.75, "gaps": [], "key_claims": []}, "narrative": "updated thesis narrative for the ticker in Chinese"}}
 ```
+
+The outer `{"type":"run.artifact","artifact":{...}}` wrapper is required. Do not emit any other text on stdout.

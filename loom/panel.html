@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loom 控制面板</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f4f4f8; color: #1a1a2e; min-height: 100vh; }
+    .header { background: linear-gradient(135deg, #7A5AF8 0%, #2EC4B6 100%); color: white; padding: 20px 32px; }
+    .header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+    .header p { opacity: 0.85; font-size: 14px; margin-top: 4px; }
+    .tab-bar { background: white; border-bottom: 1px solid #e5e7eb; padding: 0 24px; display: flex; }
+    .tab-btn { padding: 12px 20px; font-size: 13px; font-weight: 600; color: #6b7280; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s; margin-bottom: -1px; }
+    .tab-btn:hover { color: #7A5AF8; }
+    .tab-btn.active { color: #7A5AF8; border-bottom-color: #7A5AF8; }
+    .layout { display: grid; grid-template-columns: 340px 1fr; gap: 0; min-height: calc(100vh - 113px); }
+    .sidebar { background: white; border-right: 1px solid #e5e7eb; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+    .main { padding: 24px; overflow-y: auto; }
+    .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 10px; }
+    .status-bar { display: flex; flex-direction: column; gap: 8px; }
+    .status-item { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 8px 12px; border-radius: 8px; background: #f9fafb; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-ok { background: #10b981; }
+    .dot-err { background: #ef4444; }
+    .dot-loading { background: #f59e0b; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .hand-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .hand-btn { padding: 14px 10px; border: 2px solid #e5e7eb; border-radius: 12px; background: white; cursor: pointer; text-align: center; transition: all 0.15s; font-size: 13px; font-weight: 600; }
+    .hand-btn:hover { border-color: #7A5AF8; background: #faf8ff; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(122,90,248,0.15); }
+    .hand-btn:active { transform: scale(0.98); }
+    .hand-btn .icon { font-size: 22px; display: block; margin-bottom: 4px; }
+    .hand-btn .label { color: #374151; }
+    .hand-btn.loading { border-color: #7A5AF8; background: #faf8ff; opacity: 0.7; pointer-events: none; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: 12px; font-weight: 600; color: #374151; }
+    input, textarea, select { border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-family: inherit; outline: none; transition: border-color 0.15s; background: white; width: 100%; }
+    input:focus, textarea:focus, select:focus { border-color: #7A5AF8; }
+    textarea { min-height: 80px; resize: vertical; }
+    input[type="password"] { font-family: monospace; letter-spacing: 2px; }
+    .empty-state { text-align: center; padding: 48px 24px; color: #9ca3af; }
+    .empty-state .big-icon { font-size: 48px; margin-bottom: 12px; }
+    .result-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .result-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #f3f4f6; flex-wrap: wrap; }
+    .result-header h2 { font-size: 18px; font-weight: 700; }
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .badge-purple { background: #ede9fe; color: #7c3aed; }
+    .badge-green { background: #d1fae5; color: #065f46; }
+    .badge-yellow { background: #fef3c7; color: #92400e; }
+    .badge-red { background: #fee2e2; color: #991b1b; }
+    .badge-gray { background: #f3f4f6; color: #4b5563; }
+    .narrative { font-size: 14px; line-height: 1.7; color: #374151; padding: 16px; background: #fafaf9; border-radius: 10px; margin-bottom: 16px; border-left: 3px solid #7A5AF8; white-space: pre-wrap; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    .detail-block h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 8px; }
+    .detail-block ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+    .detail-block li { font-size: 13px; color: #374151; padding: 4px 0; border-bottom: 1px solid #f3f4f6; }
+    .detail-block li:last-child { border-bottom: none; }
+    .resource-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 4px; }
+    .resource-name { font-family: monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; color: #4b5563; }
+    .resource-used { color: #10b981; font-weight: 700; }
+    .resource-ignored { color: #9ca3af; }
+    .webview-note { margin-top: 20px; padding: 12px 16px; background: #ecfdf5; border-radius: 8px; font-size: 13px; color: #065f46; display: flex; align-items: center; gap: 8px; }
+    .error-card { background: #fff5f5; border: 1.5px solid #fca5a5; border-radius: 12px; padding: 20px; }
+    .error-card h3 { color: #dc2626; font-size: 15px; margin-bottom: 8px; }
+    .error-card p { font-size: 13px; color: #7f1d1d; line-height: 1.6; }
+    .error-card code { background: #fee2e2; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+    .loading-card { padding: 40px; text-align: center; background: white; border-radius: 16px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: #7A5AF8; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .divider { height: 1px; background: #f3f4f6; flex-shrink: 0; }
+    .links { display: flex; gap: 8px; flex-wrap: wrap; }
+    .link-chip { padding: 6px 12px; background: #ede9fe; color: #7c3aed; border-radius: 999px; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 0.15s; }
+    .link-chip:hover { background: #ddd6fe; }
+    /* ── Config tab ── */
+    .config-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; }
+    .config-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: #1a1a2e; display: flex; align-items: baseline; gap: 8px; }
+    .config-card h3 span { font-size: 12px; font-weight: 400; color: #9ca3af; }
+    .cfg-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .hand-row { display: grid; grid-template-columns: 128px 1fr 1fr 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .hand-row-header { display: grid; grid-template-columns: 128px 1fr 1fr 1fr 1fr; gap: 8px; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #f3f4f6; }
+    .col-header { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; }
+    .hand-label { font-size: 13px; font-weight: 600; color: #374151; }
+    .preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+    .preset-label { font-size: 12px; color: #6b7280; white-space: nowrap; }
+    .preset-btn { padding: 5px 13px; border: 1.5px solid #e5e7eb; border-radius: 999px; font-size: 12px; font-weight: 600; color: #374151; background: white; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .preset-btn:hover { border-color: #7A5AF8; color: #7A5AF8; background: #faf8ff; }
+    .btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .btn-primary { padding: 10px 24px; background: #7A5AF8; color: white; border: none; border-radius: 999px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+    .btn-primary:hover { background: #6d4fe0; transform: translateY(-1px); }
+    .btn-ghost { padding: 10px 20px; background: transparent; color: #6b7280; border: 1.5px solid #e5e7eb; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+    .btn-ghost:hover { border-color: #9ca3af; color: #374151; }
+    .save-msg { font-size: 13px; font-weight: 600; }
+    .save-msg.ok { color: #10b981; }
+    .save-msg.err { color: #dc2626; }
+    .cfg-note { font-size: 12px; color: #6b7280; line-height: 1.6; padding: 12px 14px; background: #f9fafb; border-radius: 8px; border: 1px solid #f3f4f6; }
+    .cfg-note strong { color: #374151; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🔭 Loom 控制面板</h1>
+    <p>触发 Hand 分析 · 查看 artifact · 验证 webview 更新</p>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-btn-analyze" onclick="switchTab('analyze')">📊 分析</button>
+    <button class="tab-btn" id="tab-btn-config" onclick="switchTab('config')">⚙ 模型配置</button>
+  </div>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <div class="sidebar">
+
+      <!-- Status: always visible -->
+      <div>
+        <div class="section-title">服务状态</div>
+        <div class="status-bar">
+          <div class="status-item">
+            <span class="dot dot-loading" id="dot-server"></span>
+            <span id="status-server">检查 Anchor Server…</span>
+          </div>
+          <div class="status-item">
+            <span class="dot dot-loading" id="dot-brain"></span>
+            <span id="status-brain">检查 Loom Brain…</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Analyze sidebar -->
+      <div id="sidebar-analyze">
+        <div>
+          <div class="section-title">分析参数</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div class="form-group">
+              <label>分析任务描述（可留空，使用默认）</label>
+              <textarea id="task" placeholder="例：分析当前大盘宏观背景和主要风险点"></textarea>
+            </div>
+            <div class="form-group">
+              <label>股票代码（Target Thesis 必填）</label>
+              <input id="ticker" type="text" placeholder="例：NVDA" style="text-transform:uppercase">
+            </div>
+            <div class="form-group">
+              <label>持仓数据（Position 更新使用）</label>
+              <textarea id="positions" placeholder="例：NVDA 100股 成本$450&#10;AAPL 50股 成本$170&#10;现金 $50,000"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div>
+          <div class="section-title">触发分析</div>
+          <div class="hand-grid">
+            <button class="hand-btn" onclick="runHand('market')" id="btn-market">
+              <span class="icon">📊</span><span class="label">市场研判</span>
+            </button>
+            <button class="hand-btn" onclick="runHand('sentiment')" id="btn-sentiment">
+              <span class="icon">🌡️</span><span class="label">情绪追踪</span>
+            </button>
+            <button class="hand-btn" onclick="runHand('target')" id="btn-target">
+              <span class="icon">🎯</span><span class="label">标的 Thesis</span>
+            </button>
+            <button class="hand-btn" onclick="runHand('position')" id="btn-position">
+              <span class="icon">💼</span><span class="label">持仓更新</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div>
+          <div class="section-title">快捷链接</div>
+          <div class="links">
+            <a class="link-chip" href="http://localhost:3000" target="_blank">主 Webview</a>
+            <a class="link-chip" href="/data/fred" target="_blank">FRED 数据</a>
+            <a class="link-chip" href="/data/fear-greed" target="_blank">F&G 数据</a>
+            <a class="link-chip" href="/inbox" target="_blank">Inbox API</a>
+            <a class="link-chip" href="/connectors" target="_blank">Connectors</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config sidebar -->
+      <div id="sidebar-config" style="display:none">
+        <div>
+          <div class="section-title">快捷链接</div>
+          <div class="links">
+            <a class="link-chip" href="http://localhost:3000" target="_blank">主 Webview</a>
+            <a class="link-chip" href="/connectors" target="_blank">Connectors</a>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="cfg-note">
+          <strong>说明</strong><br>
+          • API Key 为空 → 读取环境变量<br>
+          • Base URL 为空 → 使用供应商默认端点<br>
+          • Hand 字段为空 → 继承全局默认<br>
+          • 保存后立即生效，无需重启 Brain
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+
+      <!-- Analyze main -->
+      <div id="main-analyze">
+        <div class="empty-state">
+          <div class="big-icon">🔭</div>
+          <p>选择一个 Hand 开始分析</p>
+          <p style="font-size:12px;margin-top:8px;color:#d1d5db">结果将显示在此处，同时 patch 到主 webview</p>
+        </div>
+      </div>
+
+      <!-- Config main -->
+      <div id="main-config" style="display:none">
+
+        <!-- Global defaults -->
+        <div class="config-card">
+          <h3>全局默认配置</h3>
+          <div class="preset-row">
+            <span class="preset-label">快速预设：</span>
+            <button class="preset-btn" onclick="applyPreset('anthropic','claude-haiku-4-5-20251001')">Anthropic · Haiku</button>
+            <button class="preset-btn" onclick="applyPreset('anthropic','claude-sonnet-4-6')">Anthropic · Sonnet</button>
+            <button class="preset-btn" onclick="applyPreset('deepseek','deepseek-chat')">DeepSeek V3</button>
+            <button class="preset-btn" onclick="applyPreset('xai','grok-3')">xAI · Grok 3</button>
+            <button class="preset-btn" onclick="applyPreset('gemini','gemini-2.0-flash')">Gemini Flash</button>
+          </div>
+          <div class="cfg-grid-2">
+            <div class="form-group">
+              <label>供应商</label>
+              <select id="def-provider">
+                <option value="anthropic">Anthropic</option>
+                <option value="openai">OpenAI</option>
+                <option value="xai">xAI (Grok)</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="gemini">Gemini</option>
+                <option value="custom">自定义（需填 Base URL）</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>模型名</label>
+              <input id="def-model" type="text" placeholder="例：claude-haiku-4-5-20251001">
+            </div>
+          </div>
+          <div class="cfg-grid-2">
+            <div class="form-group">
+              <label>API Key（空 = 读取环境变量）</label>
+              <input id="def-apikey" type="password" placeholder="sk-ant-… / sk-… / gsk_…">
+            </div>
+            <div class="form-group">
+              <label>Base URL（空 = 供应商默认端点）</label>
+              <input id="def-baseurl" type="text" placeholder="https://…">
+            </div>
+          </div>
+        </div>
+
+        <!-- Per-hand overrides -->
+        <div class="config-card">
+          <h3>各 Hand 单独配置 <span>（空字段继承全局默认）</span></h3>
+          <div class="hand-row-header">
+            <div class="col-header">Hand</div>
+            <div class="col-header">供应商</div>
+            <div class="col-header">模型</div>
+            <div class="col-header">API Key</div>
+            <div class="col-header">Base URL</div>
+          </div>
+          <!-- market -->
+          <div class="hand-row">
+            <div class="hand-label">📊 市场研判</div>
+            <select id="h-market-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+            <input id="h-market-model" type="text" placeholder="（继承默认）">
+            <input id="h-market-apikey" type="password" placeholder="（继承默认）">
+            <input id="h-market-baseurl" type="text" placeholder="（继承默认）">
+          </div>
+          <!-- sentiment -->
+          <div class="hand-row">
+            <div class="hand-label">🌡️ 情绪追踪</div>
+            <select id="h-sentiment-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+            <input id="h-sentiment-model" type="text" placeholder="（继承默认）">
+            <input id="h-sentiment-apikey" type="password" placeholder="（继承默认）">
+            <input id="h-sentiment-baseurl" type="text" placeholder="（继承默认）">
+          </div>
+          <!-- target -->
+          <div class="hand-row">
+            <div class="hand-label">🎯 标的 Thesis</div>
+            <select id="h-target-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+            <input id="h-target-model" type="text" placeholder="（继承默认）">
+            <input id="h-target-apikey" type="password" placeholder="（继承默认）">
+            <input id="h-target-baseurl" type="text" placeholder="（继承默认）">
+          </div>
+          <!-- position -->
+          <div class="hand-row">
+            <div class="hand-label">💼 持仓管理</div>
+            <select id="h-position-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+            <input id="h-position-model" type="text" placeholder="（继承默认）">
+            <input id="h-position-apikey" type="password" placeholder="（继承默认）">
+            <input id="h-position-baseurl" type="text" placeholder="（继承默认）">
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn-primary" onclick="saveConfig()">💾 保存配置</button>
+          <button class="btn-ghost" onclick="loadConfig()">↺ 重新加载</button>
+          <span id="save-msg" class="save-msg" style="display:none"></span>
+        </div>
+
+      </div><!-- /main-config -->
+    </div><!-- /main -->
+  </div><!-- /layout -->
+
+  <script>
+    const DEFAULT_TASKS = {
+      market:    '分析当前大盘 regime：宏观背景、板块轮动、主要风险和近期催化剂',
+      sentiment: '评估当前市场情绪定位：fear/greed 读数、AAII/NAAIM 数据、与历史基准的对比',
+      target:    (t) => `分析 ${t || 'SPY'} 的投资 thesis：核心假设、主要催化剂、失效条件`,
+      position:  '根据提供的持仓数据生成持仓报告：市值、P&L、集中度分析',
+    };
+    const HAND_NAMES  = { market:'市场研判', sentiment:'情绪追踪', target:'标的 Thesis', position:'持仓管理' };
+    const HAND_ICONS  = { market:'📊', sentiment:'🌡️', target:'🎯', position:'💼' };
+    const HANDS       = ['market', 'sentiment', 'target', 'position'];
+
+    // ── Tabs ────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      ['analyze', 'config'].forEach(t => {
+        document.getElementById('tab-btn-' + t).classList.toggle('active', t === tab);
+        document.getElementById('sidebar-' + t).style.display = t === tab ? '' : 'none';
+        document.getElementById('main-' + t).style.display    = t === tab ? '' : 'none';
+      });
+      if (tab === 'config') loadConfig();
+    }
+
+    // ── Status ──────────────────────────────────────────────────────
+    async function checkStatus() {
+      try {
+        const r = await fetch('/health', { signal: AbortSignal.timeout(3000) });
+        if (r.ok) setStatus('server', true, 'Anchor Server 运行中 (port 3000)');
+      } catch { setStatus('server', false, 'Anchor Server 未运行'); }
+
+      try {
+        const r = await fetch('http://localhost:3001/health', { signal: AbortSignal.timeout(3000) });
+        if (r.ok) {
+          const d = await r.json();
+          setStatus('brain', true, `Loom Brain 运行中 (${d.hands?.length || 0} hands)`);
+        }
+      } catch { setStatus('brain', false, 'Loom Brain 未运行 → cd loom && python main.py'); }
+    }
+
+    function setStatus(id, ok, msg) {
+      document.getElementById('dot-' + id).className = 'dot ' + (ok ? 'dot-ok' : 'dot-err');
+      document.getElementById('status-' + id).textContent = msg;
+    }
+
+    // ── Run hand ────────────────────────────────────────────────────
+    async function runHand(handId) {
+      const taskInput = document.getElementById('task').value.trim();
+      const ticker    = document.getElementById('ticker').value.trim().toUpperCase();
+      const positions = document.getElementById('positions').value.trim();
+
+      const dt = DEFAULT_TASKS[handId];
+      const task = taskInput || (typeof dt === 'function' ? dt(ticker) : dt);
+
+      const context = { tags: [] };
+      if (ticker) { context.ticker = ticker; context.tags.push('equity'); }
+      if (handId === 'position' && positions) { context.position_data = positions; context.tags.push('portfolio'); }
+
+      const btn = document.getElementById('btn-' + handId);
+      btn.classList.add('loading');
+      btn.querySelector('.icon').textContent = '⏳';
+
+      document.getElementById('main-analyze').innerHTML = `
+        <div class="loading-card">
+          <div class="spinner"></div>
+          <p style="font-weight:700;font-size:16px;margin-bottom:8px">正在分析…</p>
+          <p style="font-size:13px;color:#6b7280">Hand: ${HAND_NAMES[handId]}</p>
+          <p style="font-size:12px;color:#9ca3af;margin-top:4px">${esc(task)}</p>
+        </div>`;
+
+      try {
+        const res  = await fetch('/loom/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hand_id: handId, task, context }),
+        });
+        const data = await res.json();
+        showResult(data, handId, task);
+      } catch (e) {
+        showError('网络错误', e.message, null);
+      } finally {
+        btn.classList.remove('loading');
+        btn.querySelector('.icon').textContent = HAND_ICONS[handId];
+      }
+    }
+
+    function showResult(data, handId, task) {
+      if (!data.ok) {
+        const noSvc = data.error?.includes('not running');
+        showError(noSvc ? 'Loom Brain 未运行' : '分析失败', data.error,
+                  noSvc ? 'cd loom && python main.py' : null);
+        return;
+      }
+      const art  = data.artifact || {};
+      const meta = art.metadata  || {};
+      const conf = meta.confidence || 0;
+      const confPct = Math.round(conf * 100);
+      const confCls = conf > 0.7 ? 'badge-green' : conf > 0.4 ? 'badge-yellow' : 'badge-red';
+      const shown = meta.resources_shown || [];
+      const used  = meta.resources_used  || [];
+      const gaps  = meta.gaps || [];
+      const claims = meta.key_claims || [];
+
+      document.getElementById('main-analyze').innerHTML = `
+        <div class="result-card">
+          <div class="result-header">
+            <h2>${HAND_NAMES[handId]} 分析结果</h2>
+            <span class="badge badge-purple">✓ 完成</span>
+            <span class="badge ${confCls}">置信度 ${confPct}%</span>
+            <span class="badge badge-gray">用了 ${used.length}/${shown.length} 个资源</span>
+          </div>
+          <h4 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin-bottom:8px">分析叙述</h4>
+          <div class="narrative">${esc(art.narrative || '')}</div>
+          <div class="detail-grid">
+            <div class="detail-block">
+              <h4>关键判断</h4>
+              <ul>${claims.length ? claims.map(c=>`<li>• ${esc(c)}</li>`).join('') : '<li style="color:#9ca3af">无结构化判断</li>'}</ul>
+            </div>
+            <div class="detail-block">
+              <h4>数据缺口</h4>
+              <ul>${gaps.length ? gaps.map(g=>`<li>⚠️ ${esc(g)}</li>`).join('') : '<li style="color:#9ca3af">无明显缺口</li>'}</ul>
+            </div>
+          </div>
+          <div style="margin-top:20px">
+            <div class="section-title" style="margin-bottom:10px">资源使用详情</div>
+            ${shown.map(rid=>`<div class="resource-bar"><span class="resource-name">${esc(rid)}</span>${used.includes(rid)?'<span class="resource-used">✓ 已使用</span>':'<span class="resource-ignored">— 未使用</span>'}</div>`).join('') || '<p style="color:#9ca3af;font-size:12px">无外部资源</p>'}
+          </div>
+          <div class="webview-note">✅ 结果已 patch 到主 webview — <a href="http://localhost:3000" target="_blank" style="color:#065f46;font-weight:700">localhost:3000</a></div>
+          <p style="font-size:11px;color:#9ca3af;margin-top:12px">任务：${esc(task)}</p>
+        </div>`;
+    }
+
+    function showError(title, msg, cmd) {
+      document.getElementById('main-analyze').innerHTML = `
+        <div class="error-card">
+          <h3>❌ ${esc(title)}</h3>
+          <p>${esc(msg)}</p>
+          ${cmd ? `<p style="margin-top:12px">启动命令：<code>${esc(cmd)}</code></p>` : ''}
+        </div>`;
+    }
+
+    // ── Config ──────────────────────────────────────────────────────
+    async function loadConfig() {
+      try {
+        const r = await fetch('http://localhost:3001/config', { signal: AbortSignal.timeout(3000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const cfg = await r.json();
+        const def = cfg.default || {};
+        setVal('def-provider', def.provider || 'anthropic');
+        setVal('def-model',    def.model    || '');
+        setVal('def-apikey',   def.api_key  || '');
+        setVal('def-baseurl',  def.base_url || '');
+        const hands = cfg.hands || {};
+        HANDS.forEach(h => {
+          const hc = hands[h] || {};
+          setVal('h-' + h + '-provider', hc.provider || '');
+          setVal('h-' + h + '-model',    hc.model    || '');
+          setVal('h-' + h + '-apikey',   hc.api_key  || '');
+          setVal('h-' + h + '-baseurl',  hc.base_url || '');
+        });
+      } catch (e) {
+        console.warn('loadConfig:', e.message);
+      }
+    }
+
+    async function saveConfig() {
+      const cfg = {
+        default: {
+          provider: getVal('def-provider'),
+          model:    getVal('def-model'),
+          api_key:  getVal('def-apikey'),
+          base_url: getVal('def-baseurl'),
+        },
+        hands: Object.fromEntries(HANDS.map(h => [h, {
+          provider: getVal('h-' + h + '-provider'),
+          model:    getVal('h-' + h + '-model'),
+          api_key:  getVal('h-' + h + '-apikey'),
+          base_url: getVal('h-' + h + '-baseurl'),
+        }])),
+      };
+      const el = document.getElementById('save-msg');
+      el.style.display = '';
+      el.className = 'save-msg';
+      el.textContent = '保存中…';
+      try {
+        const r = await fetch('http://localhost:3001/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cfg),
+        });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || '保存失败');
+        el.className = 'save-msg ok';
+        el.textContent = '✓ 已保存，立即生效';
+        setTimeout(() => el.style.display = 'none', 3000);
+      } catch (e) {
+        el.className = 'save-msg err';
+        el.textContent = '❌ ' + e.message;
+      }
+    }
+
+    function applyPreset(provider, model) {
+      setVal('def-provider', provider);
+      setVal('def-model',    model);
+    }
+
+    function getVal(id) { return document.getElementById(id)?.value?.trim() || ''; }
+    function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+    function esc(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Init ────────────────────────────────────────────────────────
+    checkStatus();
+    setInterval(checkStatus, 15000);
+  </script>
+</body>
+</html>
