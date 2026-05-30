@@ -3,6 +3,13 @@
 'use strict';
 
 class PushBroker {
+  // Global kill switch: when true, ccPrompt enrichment is silently dropped.
+  // Set via ANCHOR_DISABLE_ENRICHMENT=1 env var or toggle() at runtime.
+  static disableEnrichment = !!(
+    process.env.ANCHOR_DISABLE_ENRICHMENT === '1' ||
+    process.env.ANCHOR_DISABLE_ENRICHMENT === 'true'
+  );
+
   // opts: { inbox, pendingOps, notifyPendingChanged, broadcastBrowserMessage }
   constructor(opts) {
     this._inbox = opts.inbox;
@@ -27,6 +34,12 @@ class PushBroker {
     const counts = this._inbox.unreadCounts();
     this._broadcast({ type: 'inbox_updated', counts });
 
+    // Global enrichment kill switch — drop ccPrompt before it can trigger
+    // a push_analyze op (which would spawn a CC subprocess / inproc agent).
+    if (PushBroker.disableEnrichment && event.ccPrompt) {
+      return item;
+    }
+
     if (event.ccPrompt) {
       this._pendingOps.push({
         intent: {
@@ -40,6 +53,12 @@ class PushBroker {
       this._notifyPendingChanged();
     }
     return item;
+  }
+
+  /** Toggle enrichment at runtime. Returns the new state. */
+  static toggleEnrichment(enabled) {
+    PushBroker.disableEnrichment = enabled !== true;
+    return PushBroker.disableEnrichment;
   }
 }
 

@@ -25,7 +25,6 @@
   <img class="toolbar-logo" src="assets/logo-mark.svg" alt="Bloom" width="32" height="32">
   <span class="toolbar-brand">Loom</span>
   <nav class="toolbar-domain-tabs" id="toolbar-domain-tabs" aria-label="Domain navigation">
-    <button class="domain-tab" data-domain="overview" title="Overview"><i class="ph-bold ph-chart-pie-slice"></i><span>Overview</span></button>
     <button class="domain-tab" data-domain="market" title="Market"><i class="ph-bold ph-newspaper"></i><span>Market</span></button>
     <button class="domain-tab" data-domain="target" title="Targets"><i class="ph-bold ph-crosshair"></i><span>Targets</span></button>
     <button class="domain-tab" data-domain="sentiment" title="Sentiment"><i class="ph-bold ph-pulse"></i><span>Sentiment</span></button>
@@ -60,26 +59,11 @@
           <i class="ph-bold ph-arrow-right"></i><span>Generate</span>
         </button>
       </div>
-      <div class="home-branch-chips" aria-label="Branch selector" id="home-branch-chips">
-        <button class="branch-chip" type="button" data-branch="market" data-placeholder="今日市场研判：宏观信号、板块轮动、风险事件..." data-prompt="哪些宏观和新闻事件正在改变本周风险偏好？">
-          <i class="ph-bold ph-newspaper"></i><span>市场研判</span>
-        </button>
-        <button class="branch-chip" type="button" data-branch="position" data-placeholder="仓位管理：持仓复盘、风险敞口、调仓建议..." data-prompt="基于我的仓位生成一份交易复盘，并标出需要 agent 继续跟进的节点">
-          <i class="ph-bold ph-briefcase"></i><span>仓位管理</span>
-        </button>
-        <button class="branch-chip" type="button" data-branch="target" data-placeholder="投资逻辑：标的跟踪、论文维护、催化剂监控..." data-prompt="为关注标的建立一个触发器：价格、新闻、财报、情绪同时跟踪">
-          <i class="ph-bold ph-crosshair"></i><span>投资逻辑</span>
-        </button>
-        <button class="branch-chip" type="button" data-branch="sentiment" data-placeholder="情绪追踪：Fear & Greed、持仓极值、社媒信号..." data-prompt="把市场情绪、Reddit、Stocktwits 和 Fear & Greed 指标合成一个情绪摘要">
-          <i class="ph-bold ph-pulse"></i><span>情绪追踪</span>
-        </button>
-      </div>
       <div class="home-suggestions" aria-label="Prompt starters">
-        <button type="button" data-route="overview" data-prompt="生成一份今日市场总览，包含宏观、重要新闻、风险日历和可追踪标的"><span>Today Market Brief</span><i class="ph-bold ph-arrow-right"></i></button>
-        <button type="button" data-route="position" data-prompt="基于我的仓位生成一份交易复盘，并标出需要 agent 继续跟进的节点"><span>Portfolio Analysis</span><i class="ph-bold ph-arrow-right"></i></button>
-        <button type="button" data-route="target" data-prompt="为 NVDA、AAPL、TSLA 建立一个可交互标的跟踪页面"><span>Target Tracking</span><i class="ph-bold ph-arrow-right"></i></button>
-        <button type="button" data-route="market" data-prompt="哪些宏观和新闻事件正在改变本周风险偏好？"><span>Market Intelligence</span><i class="ph-bold ph-arrow-right"></i></button>
-        <button type="button" data-route="sentiment" data-prompt="把市场情绪、Reddit、Stocktwits 和 Fear & Greed 指标合成一个情绪摘要。"><span>Sentiment Pulse</span><i class="ph-bold ph-arrow-right"></i></button>
+        <button type="button" data-route="market" data-prompt="\market 今日市场简报：宏观信号、板块轮动、风险事件"><span>Today Market Brief</span><i class="ph-bold ph-arrow-right"></i></button>
+        <button type="button" data-route="position" data-prompt="\position 基于我的仓位生成一份交易复盘，并标出需要 agent 继续跟进的节点"><span>Portfolio Analysis</span><i class="ph-bold ph-arrow-right"></i></button>
+        <button type="button" data-route="target" data-prompt="\target 为 NVDA、AAPL、TSLA 建立一个可交互标的跟踪页面"><span>Target Tracking</span><i class="ph-bold ph-arrow-right"></i></button>
+        <button type="button" data-route="sentiment" data-prompt="\sentiment 把市场情绪、Reddit、Stocktwits 和 Fear & Greed 指标合成一个情绪摘要"><span>Sentiment Pulse</span><i class="ph-bold ph-arrow-right"></i></button>
       </div>
     </div>
 
@@ -164,6 +148,12 @@
         <span class="domain-card-badge" id="badge-target" hidden>0</span>
         <span class="domain-card-title">标的跟踪</span>
         <span class="domain-card-meta" id="meta-target">Target Tracking</span>
+      </button>
+      <button class="home-domain-card" type="button" data-domain="sentiment">
+        <span class="domain-card-icon"><i class="ph-bold ph-pulse"></i></span>
+        <span class="domain-card-badge" id="badge-sentiment" hidden>0</span>
+        <span class="domain-card-title">情绪监测</span>
+        <span class="domain-card-meta" id="meta-sentiment">Sentiment Monitoring</span>
       </button>
     </div>
   </div>
@@ -385,7 +375,7 @@
       <button id="loom-modal-close" class="loom-modal-close-btn" type="button" title="关闭"><i class="ph-bold ph-x"></i></button>
     </div>
     <div class="loom-modal-tabs">
-      <button class="loom-modal-tab loom-modal-tab--active" data-tab="models" type="button">Models</button>
+      <button class="loom-modal-tab loom-modal-tab--active" data-tab="models" type="button">Settings</button>
       <button class="loom-modal-tab" data-tab="connector" type="button">Connector</button>
     </div>
     <div class="loom-modal-body">
@@ -457,41 +447,84 @@
             <input id="lm-def-baseurl" type="text" placeholder="https://…">
           </div>
         </div>
-        <div class="loom-section-label" style="margin-top:14px">各 Hand 单独配置 <span class="loom-hint">空字段继承全局默认</span></div>
+        <div class="loom-section-label" style="margin-top:14px">各 Hand 配置 <span class="loom-hint">· 选 API 填写模型信息，选 Agent 填写 endpoint</span></div>
         <div class="loom-hand-table">
-          <div class="loom-hand-header">
-            <span>Hand</span><span>供应商</span><span>模型</span><span>API Key</span><span>Base URL</span>
+          <div class="loom-hand-header loom-hand-header--unified">
+            <span>Hand</span><span>模式</span><span>配置</span>
           </div>
-          <div class="loom-hand-row">
-            <span>📊 市场研判</span>
-            <select id="lm-market-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
-            <input id="lm-market-model" type="text" placeholder="（继承默认）">
-            <input id="lm-market-apikey" type="password" placeholder="（继承默认）">
-            <input id="lm-market-baseurl" type="text" placeholder="（继承默认）">
+          <!-- market -->
+          <div class="loom-hand-row loom-hand-row--unified">
+            <span>📊 Market</span>
+            <select class="hand-mode-select" id="hmode-market">
+              <option value="api">API 配置</option>
+              <option value="agent">外部 Agent</option>
+            </select>
+            <div class="hand-fields-api" id="hf-api-market">
+              <select id="lm-market-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+              <input id="lm-market-model" type="text" placeholder="模型名">
+              <input id="lm-market-apikey" type="password" placeholder="API Key">
+              <input id="lm-market-baseurl" type="text" placeholder="Base URL">
+            </div>
+            <div class="hand-fields-agent" id="hf-agent-market">
+              <input id="ag-ep-market" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace">
+              <input id="ag-desc-market" type="text" placeholder="功能描述（可选）">
+            </div>
           </div>
-          <div class="loom-hand-row">
-            <span>🌡️ 情绪追踪</span>
-            <select id="lm-sentiment-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
-            <input id="lm-sentiment-model" type="text" placeholder="（继承默认）">
-            <input id="lm-sentiment-apikey" type="password" placeholder="（继承默认）">
-            <input id="lm-sentiment-baseurl" type="text" placeholder="（继承默认）">
+          <!-- sentiment -->
+          <div class="loom-hand-row loom-hand-row--unified">
+            <span>🌡️ Sentiment</span>
+            <select class="hand-mode-select" id="hmode-sentiment">
+              <option value="api">API 配置</option>
+              <option value="agent">外部 Agent</option>
+            </select>
+            <div class="hand-fields-api" id="hf-api-sentiment">
+              <select id="lm-sentiment-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+              <input id="lm-sentiment-model" type="text" placeholder="模型名">
+              <input id="lm-sentiment-apikey" type="password" placeholder="API Key">
+              <input id="lm-sentiment-baseurl" type="text" placeholder="Base URL">
+            </div>
+            <div class="hand-fields-agent" id="hf-agent-sentiment">
+              <input id="ag-ep-sentiment" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace">
+              <input id="ag-desc-sentiment" type="text" placeholder="功能描述（可选）">
+            </div>
           </div>
-          <div class="loom-hand-row">
-            <span>🎯 标的 Thesis</span>
-            <select id="lm-target-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
-            <input id="lm-target-model" type="text" placeholder="（继承默认）">
-            <input id="lm-target-apikey" type="password" placeholder="（继承默认）">
-            <input id="lm-target-baseurl" type="text" placeholder="（继承默认）">
+          <!-- target -->
+          <div class="loom-hand-row loom-hand-row--unified">
+            <span>🎯 Target</span>
+            <select class="hand-mode-select" id="hmode-target">
+              <option value="api">API 配置</option>
+              <option value="agent">外部 Agent</option>
+            </select>
+            <div class="hand-fields-api" id="hf-api-target">
+              <select id="lm-target-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+              <input id="lm-target-model" type="text" placeholder="模型名">
+              <input id="lm-target-apikey" type="password" placeholder="API Key">
+              <input id="lm-target-baseurl" type="text" placeholder="Base URL">
+            </div>
+            <div class="hand-fields-agent" id="hf-agent-target">
+              <input id="ag-ep-target" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace">
+              <input id="ag-desc-target" type="text" placeholder="功能描述（可选）">
+            </div>
           </div>
-          <div class="loom-hand-row">
-            <span>💼 持仓管理</span>
-            <select id="lm-position-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
-            <input id="lm-position-model" type="text" placeholder="（继承默认）">
-            <input id="lm-position-apikey" type="password" placeholder="（继承默认）">
-            <input id="lm-position-baseurl" type="text" placeholder="（继承默认）">
+          <!-- position -->
+          <div class="loom-hand-row loom-hand-row--unified">
+            <span>💼 Portfolio</span>
+            <select class="hand-mode-select" id="hmode-position">
+              <option value="api">API 配置</option>
+              <option value="agent">外部 Agent</option>
+            </select>
+            <div class="hand-fields-api" id="hf-api-position">
+              <select id="lm-position-provider"><option value="">（默认）</option><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option><option value="xai">xAI (Grok)</option><option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option><option value="custom">自定义</option></select>
+              <input id="lm-position-model" type="text" placeholder="模型名">
+              <input id="lm-position-apikey" type="password" placeholder="API Key">
+              <input id="lm-position-baseurl" type="text" placeholder="Base URL">
+            </div>
+            <div class="hand-fields-agent" id="hf-agent-position">
+              <input id="ag-ep-position" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace">
+              <input id="ag-desc-position" type="text" placeholder="功能描述（可选）">
+            </div>
           </div>
         </div>
-      </div>
 
       <!-- Connector tab -->
       <div class="loom-tab-panel loom-tab-panel--hidden" data-panel="connector">
@@ -505,12 +538,13 @@
       <div class="loom-modal-actions">
         <button id="loom-modal-open-panel" class="btn btn--ghost btn--sm" type="button"><i class="ph-bold ph-arrow-square-out"></i> 完整面板</button>
         <button id="loom-modal-cancel" class="btn btn--ghost btn--sm" type="button">取消</button>
-        <button id="loom-modal-save" class="btn btn--brand btn--sm" type="button"><i class="ph-bold ph-floppy-disk"></i> 保存 Hands</button>
+        <button id="loom-modal-save" class="btn btn--brand btn--sm" type="button"><i class="ph-bold ph-floppy-disk"></i> 保存</button>
       </div>
     </div>
   </div>
 </div>
 
+<script src="timing-waterfall.js"></script>
 <script src="anchor-client.js"></script>
 <script src="prompt-panel.js"></script>
 <script src="anchor-debate-overlay.js"></script>

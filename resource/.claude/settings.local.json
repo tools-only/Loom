@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tasklist //FI \"IMAGENAME eq node.exe\" //FO CSV)",
+      "Bash(node *)",
+      "WebFetch(domain:www.anthropic.com)",
+      "Read(//d/ai-native chrome/**)",
+      "Read(//d/ai-native chrome/mcp/**)"
+    ]
+  }
+}

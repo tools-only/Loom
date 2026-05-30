@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loom Ops — Engineering Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;
+  --fg:#c9d1d9;--fg2:#8b949e;--fg3:#6e7681;
+  --green:#3fb950;--yellow:#d29922;--red:#f85149;--blue:#58a6ff;
+  --purple:#a371f7;--cyan:#39d2c0;--orange:#db6d28;
+  --font:'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+}
+body{background:var(--bg);color:var(--fg);font:13px/1.5 var(--font);min-height:100vh;overflow-x:hidden}
+
+/* Header */
+.topbar{
+  display:flex;align-items:center;gap:12px;padding:12px 20px;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+}
+.topbar-logo{font-size:18px;font-weight:700;letter-spacing:-0.02em}
+.topbar-logo span{color:var(--purple)}
+.topbar-spacer{flex:1}
+.topbar-status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--fg2)}
+.topbar-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0}
+.topbar-dot.warn{background:var(--yellow)}
+.topbar-dot.dead{background:var(--red)}
+.topbar-dot.pulse{animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.35}}
+.topbar-tag{
+  font-size:10px;padding:2px 8px;border-radius:10px;
+  background:var(--bg3);color:var(--fg2);border:1px solid var(--border);
+}
+
+/* Grid */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(340px,1fr));
+  gap:16px;padding:16px 20px;
+}
+.grid-wide{grid-column:1/-1}
+
+/* Cards */
+.card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+  padding:16px;display:flex;flex-direction:column;gap:10px;
+}
+.card-header{
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--fg2);
+}
+.card-header i{font-size:16px}
+.card-header .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.card-header .dot.live{background:var(--green)}
+.card-header .dot.idle{background:var(--fg3)}
+.card-header .dot.warn{background:var(--yellow)}
+.card-header .dot.dead{background:var(--red)}
+.card-body{font-size:12px;display:flex;flex-direction:column;gap:6px}
+
+/* Stat row */
+.stat{display:flex;justify-content:space-between;align-items:center;padding:3px 0}
+.stat-label{color:var(--fg2);font-size:11px}
+.stat-value{font-weight:600;font-size:12px}
+.stat-value.green{color:var(--green)}.stat-value.yellow{color:var(--yellow)}
+.stat-value.red{color:var(--red)}.stat-value.blue{color:var(--blue)}
+
+/* Topology */
+.topo{position:relative;padding:24px 0;min-height:280px}
+.topo svg{width:100%;height:auto}
+.topo-node{transition:all .3s ease}
+.topo-node:hover{filter:brightness(1.2)}
+
+/* Log panels */
+.log-panel{
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;
+  max-height:240px;overflow-y:auto;font-size:11px;padding:6px 0;
+}
+.log-entry{
+  display:flex;gap:10px;padding:3px 12px;line-height:1.6;
+  border-left:2px solid transparent;
+}
+.log-entry:hover{background:var(--bg3)}
+.log-entry.start{border-left-color:var(--cyan)}
+.log-entry.done{border-left-color:var(--green)}
+.log-entry.error{border-left-color:var(--red)}
+.log-entry.event{border-left-color:var(--blue)}
+.log-entry.patch{border-left-color:var(--purple)}
+.log-ts{color:var(--fg3);white-space:nowrap;flex-shrink:0}
+.log-kind{
+  font-size:10px;text-transform:uppercase;padding:0 5px;border-radius:3px;
+  white-space:nowrap;flex-shrink:0;font-weight:600;
+}
+.log-kind.start{background:rgba(57,210,192,.15);color:var(--cyan)}
+.log-kind.running{background:rgba(88,166,255,.15);color:var(--blue)}
+.log-kind.done{background:rgba(63,185,80,.15);color:var(--green)}
+.log-kind.error{background:rgba(248,81,73,.15);color:var(--red)}
+.log-kind.agent{background:rgba(163,113,247,.15);color:var(--purple)}
+.log-kind.patch{background:rgba(219,109,40,.15);color:var(--orange)}
+.log-msg{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg)}
+.log-empty{color:var(--fg3);font-style:italic;padding:8px 12px;text-align:center}
+
+/* Process table */
+.proc-table{width:100%;font-size:11px;border-collapse:collapse}
+.proc-table th{text-align:left;color:var(--fg2);font-weight:500;padding:4px 8px;border-bottom:1px solid var(--border)}
+.proc-table td{padding:4px 8px;border-bottom:1px solid rgba(48,54,61,.4)}
+.proc-table tr.dead td{color:var(--fg3);text-decoration:line-through}
+.proc-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}
+.proc-dot.live{background:var(--green)}.proc-dot.dead{background:var(--fg3)}
+
+/* Error banner */
+.banner{
+  grid-column:1/-1;padding:10px 16px;border-radius:8px;
+  font-size:12px;display:none;align-items:center;gap:8px;
+}
+.banner.warn{display:flex;background:rgba(210,153,34,.12);border:1px solid rgba(210,153,34,.3);color:var(--yellow)}
+.banner.dead{display:flex;background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);color:var(--red)}
+.banner i{font-size:16px}
+
+/* Offline overlay on cards */
+.card.offline{opacity:.5;position:relative}
+.card.offline::after{
+  content:'Offline';position:absolute;top:8px;right:12px;
+  font-size:10px;color:var(--yellow);font-weight:600;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Responsive */
+@media(max-width:768px){
+  .grid{grid-template-columns:1fr;padding:12px}
+  .topbar{padding:10px 12px;gap:8px}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">Loom <span>Ops</span></div>
+  <span class="topbar-tag" id="tag-port">:3000</span>
+  <span class="topbar-tag" id="tag-provider">-</span>
+  <span class="topbar-spacer"></span>
+  <div class="topbar-status">
+    WS <span class="topbar-dot pulse" id="ws-dot"></span>
+    <span id="ws-label">connecting</span>
+  </div>
+  <span class="topbar-tag" id="tag-up">-</span>
+  <div class="topbar-status">
+    Server <span class="topbar-dot" id="server-dot"></span>
+  </div>
+</div>
+
+<div class="grid" id="grid">
+
+  <!-- Global banners -->
+  <div class="banner warn" id="banner-warn"><i class="ph-bold ph-warning"></i><span id="banner-warn-msg"></span></div>
+  <div class="banner dead" id="banner-dead"><i class="ph-bold ph-x-circle"></i><span id="banner-dead-msg"></span></div>
+
+  <!-- Architecture Topology -->
+  <div class="card grid-wide">
+    <div class="card-header"><i class="ph-bold ph-graph"></i> Architecture Topology</div>
+    <div class="topo" id="topo-container">
+      <svg viewBox="0 0 900 300" id="topo-svg"></svg>
+    </div>
+  </div>
+
+  <!-- Server card -->
+  <div class="card" id="card-server">
+    <div class="card-header"><i class="ph-bold ph-cpu"></i> Server <span class="dot live" id="dot-server"></span></div>
+    <div class="card-body" id="body-server"></div>
+  </div>
+
+  <!-- Inproc Agent card -->
+  <div class="card" id="card-inproc">
+    <div class="card-header"><i class="ph-bold ph-brain"></i> Inproc Agent <span class="dot live" id="dot-inproc"></span></div>
+    <div class="card-body" id="body-inproc"></div>
+  </div>
+
+  <!-- Processor Pool card -->
+  <div class="card" id="card-pool">
+    <div class="card-header"><i class="ph-bold ph-stack"></i> Processor Pool <span class="dot live" id="dot-pool"></span></div>
+    <div class="card-body" id="body-pool"></div>
+  </div>
+
+  <!-- OS Processes card -->
+  <div class="card" id="card-procs">
+    <div class="card-header"><i class="ph-bold ph-activity"></i> OS Processes <span class="dot live" id="dot-procs"></span></div>
+    <div class="card-body" style="overflow-x:auto">
+      <table class="proc-table"><thead><tr><th>PID</th><th>Role</th><th>Status</th><th>Alive</th><th>Started</th></tr></thead><tbody id="proc-tbody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- Spawn Log -->
+  <div class="card grid-wide">
+    <div class="card-header"><i class="ph-bold ph-clock-countdown"></i> Spawn Log <span style="font-size:10px;color:var(--fg3)" id="spawn-src">via pusher</span></div>
+    <div class="log-panel" id="spawn-log"><div class="log-empty">Waiting for pusher...</div></div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="card grid-wide">
+    <div class="card-header"><i class="ph-bold ph-pulse"></i> Event Timeline <span style="font-size:10px;color:var(--fg3)" id="timeline-src">via Anchor WS</span></div>
+    <div class="log-panel" id="timeline-log"><div class="log-empty">Waiting for events...</div></div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// Ops Dashboard — Node-driven refresh architecture
+//
+// ws://localhost:3002 (ops-pusher sidecar): pushes full state @ 1s
+//   → all cards, process table, spawn log refreshed on each push
+//
+// ws://localhost:3000 (Anchor service): pushes agent_event/patch
+//   → timeline updates in real-time (<100ms)
+//
+// No browser-side polling. No LLM token consumption.
+// ═══════════════════════════════════════════════════════════════════
+
+const $ = id => document.getElementById(id);
+function fmt(s){return s==null||s===undefined?'-':String(s)}
+function ago(iso){if(!iso)return'-';const d=(Date.now()-new Date(iso).getTime())/1000;return d<60?Math.floor(d)+'s':d<3600?Math.floor(d/60)+'m':Math.floor(d/3600)+'h'}
+
+const EMPTY_DATA = { health:null, agents:{main:false,subagents:[]}, status:null, spawnLog:{entries:[]}, processes:{processes:[]} };
+const STATE = { data:EMPTY_DATA, serverUp:false, wsLive:false, wsAnchorLive:false,
+  timelineEntries:[], frames:0, pusherLag:0 };
+
+// ── Channel 1: ops-pusher WS (state push @ 1s) ────────────────────
+function connectPusher(){
+  const ws = new WebSocket('ws://'+location.hostname+':3002');
+  ws.onopen = () => {
+    STATE.wsLive = true;
+    updateWSDot();
+  };
+  ws.onmessage = (e) => {
+    let msg;
+    try{msg=JSON.parse(e.data)}catch(_){return}
+    if(msg.type==='ops_state'){
+      STATE.data = msg.data;
+      STATE.serverUp = msg.server_up;
+      STATE.frames = msg.frame;
+      STATE.pusherLag = Date.now() - new Date(msg.ts).getTime();
+      renderAll();
+    }
+  };
+  ws.onclose = () => { STATE.wsLive=false; updateWSDot(); setTimeout(connectPusher,1000); };
+  ws.onerror = () => { ws.close(); };
+}
+
+function updateWSDot(){
+  const d=$('ws-dot'); d.classList.remove('pulse','warn','dead');
+  if(STATE.wsLive)d.classList.add('pulse');else d.classList.add('warn');
+}
+
+// ── Channel 2: Anchor WS (real-time events) ────────────────────────
+function connectAnchorWS(){
+  const ws = new WebSocket('ws://'+location.host);
+  ws.onopen = () => { STATE.wsAnchorLive=true; };
+  ws.onmessage = (e) => {
+    let msg;
+    try{msg=JSON.parse(e.data)}catch(_){return}
+    if(msg.type==='agent_event'&&msg.event){
+      STATE.timelineEntries.unshift({ts:new Date().toISOString(),event:msg.event});
+      if(STATE.timelineEntries.length>80)STATE.timelineEntries.length=80;
+      renderTimeline();
+    }
+    if(msg.type==='patch'){
+      STATE.timelineEntries.unshift({ts:new Date().toISOString(),event:{kind:'patch',count:msg.patches?.length||0}});
+      if(STATE.timelineEntries.length>80)STATE.timelineEntries.length=80;
+      renderTimeline();
+    }
+  };
+  ws.onclose = () => { STATE.wsAnchorLive=false; setTimeout(connectAnchorWS,2000); };
+  ws.onerror = () => { ws.close(); };
+}
+
+// ── Render ─────────────────────────────────────────────────────────
+function renderAll(){
+  renderBanners();
+  renderTopo();
+  renderServer();
+  renderAgent();
+  renderPool();
+  renderProcesses();
+  renderTopbar();
+  renderSpawnLog();
+  renderTimeline();
+  updateWSDot();
+}
+
+function renderBanners(){
+  const d = STATE.data;
+  const bw=$('banner-warn'),bd=$('banner-dead');
+  if(!STATE.serverUp){
+    bd.style.display='flex';$('banner-dead-msg').textContent='Anchor server unreachable';
+    bw.style.display='none';
+  }else if(d&&d.health&&d.health.shutting_down){
+    bw.style.display='flex';$('banner-warn-msg').textContent='Server shutting down';
+  }else{bw.style.display='none';bd.style.display='none'}
+  ['server','inproc','pool','procs'].forEach(id=>{
+    document.getElementById('card-'+id).classList.toggle('offline',!STATE.serverUp);
+  });
+  const sd=$('server-dot');sd.classList.toggle('live',STATE.serverUp);sd.classList.toggle('dead',!STATE.serverUp);
+}
+
+function renderTopbar(){
+  const d = STATE.data;
+  $('tag-port').textContent = ':'+(d?.health?.port||'?');
+  $('tag-provider').textContent = 'push @ '+(STATE.pusherLag||'?')+'ms';
+  $('tag-up').textContent = STATE.serverUp ? 'UP · F'+STATE.frames : 'DOWN';
+}
+
+function renderServer(){
+  const h = STATE.data?.health;
+  const el = $('body-server');
+  const dot = $('dot-server');
+  if(!h){el.innerHTML='<span style="color:var(--yellow)">Waiting for state...</span>';dot.className='dot warn';return}
+  dot.className='dot live';
+  el.innerHTML=
+    `<div class="stat"><span class="stat-label">Port</span><span class="stat-value">${h.port}</span></div>`+
+    `<div class="stat"><span class="stat-label">Pending ops</span><span class="stat-value ${h.pending_ops>0?'yellow':''}">${h.pending_ops}</span></div>`+
+    `<div class="stat"><span class="stat-label">Main agent</span><span class="stat-value ${h.main_agent_connected?'green':'red'}">${h.main_agent_connected?'Connected':'Offline'}</span></div>`+
+    `<div class="stat"><span class="stat-label">Subagents</span><span class="stat-value blue">${h.subagents_connected?.length||0}</span></div>`+
+    `<div class="stat"><span class="stat-label">WS clients</span><span class="stat-value">${h.webview_clients||0}</span></div>`;
+}
+
+function renderAgent(){
+  const a = STATE.data?.agents;
+  const dot = $('dot-inproc');
+  if(!a){$('body-inproc').innerHTML='<span style="color:var(--fg3)">-</span>';dot.className='dot idle';return}
+  dot.className='dot '+(a.main?'live':'idle');
+  let html='';
+  html+=`<div class="stat"><span class="stat-label">CC main</span><span class="stat-value ${a.main?'green':'red'}">${a.main?'● Connected':'○ Idle'}</span></div>`;
+  (a.subagents||[]).forEach(s=>{html+=`<div class="stat"><span class="stat-label">${s.label||s.id}</span><span class="stat-value green">● ${ago(s.connectedAt)}</span></div>`});
+  if(!a.main&&!(a.subagents||[]).length)html+=`<div class="stat"><span class="stat-value" style="color:var(--fg3)">No agents</span></div>`;
+  $('body-inproc').innerHTML=html;
+}
+
+function renderPool(){
+  const s = STATE.data?.status;
+  const dot = $('dot-pool');
+  if(!s){$('body-pool').innerHTML='<span style="color:var(--fg3)">-</span>';dot.className='dot warn';return}
+  dot.className='dot '+(s.loop_enabled?'live':'warn');
+  $('body-pool').innerHTML=
+    `<div class="stat"><span class="stat-label">Pool size</span><span class="stat-value blue">${s.pool_size}</span></div>`+
+    `<div class="stat"><span class="stat-label">Pool idle</span><span class="stat-value ${s.pool_idle>0?'green':'yellow'}">${s.pool_idle}</span></div>`+
+    `<div class="stat"><span class="stat-label">Spawn lock</span><span class="stat-value ${s.cc_spawn_lock?'yellow':'green'}">${s.cc_spawn_lock?'LOCKED':'free'}</span></div>`+
+    `<div class="stat"><span class="stat-label">Loop</span><span class="stat-value ${s.loop_enabled?'green':'red'}">${s.loop_enabled}</span></div>`+
+    `<div class="stat"><span class="stat-label">Pending ops</span><span class="stat-value ${s.pending_ops>0?'yellow':''}">${s.pending_ops}</span></div>`;
+}
+
+function renderProcesses(){
+  const p = STATE.data?.processes;
+  const dot = $('dot-procs');
+  if(!p||!p.processes){$('proc-tbody').innerHTML='<tr><td colspan="5" style="color:var(--fg3)">-</td></tr>';dot.className='dot warn';return}
+  dot.className='dot live';
+  $('proc-tbody').innerHTML = (p.processes||[]).map(pr=>{
+    const alive=pr.alive!==false;
+    return `<tr class="${alive?'':'dead'}"><td>${pr.pid||'-'}</td><td>${pr.role||'-'}</td><td>${pr.status||'-'}</td><td><span class="proc-dot ${alive?'live':'dead'}"></span>${alive?'yes':'no'}</td><td>${pr.started_at?ago(pr.started_at):'-'}</td></tr>`;
+  }).join('')||'<tr><td colspan="5" style="color:var(--fg3)">None</td></tr>';
+}
+
+function renderSpawnLog(){
+  const log = STATE.data?.spawnLog;
+  const el = $('spawn-log');
+  $('spawn-src').textContent = 'via pusher · F'+STATE.frames;
+  if(!log||!log.entries||log.entries.length===0){el.innerHTML='<div class="log-empty">No spawn events yet</div>';return}
+  el.innerHTML = log.entries.slice(0,30).map(e=>{
+    const t=new Date(e.ts).toLocaleTimeString();
+    return `<div class="log-entry ${e.status}"><span class="log-ts">${t}</span><span class="log-kind ${e.status}">${e.status}</span><span class="log-msg">${fmt(e.msg)}</span></div>`;
+  }).join('');
+}
+
+function renderTimeline(){
+  const entries = STATE.timelineEntries;
+  const el = $('timeline-log');
+  $('timeline-src').textContent = 'via Anchor WS · '+(entries.length||0)+' events';
+  if(entries.length===0){el.innerHTML='<div class="log-empty">Waiting for events...</div>';return}
+  el.innerHTML = entries.slice(0,30).map(e=>{
+    const t=new Date(e.ts).toLocaleTimeString();
+    const ev=e.event;let kind='agent',msg='';
+    if(ev.kind&&ev.kind.startsWith('debate')){kind='agent';msg='debate: '+(ev.payload?.summary||'')}
+    else if(ev.type==='thinking'){kind='agent';msg='thinking: '+(ev.payload?.summary||'')}
+    else if(ev.type==='tool_call'){kind='agent';msg='tool: '+(ev.payload?.tool||'')}
+    else if(ev.type==='decision'){kind='agent';msg='decision: '+(ev.payload?.choice||'')}
+    else if(ev.type==='partial_render'){kind='agent';msg='partial: '+(ev.payload?.target_anchor||'')}
+    else if(ev.type==='complete'){kind='patch';msg='complete: '+(ev.payload?.summary||'')+' @'+(ev.payload?.target_anchor||ev.target_anchor||'?')}
+    else if(ev.type==='error'){kind='error';msg='ERROR: '+(ev.payload?.message||'?')}
+    else if(ev.kind==='patch'){kind='patch';msg='patch: '+ev.count+' node(s)'}
+    else{kind='agent';msg=JSON.stringify(ev).slice(0,100)}
+    return `<div class="log-entry event ${kind==='error'?'error':kind==='patch'?'patch':'event'}"><span class="log-ts">${t}</span><span class="log-kind ${kind==='error'?'error':kind==='patch'?'patch':'agent'}">${kind}</span><span class="log-msg">${msg}</span></div>`;
+  }).join('');
+}
+
+// ── Topology (still renders from STATE.data) ────────────────────────
+function renderTopo(){
+  const svg=$('topo-svg');
+  const d=STATE.data;const servOk=STATE.serverUp;
+  const procAlive=d?.status?.pool_size||0;const poolIdle=d?.status?.pool_idle||0;
+  const agents=d?.agents?.subagents?.length||0;const wsClients=d?.health?.webview_clients||0;
+  const sc=servOk?'#3fb950':'#6e7681';const pc=procAlive>0?'#58a6ff':'#6e7681';const ic=poolIdle>=0?'#a371f7':'#6e7681';
+  svg.innerHTML=
+    `<defs><marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#30363d"/></marker><filter id="glow"><feGaussianBlur stdDeviation="2" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`+
+    `<rect x="60" y="20" width="140" height="50" rx="8" fill="#161b22" stroke="${wsClients>0?'#3fb950':'#30363d'}" stroke-width="1.5"/><text x="130" y="40" text-anchor="middle" fill="#c9d1d9" font-size="11" font-family="inherit">Browser</text><text x="130" y="55" text-anchor="middle" fill="${wsClients>0?'#3fb950':'#6e7681'}" font-size="9" font-family="inherit">WS: ${wsClients}</text>`+
+    `<line x1="200" y1="45" x2="380" y2="45" stroke="#30363d" stroke-width="1.5" marker-end="url(#arrow)"/><text x="290" y="38" text-anchor="middle" fill="#8b949e" font-size="8" font-family="inherit">ws://</text>`+
+    `<rect x="380" y="10" width="160" height="70" rx="10" fill="#161b22" stroke="${sc}" stroke-width="2" filter="url(#glow)"/><text x="460" y="32" text-anchor="middle" fill="#c9d1d9" font-size="12" font-weight="700" font-family="inherit">server.cjs</text><text x="460" y="50" text-anchor="middle" fill="${sc}" font-size="10" font-family="inherit">:${d?.health?.port||3000}</text><text x="460" y="65" text-anchor="middle" fill="${servOk?'#3fb950':'#f85149'}" font-size="9" font-family="inherit">${servOk?'● LIVE':'○ DEAD'}</text>`+
+    `<line x1="460" y1="80" x2="200" y2="130" stroke="#30363d" stroke-width="1"/><line x1="460" y1="80" x2="460" y2="130" stroke="#30363d" stroke-width="1"/><line x1="460" y1="80" x2="700" y2="130" stroke="#30363d" stroke-width="1"/>`+
+    `<rect x="100" y="130" width="200" height="55" rx="8" fill="#161b22" stroke="${ic}" stroke-width="1.5"/><text x="200" y="150" text-anchor="middle" fill="#c9d1d9" font-size="11" font-family="inherit">Inproc Agent</text><text x="200" y="167" text-anchor="middle" fill="${ic}" font-size="10" font-family="inherit">SDK → tool-use loop</text><text x="200" y="180" text-anchor="middle" fill="#8b949e" font-size="8" font-family="inherit">streaming → patch</text>`+
+    `<rect x="380" y="130" width="160" height="55" rx="8" fill="#161b22" stroke="${pc}" stroke-width="1.5"/><text x="460" y="150" text-anchor="middle" fill="#c9d1d9" font-size="11" font-family="inherit">Processor Pool</text><text x="460" y="167" text-anchor="middle" fill="${pc}" font-size="10" font-family="inherit">size:${procAlive} idle:${poolIdle}</text><text x="460" y="180" text-anchor="middle" fill="#8b949e" font-size="8" font-family="inherit">claude -p subproc</text>`+
+    `<rect x="640" y="130" width="200" height="55" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/><text x="740" y="150" text-anchor="middle" fill="#c9d1d9" font-size="11" font-family="inherit">Debate + Codex</text><text x="740" y="167" text-anchor="middle" fill="#8b949e" font-size="10" font-family="inherit">orchestrator · bridge</text><text x="740" y="180" text-anchor="middle" fill="#8b949e" font-size="8" font-family="inherit">GPT-5 via codex CLI</text>`+
+    `<rect x="100" y="210" width="200" height="45" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/><text x="200" y="230" text-anchor="middle" fill="#8b949e" font-size="11" font-family="inherit">Shim (stdio bridge)</text><text x="200" y="245" text-anchor="middle" fill="#6e7681" font-size="9" font-family="inherit">JSON-RPC ↔ /ws/agent</text>`+
+    `<rect x="380" y="210" width="160" height="45" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/><text x="460" y="230" text-anchor="middle" fill="#8b949e" font-size="11" font-family="inherit">Connectors</text><text x="460" y="245" text-anchor="middle" fill="#6e7681" font-size="9" font-family="inherit">RSS · webhook · push</text>`+
+    (agents>0?`<rect x="640" y="210" width="200" height="45" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1"/><text x="740" y="230" text-anchor="middle" fill="#3fb950" font-size="11" font-family="inherit">Subagents: ${agents}</text><text x="740" y="245" text-anchor="middle" fill="#6e7681" font-size="9" font-family="inherit">agentRegistry active</text>`:``);
+}
+
+// ── Boot ───────────────────────────────────────────────────────────
+renderAll();
+
+connectPusher();
+connectAnchorWS();
+
+// Fallback: if pusher doesn't connect within 3s, poll REST directly
+setTimeout(() => {
+  if (!STATE.wsLive) {
+    console.warn('[ops-dashboard] pusher not connected — falling back to REST polling');
+    document.getElementById('tag-provider').textContent = 'fallback poll';
+    setInterval(pollFallback, 1200);
+    pollFallback();
+  }
+}, 3000);
+
+async function pollFallback(){
+  try {
+    const [h,a,s,sl,p] = await Promise.all([
+      (await fetch('/health')).json(), (await fetch('/agents')).json(),
+      (await fetch('/debug/status')).json(), (await fetch('/debug/spawn-log')).json(),
+      (await fetch('/debug/processes')).json()
+    ]);
+    STATE.data = {health:h,agents:a,status:s,spawnLog:sl,processes:p};
+    STATE.serverUp = !!(h && h.ok);
+    STATE.frames++;
+    renderAll();
+  } catch(e) { /* silent */ }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPO 产业链全景报告 — 2026.05</title>
+<style>
+  body { margin: 0; padding: 32px 40px; background: var(--paper); color: var(--ink); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+  h1, h2, h3 { font-family: 'Bricolage Grotesque', system-ui, sans-serif; margin: 0; }
+  h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  p { line-height: 1.6; margin: 0; }
+
+  .report-header { margin-bottom: 28px; }
+  .report-header .subtitle { color: var(--ink-2); font-size: 15px; margin-top: 6px; }
+  .report-header .date-badge { display: inline-block; background: var(--pastel-2); padding: 4px 14px; border-radius: 999px; font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+
+  .anc-section { background: var(--paper); border: 1px solid var(--border); border-radius: 20px; padding: 24px 28px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+  .anc-section--gc { background: white; }
+  .anc-section h2 { margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .anc-section h2 .layer-tag { font-size: 13px; font-weight: 500; padding: 2px 12px; border-radius: 999px; background: var(--pastel-3); color: var(--ink-2); font-family: 'Plus Jakarta Sans', sans-serif; }
+
+  .anc-kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .anc-kpi { border-radius: 16px; padding: 18px 20px; position: relative; overflow: hidden; }
+  .anc-kpi::before { content: ''; position: absolute; inset: 0; opacity: 0.12; border-radius: 16px; }
+  .kpi-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .kpi-label-top { font-size: 13px; font-weight: 600; line-height: 1.3; color: var(--ink-2); }
+  .kpi-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .kpi-bottom { }
+  .kpi-value { font-family: 'Bricolage Grotesque', sans-serif; font-size: 26px; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; }
+  .kpi-unit { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+  .kpi-change { font-size: 12px; font-weight: 600; margin-top: 4px; }
+  .kpi-change.pos { color: #16a34a; }
+  .kpi-change.neg { color: #dc2626; }
+
+  .anc-kpi--aurora { background: linear-gradient(135deg, #eef2ff 0%, #ecfdf5 50%, #ffffff 100%); }
+  .anc-kpi--aurora::before { background: radial-gradient(ellipse at 0% 0%, #6366f1 0%, transparent 70%), radial-gradient(ellipse at 100% 100%, #10b981 0%, transparent 70%); }
+  .anc-kpi--warm { background: linear-gradient(135deg, #fef2f2 0%, #faf5ff 50%, #ffffff 100%); }
+  .anc-kpi--warm::before { background: radial-gradient(ellipse at 0% 0%, #f87171 0%, transparent 70%), radial-gradient(ellipse at 100% 100%, #a78bfa 0%, transparent 70%); }
+  .anc-kpi--cool { background: linear-gradient(135deg, #f0fdfa 0%, #eff6ff 50%, #ffffff 100%); }
+  .anc-kpi--cool::before { background: radial-gradient(ellipse at 0% 0%, #2dd4bf 0%, transparent 70%), radial-gradient(ellipse at 100% 100%, #60a5fa 0%, transparent 70%); }
+  .anc-kpi--ocean { background: linear-gradient(135deg, #f0f5ff 0%, #fef2f2 50%, #ffffff 100%); }
+  .anc-kpi--ocean::before { background: radial-gradient(ellipse at 0% 0%, #1e40af 0%, transparent 70%), radial-gradient(ellipse at 100% 100%, #fb7185 0%, transparent 70%); }
+  .anc-kpi--flame { background: linear-gradient(135deg, #fff7ed 0%, #fef2f2 50%, #ffffff 100%); }
+  .anc-kpi--flame::before { background: radial-gradient(ellipse at 0% 0%, #f97316 0%, transparent 70%), radial-gradient(ellipse at 100% 100%, #e11d48 0%, transparent 70%); }
+  .anc-kpi--berry { background: linear-gradient(135deg, #faf5ff 0%, #fef2f2 50%, #ffffff 100%); }
+  .anc-kpi--berry::before { background: radial-gradient(ellipse at 0% 0%, #7e22ce 0%, transparent 70%), radial-gradient(ellipse at 100% 100%, #be123c 0%, transparent 70%); }
+  .anc-kpi--arctic { background: linear-gradient(135deg, #f0f9ff 0%, #ecfdf5 50%, #ffffff 100%); }
+  .anc-kpi--arctic::before { background: radial-gradient(ellipse at 0% 0%, #38bdf8 0%, transparent 70%), radial-gradient(ellipse at 100% 100%, #34d399 0%, transparent 70%); }
+  .anc-kpi--forest { background: linear-gradient(135deg, #f0fdf4 0%, #fef7ee 50%, #ffffff 100%); }
+  .anc-kpi--forest::before { background: radial-gradient(ellipse at 0% 0%, #15803d 0%, transparent 70%), radial-gradient(ellipse at 100% 100%, #d97706 0%, transparent 70%); }
+  .anc-kpi--sunset { background: linear-gradient(135deg, #fef2f2 0%, #fffbeb 50%, #ffffff 100%); }
+  .anc-kpi--sunset::before { background: radial-gradient(ellipse at 0% 0%, #f43f5e 0%, transparent 70%), radial-gradient(ellipse at 100% 100%, #fbbf24 0%, transparent 70%); }
+  .anc-kpi--dusk { background: linear-gradient(135deg, #f8fafc 0%, #fdf2f8 50%, #ffffff 100%); }
+  .anc-kpi--dusk::before { background: radial-gradient(ellipse at 0% 0%, #64748b 0%, transparent 70%), radial-gradient(ellipse at 100% 100%, #f9a8d4 0%, transparent 70%); }
+
+  .anc-pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+  .anc-pill { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+  .anc-pill--active { background: #dcfce7; color: #166534; }
+  .anc-pill--gen { background: #eef2ff; color: #4338ca; }
+  .anc-pill--warn { background: #fef3c7; color: #92400e; }
+  .anc-pill--review { background: #e0f2fe; color: #075985; }
+  .anc-pill--done { background: #f3e8ff; color: #6b21a8; }
+  .anc-pill--draft { background: #fce7f3; color: #9d174d; }
+
+  .anc-divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  .company-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .company-row .ticker { font-weight: 700; font-size: 15px; }
+  .company-row .price { font-size: 14px; color: var(--ink-2); }
+  .company-row .change { font-size: 13px; font-weight: 600; }
+  .company-row .desc { font-size: 13px; color: var(--ink-2); }
+
+  .insight-box { background: #f8fafc; border-left: 3px solid #6366f1; border-radius: 8px; padding: 14px 18px; margin: 12px 0; font-size: 14px; line-height: 1.5; }
+
+  .event-timeline { display: flex; flex-direction: column; gap: 10px; }
+  .event-item { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; }
+  .event-item .event-date { font-weight: 600; min-width: 70px; color: var(--ink-2); }
+  .event-item .event-desc { line-height: 1.4; }
+
+  .risk-list { list-style: none; padding: 0; margin: 0; }
+  .risk-list li { padding: 6px 0; padding-left: 16px; position: relative; font-size: 14px; line-height: 1.5; }
+  .risk-list li::before { content: '⚠'; position: absolute; left: -2px; font-size: 12px; }
+
+  @media (max-width: 640px) { body { padding: 16px; } .anc-section { padding: 16px; } .anc-kpi-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="report-header" data-anc="header" data-handles="refine,lock">
+  <h1>CPO 共封装光学 · 产业链全景报告</h1>
+  <div class="subtitle">美股核心标的梳理 · 价格锚定 2026.05.26</div>
+  <div class="date-badge">📅 2026年5月27日 · 数据截止最近收盘</div>
+  <div class="anc-pill-row">
+    <span class="anc-pill anc-pill--active">产业趋势 · 看多</span>
+    <span class="anc-pill anc-pill--gen">CPO 元年</span>
+    <span class="anc-pill anc-pill--warn">高波动</span>
+  </div>
+</div>
+
+<!-- MARKET OVERVIEW -->
+<section class="anc-section anc-section--gc" data-anc="overview" data-handles="refine,lock,expand">
+  <h2>📊 市场总览 <span class="layer-tag">宏观面</span></h2>
+  <p style="margin-bottom:14px;">2026年全球光收发器市场规模预计达 <strong>2600亿美元</strong>（同比+57%），CPO作为下一代光互连方案正式进入商业化元年。英伟达 Rubin 平台率先在交换机层面采用 CPO，Meta 在 OFC 2026 验证 CPO 的功耗/成本优势。摩根士丹利预计光学市场将从2025年约3000亿增至2028年超6500亿美元。</p>
+
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--aurora">
+      <div class="kpi-top">
+        <div class="kpi-label-top">CPO 市场规模</div>
+        <div class="kpi-icon">📈</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$1.6亿 → $910亿</div>
+        <div class="kpi-unit">2026E → 2028E（高盛）</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--ocean">
+      <div class="kpi-top">
+        <div class="kpi-label-top">NVIDIA CPO 投资</div>
+        <div class="kpi-icon">🔵</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$40亿</div>
+        <div class="kpi-unit">向 LITE + COHR 各投 $20亿</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--flame">
+      <div class="kpi-top">
+        <div class="kpi-label-top">AI 光收发器市场</div>
+        <div class="kpi-icon">🔥</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$2600亿</div>
+        <div class="kpi-unit">2026E（同比+57%）</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--forest">
+      <div class="kpi-top">
+        <div class="kpi-label-top">新增潜在市场 TAM</div>
+        <div class="kpi-icon">🌐</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$230亿</div>
+        <div class="kpi-unit">摩根士丹利 2028E</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LAYER 1: SUBSTRATE -->
+<section class="anc-section anc-section--gc" data-anc="layer1" data-handles="refine,expand">
+  <h2>① 原材料 &amp; 衬底 <span class="layer-tag">上游</span></h2>
+  <p style="margin-bottom:12px;font-size:14px;color:var(--ink-2);">磷化铟（InP）与 SOI 衬底是 CPO 光芯片的基础材料，扩产受限、产能瓶颈突出。</p>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--aurora">
+      <div class="kpi-top">
+        <div class="kpi-label-top">AXT Inc<br><span style="font-weight:400;font-size:12px;color:var(--ink-2);">InP 衬底全球龙头</span></div>
+        <div class="kpi-icon">💎</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$132.60</div>
+        <div class="kpi-unit">市占率 ~45% · 市值 $86.8亿</div>
+        <div class="kpi-change neg">📉 5.84% · 52W 范围 $1.45–$143</div>
+      </div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <strong>🔍 关键判断：</strong>AXTI 年内涨幅超 90x，但 GF Value 仅 $2.60，严重高估。5/26 获利回吐 -5.84%。Wedbush 目标价 $93，B.Riley 仅 $21。材料垄断地位真实，但当前价格已透支未来多年预期。
+  </div>
+</section>
+
+<!-- LAYER 2: LASER SOURCE -->
+<section class="anc-section anc-section--gc" data-anc="layer2" data-handles="refine,expand">
+  <h2>② 激光器光源 <span class="layer-tag">上游 · 弹性最大环节</span></h2>
+  <p style="margin-bottom:12px;font-size:14px;color:var(--ink-2);">EML/CW 激光器是 CPO 核心光引擎，产能被传统订单锁定至 2027-2028，供需错配最严重。</p>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--warm">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Lumentum<br><span style="font-weight:400;font-size:12px;color:var(--ink-2);">EML 激光器 No.1</span></div>
+        <div class="kpi-icon">⭐</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">~$1,053</div>
+        <div class="kpi-unit">YTD +163% · 市值 ~$710亿</div>
+        <div class="kpi-change pos">📈 +16.5%（近期日涨）</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--ocean">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Coherent<br><span style="font-weight:400;font-size:12px;color:var(--ink-2);">全产业链巨头</span></div>
+        <div class="kpi-icon">🔷</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">~$380</div>
+        <div class="kpi-unit">YTD +107% · P/E 182x</div>
+        <div class="kpi-change pos">📈 +15%（NVIDIA 投资后）</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--flame">
+      <div class="kpi-top">
+        <div class="kpi-label-top">AAOI<br><span style="font-weight:400;font-size:12px;color:var(--ink-2);">800G 高弹性黑马</span></div>
+        <div class="kpi-icon">⚡</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">~$185</div>
+        <div class="kpi-unit">YTD +377% · 800G 产能满</div>
+        <div class="kpi-change pos">📈 +24%（近期单日）</div>
+      </div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <strong>🔍 关键判断：</strong>英伟达 3/3 宣布向 LITE+COHR 各投资 $20 亿（合计 $40 亿），含数十亿采购承诺。LITE 5/18 被纳入 Nasdaq-100，Q3 指引 $7.8-8.3 亿。COHR 数据中心收入 $13.6 亿（+41%）。AAOI Q2 指引 $1.8-1.98 亿，800G 供不应求至 2027。三者在 5/18 均遭获利了结回落 6-10%，但基本面未变。
+  </div>
+</section>
+
+<!-- LAYER 3: SILICON PHOTONICS -->
+<section class="anc-section anc-section--gc" data-anc="layer3" data-handles="refine,expand">
+  <h2>③ 硅光 PIC 代工 <span class="layer-tag">中游 · 最确定瓶颈</span></h2>
+  <p style="margin-bottom:12px;font-size:14px;color:var(--ink-2);">硅光芯片代工产能 2028 年前已被预订一空，独立代工商议价权最强。</p>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--cool">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Tower Semiconductor<br><span style="font-weight:400;font-size:12px;color:var(--ink-2);">硅光代工龙头</span></div>
+        <div class="kpi-icon">🏭</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$288.53</div>
+        <div class="kpi-unit">市值 $325亿 · P/E 132x</div>
+        <div class="kpi-change pos">📈 +1.8%（5/26）· 52W $37–$303</div>
+      </div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <strong>🔍 关键判断：</strong>TSEM 5/13 获 $13 亿硅光合同 + $2.9 亿预付款，70% 产能已预订至 2028。当日大涨 +31%。被视为"硅光时代的台积电"，但 P/E 132x 定价较高。分析师目标 $314。
+  </div>
+</section>
+
+<!-- LAYER 4: DSP -->
+<section class="anc-section anc-section--gc" data-anc="layer4" data-handles="refine,expand">
+  <h2>④ DSP 芯片 &amp; 信号处理 <span class="layer-tag">中游</span></h2>
+  <p style="margin-bottom:12px;font-size:14px;color:var(--ink-2);">高速 DSP 是 CPO 光模块的"大脑"，1.6T 升级驱动 ASP 大幅提升。</p>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--berry">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Broadcom<br><span style="font-weight:400;font-size:12px;color:var(--ink-2);">硅光 PIC 份额 &gt;40%</span></div>
+        <div class="kpi-icon">🟣</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$422</div>
+        <div class="kpi-unit">市值 ~$2T · P/E 80x</div>
+        <div class="kpi-change pos">📈 +1.9%（5/26）</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--aurora">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Marvell<br><span style="font-weight:400;font-size:12px;color:var(--ink-2);">1.6T DSP No.2</span></div>
+        <div class="kpi-icon">💠</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$208.26</div>
+        <div class="kpi-unit">市值 $1823亿 · P/E 68x</div>
+        <div class="kpi-change pos">📈 +6.08%（5/26）汇丰升目标至 $300</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--arctic">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Credo Technology<br><span style="font-weight:400;font-size:12px;color:var(--ink-2);">AEC/LPO 高速互联</span></div>
+        <div class="kpi-icon">❄️</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$218</div>
+        <div class="kpi-unit">市值 $403亿 · 前向 P/E ~110x</div>
+        <div class="kpi-change pos">📈 +12.9%（5/22 新高）</div>
+      </div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <strong>🔍 关键判断：</strong>AVGO Tomahawk 5-Bailly CPO 交换机已出货，绑定台积电 COUPE 平台。MRVL 5/26 暴涨 +6.08% 后盘前再涨 +5.8%，汇丰目标价 $300（全市场最高），光学互联收入被低估。CRDO 5/22 创 $218 新高，Q3 EPS $1.07（超预期 27%），营收同比 +201%。
+  </div>
+</section>
+
+<!-- LAYER 5: PACKAGING -->
+<section class="anc-section anc-section--gc" data-anc="layer5" data-handles="refine,expand">
+  <h2>⑤ CPO 封装 &amp; 精密制造 <span class="layer-tag">中游</span></h2>
+  <p style="margin-bottom:12px;font-size:14px;color:var(--ink-2);">精密封装代工是 CPO 从芯片到系统的关键桥梁，技术壁垒极高。</p>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--sunset">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Fabrinet<br><span style="font-weight:400;font-size:12px;color:var(--ink-2);">精密光模块代工龙头</span></div>
+        <div class="kpi-icon">🔧</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$680.77</div>
+        <div class="kpi-unit">市值 $244亿 · P/E 58x · EPS $11.75</div>
+        <div class="kpi-change neg">📉 -3.28%（5/26）盘中振幅 6.8%</div>
+      </div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <strong>🔍 关键判断：</strong>FN 为 LITE+COHR 核心代工伙伴，管理层已确认 CPO 产生收入。5/26 盘中从 $720 跌至 $673（-6.8% 振幅），高位波动加剧。52W $225–$749，年涨 ~3x。CPO 封装收入占比将随量产出货逐步提升。
+  </div>
+</section>
+
+<!-- LAYER 6: NETWORK -->
+<section class="anc-section anc-section--gc" data-anc="layer6" data-handles="refine,expand">
+  <h2>⑥ 网络传输 &amp; 设备 <span class="layer-tag">下游</span></h2>
+  <p style="margin-bottom:12px;font-size:14px;color:var(--ink-2);">AI 骨干网扩容 + CPO 交换机落地驱动设备端需求爆发。</p>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--cool">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Ciena<br><span style="font-weight:400;font-size:12px;color:var(--ink-2);">DCI+OCS 核心玩家</span></div>
+        <div class="kpi-icon">🌊</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">~$600</div>
+        <div class="kpi-unit">YTD +500% · P/E ~350x</div>
+        <div class="kpi-change pos">📈 52W 新高 $599.81（5/26）</div>
+      </div>
+    </div>
+  </div>
+  <div class="insight-box">
+    <strong>🔍 关键判断：</strong>CIEN 年内涨超 5 倍，估值极高。5/26 再创 52W 新高 $599.81。TD Cowen 目标 $675（买入），但 P/E 350x 缺乏安全边际。后续关注 6/4 财报能否支撑估值。
+  </div>
+</section>
+
+<!-- LAYER 7: TEST -->
+<section class="anc-section anc-section--gc" data-anc="layer7" data-handles="refine,expand">
+  <h2>⑦ 测试 &amp; 质量验证 <span class="layer-tag">下游 · 卖铲子</span></h2>
+  <p style="margin-bottom:12px;font-size:14px;color:var(--ink-2);">CPO 放量前，测试设备先行。"卖铲子"逻辑确定性最高。</p>
+  <div class="insight-box">
+    <strong>🔍 关键判断：</strong>AEHR（光子测试设备）年内累涨超 +200%，VIAVI 光测试同样受益。行业放量顺序：测试设备 → 材料 → 芯片 → 封装 → 系统。
+  </div>
+</section>
+
+<!-- CATALYSTS -->
+<section class="anc-section anc-section--gc" data-anc="catalysts" data-handles="refine,expand">
+  <h2>📅 近期关键催化事件</h2>
+  <div class="event-timeline">
+    <div class="event-item">
+      <div class="event-date">2026.03.03</div>
+      <div class="event-desc"><strong>英伟达 $40 亿投资 CPO</strong> — 分别向 LITE + COHR 各投 $20 亿，包含数十亿采购承诺。</div>
+    </div>
+    <div class="event-item">
+      <div class="event-date">2026.05.06</div>
+      <div class="event-desc"><strong>英伟达投资康宁 $32 亿</strong> — 建 3 座专属光学工厂，光纤产能扩张 10 倍。</div>
+    </div>
+    <div class="event-item">
+      <div class="event-date">2026.05.13</div>
+      <div class="event-desc"><strong>TSEM $13 亿硅光合同</strong> — Tower 半导体获单年度最大硅光代工订单，含 $2.9 亿预付款。</div>
+    </div>
+    <div class="event-item">
+      <div class="event-date">2026.05.18</div>
+      <div class="event-desc"><strong>LITE 纳入 Nasdaq-100</strong> — 同时 CPO 板块获利了结，LITE -9%、COHR -6%、AAOI -10%。</div>
+    </div>
+    <div class="event-item">
+      <div class="event-date">2026.05.19</div>
+      <div class="event-desc"><strong>Google I/O</strong> — AI 商业化与光互联关注度升温。</div>
+    </div>
+    <div class="event-item">
+      <div class="event-date">2026.05.27</div>
+      <div class="event-desc"><strong>MRVL 财报</strong> — 汇丰目标价 $300，盘前已涨 +5.8%。</div>
+    </div>
+  </div>
+</section>
+
+<!-- RISK -->
+<section class="anc-section anc-section--gc" data-anc="risks" data-handles="refine,lock">
+  <h2>⚠️ 风险提示</h2>
+  <ul class="risk-list">
+    <li><strong>估值极端偏高：</strong>LITE P/E 极高，COHR 182x，CIEN 350x，AXTI GF Value 仅 $2.60（当前 $132）。盈利增长若不及预期将引发剧烈回调。</li>
+    <li><strong>技术路线未统一：</strong>CPO 与 NPO（近封装光学）路线之争尚未尘埃落定，下游客户可能推迟大规模采用。</li>
+    <li><strong>量产良率不确定性：</strong>CPO 封装良率仍在爬坡，2026-2027 年实际出货量存在不及预期风险。</li>
+    <li><strong>中美贸易摩擦：</strong>AXTI 等公司依赖中国出口许可，地缘政治风险不可忽视。</li>
+    <li><strong>板块获利了结压力：</strong>CPO 板块年内翻倍股超 24 只，5/18 集体回调 6-10% 预示高位波动加剧。</li>
+  </ul>
+</section>
+
+<!-- INVESTMENT FRAMEWORK -->
+<section class="anc-section anc-section--gc" data-anc="framework" data-handles="refine,expand,lock">
+  <h2>📋 投资策略框架</h2>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--aurora">
+      <div class="kpi-top">
+        <div class="kpi-label-top">最确定龙头</div>
+        <div class="kpi-icon">🏆</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:16px;">LITE · COHR · AVGO</div>
+        <div class="kpi-unit">芯片+全产业链，英伟达背书</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--flame">
+      <div class="kpi-top">
+        <div class="kpi-label-top">高弹性标的</div>
+        <div class="kpi-icon">🚀</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:16px;">AAOI · AXTI · SIVE</div>
+        <div class="kpi-unit">小市值高 Beta，波动剧烈</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--cool">
+      <div class="kpi-top">
+        <div class="kpi-label-top">代工压舱石</div>
+        <div class="kpi-icon">⚓</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:16px;">TSEM · FN</div>
+        <div class="kpi-unit">产能锁定至 2028</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--forest">
+      <div class="kpi-top">
+        <div class="kpi-label-top">"卖铲子"</div>
+        <div class="kpi-icon">⛏️</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:16px;">AEHR · VIAV</div>
+        <div class="kpi-unit">测试设备先行</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<section class="anc-section" data-anc="footer" data-handles="lock" style="border:none;box-shadow:none;padding:16px 0;margin:0;">
+  <p style="font-size:12px;color:var(--ink-3);text-align:center;">本报告由 AI 自动生成，数据来源为公开市场信息，不构成投资建议。投资有风险，入市需谨慎。</p>
+</section>
+
+</body>
+</html>

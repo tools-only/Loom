@@ -50,6 +50,30 @@
         <button class="btn btn--ghost btn--sm hsp-cancel">取消</button>
         <span class="hsp-status" style="font-size:12px;color:var(--ink-3);align-self:center;display:none"></span>
       </div>
+      <hr class="anc-divider" style="margin:14px 0">
+      <div class="hsp-mount-section">
+        <div style="font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <i class="ph-bold ph-plug"></i> 挂载外部 Agent
+          <span class="hsp-mount-badge" style="display:none;font-size:11px;font-weight:500;padding:2px 8px;border-radius:999px;background:var(--pastel-mint,#e8f8f1);color:var(--accent-emerald,#22c55e)">已挂载</span>
+        </div>
+        <div class="hsp-mount-form" style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <label style="font-size:12px;font-weight:600;color:var(--ink-2)">Endpoint URL</label>
+            <input class="hsp-endpoint" type="url" placeholder="http://localhost:8080/v1/chat/completions"
+              style="padding:8px 10px;border-radius:8px;border:1px solid var(--surface-2,rgba(0,0,0,.12));background:var(--paper);font-size:13px;color:var(--ink);font-family:monospace">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <label style="font-size:12px;font-weight:600;color:var(--ink-2)">功能描述（可选）</label>
+            <textarea class="hsp-description" rows="2" placeholder="例如：专注于 A 股量化信号和板块轮动分析"
+              style="padding:8px 10px;border-radius:8px;border:1px solid var(--surface-2,rgba(0,0,0,.12));background:var(--paper);font-size:13px;color:var(--ink);resize:vertical;font-family:inherit"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn--brand btn--sm hsp-mount-btn">挂载</button>
+            <button class="btn btn--ghost btn--sm hsp-unmount-btn" style="display:none">卸载</button>
+            <span class="hsp-mount-status" style="font-size:12px;color:var(--ink-3)"></span>
+          </div>
+        </div>
+      </div>
     `;
 
     let currentConfig = {};
@@ -101,10 +125,71 @@
       return out;
     }
 
+    // ── mount / unmount ──────────────────────────────────────────────────
+    const mountBtn    = panel.querySelector('.hsp-mount-btn');
+    const unmountBtn  = panel.querySelector('.hsp-unmount-btn');
+    const mountStatus = panel.querySelector('.hsp-mount-status');
+    const mountBadge  = panel.querySelector('.hsp-mount-badge');
+    const endpointInp = panel.querySelector('.hsp-endpoint');
+    const descInp     = panel.querySelector('.hsp-description');
+
+    async function refreshMountState() {
+      try {
+        const r = await fetch(`${BRAIN_URL}/hand/${handId}/mount`);
+        if (!r.ok) return;
+        const data = await r.json();
+        if (data.mounted) {
+          endpointInp.value = data.endpoint || '';
+          endpointInp.disabled = true;
+          descInp.disabled = true;
+          mountBtn.style.display = 'none';
+          unmountBtn.style.display = '';
+          mountBadge.style.display = '';
+          mountStatus.textContent = data.endpoint || '';
+        } else {
+          endpointInp.disabled = false;
+          descInp.disabled = false;
+          mountBtn.style.display = '';
+          unmountBtn.style.display = 'none';
+          mountBadge.style.display = 'none';
+          mountStatus.textContent = '';
+        }
+      } catch (_) {}
+    }
+
+    mountBtn.addEventListener('click', async () => {
+      const endpoint = endpointInp.value.trim();
+      if (!endpoint) { mountStatus.textContent = '请填写 Endpoint URL'; return; }
+      mountStatus.textContent = '挂载中…';
+      try {
+        const r = await fetch(`${BRAIN_URL}/hand/${handId}/mount`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint, description: descInp.value.trim() }),
+        });
+        const data = await r.json();
+        if (data.ok) {
+          mountStatus.textContent = '✓ 已挂载';
+          await refreshMountState();
+        } else {
+          mountStatus.textContent = data.error || '挂载失败';
+        }
+      } catch (e) { mountStatus.textContent = '网络错误'; }
+    });
+
+    unmountBtn.addEventListener('click', async () => {
+      mountStatus.textContent = '卸载中…';
+      try {
+        await fetch(`${BRAIN_URL}/hand/${handId}/mount`, { method: 'DELETE' });
+        mountStatus.textContent = '';
+        await refreshMountState();
+      } catch (_) { mountStatus.textContent = '卸载失败'; }
+    });
+
     gearBtn.addEventListener('click', async () => {
       const isOpen = panel.style.display !== 'none';
       panel.style.display = isOpen ? 'none' : 'block';
-      if (!isOpen) await loadConfig();
+      if (!isOpen) { await loadConfig(); await refreshMountState(); }
     });
 
     panel.querySelector('.hsp-save').addEventListener('click', async () => {

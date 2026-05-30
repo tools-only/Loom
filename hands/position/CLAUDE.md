@@ -26,7 +26,12 @@ The position hand uses no external resource_api calls — all data is user-provi
 Write ONLY this JSON line to stdout (no other text):
 
 ```json
-{"type": "run.artifact", "artifact": {"metadata": {"confidence": 0.9, "gaps": [], "key_claims": []}, "narrative": "portfolio analysis in Chinese: positions, P&L summary, risk exposure, concentration flags"}}
+{"type": "run.artifact", "artifact": {"metadata": {"resources_used": ["config.json"], "key_claims": ["position summary", "risk flag"], "gaps": ["missing price data if any"]}, "narrative": "portfolio analysis in Chinese: positions, P&L summary, risk exposure, concentration flags"}}
 ```
+
+- `resources_used`: use `"config.json"` as the source identifier since position data is user-provided. Add any resource IDs if you fetched supplementary price data.
+- `key_claims`: key portfolio observations — concentration, exposure, P&L flags.
+- `gaps`: price data not available or positions missing market values.
+- Do not include a `confidence` field.
 
 The outer `{"type":"run.artifact","artifact":{...}}` wrapper is required. Do not emit any other text on stdout.

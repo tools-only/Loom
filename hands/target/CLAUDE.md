@@ -37,7 +37,12 @@ Each `wiki/tickers/<TICKER>.md` contains:
 Write ONLY this JSON line to stdout (no other text):
 
 ```json
-{"type": "run.artifact", "artifact": {"metadata": {"confidence": 0.75, "gaps": [], "key_claims": []}, "narrative": "updated thesis narrative for the ticker in Chinese"}}
+{"type": "run.artifact", "artifact": {"metadata": {"resources_used": ["sec-edgar", "finnhub", "yahoo-finance"], "key_claims": ["thesis update 1", "changed assumption"], "gaps": ["filing not yet available"]}, "narrative": "updated thesis narrative for the ticker in Chinese"}}
 ```
+
+- `resources_used`: list every resource ID fetched (e.g. `"sec-edgar"`, `"finnhub"`, `"yahoo-finance"`). SEC/EDGAR and Finnhub are Tier A/B — always prefer them as primary sources.
+- `key_claims`: thesis changes, new evidence, or invalidation signals identified this session.
+- `gaps`: filings or data not yet available.
+- Do not include a `confidence` field.
 
 The outer `{"type":"run.artifact","artifact":{...}}` wrapper is required. Do not emit any other text on stdout.

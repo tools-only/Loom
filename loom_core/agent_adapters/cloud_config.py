@@ -33,5 +33,7 @@ def load_cloud_agents(repo_root: Path) -> dict:
             "auth_token": token or None,
             "capabilities": info.get("capabilities", []),
             "timeout_s": float(info.get("timeout_s", 120)),
+            "protocol": info.get("protocol", "loom"),
+            "system_prompt": info.get("system_prompt"),
         }
     return result

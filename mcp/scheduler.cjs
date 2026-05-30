@@ -74,4 +74,17 @@ function remove(id) {
 
 function list() { return _specs.slice(); }
 
-module.exports = { init, add, remove, list };
+function toggle(id, enabled) {
+  const spec = _specs.find(s => s.id === id);
+  if (!spec) throw new Error('schedule not found: ' + id);
+  spec.enabled = enabled !== false;
+  // Stop existing task
+  const task = _jobs.get(id);
+  if (task) { task.stop(); _jobs.delete(id); }
+  // Re-register if enabling
+  if (spec.enabled) _register(spec);
+  _save();
+  return spec;
+}
+
+module.exports = { init, add, remove, toggle, list };

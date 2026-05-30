@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今日市场总览 — 2026-05-27</title>
+<style>
+  body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f5f7fb; margin: 0; padding: 24px; color: var(--ink, #1a1a2e); }
+  .page-header { margin-bottom: 24px; }
+  .page-header h1 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 28px; margin: 0 0 4px 0; }
+  .page-header .date { color: #666; font-size: 14px; }
+  .anc-kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .anc-section { background: #fff; border-radius: 20px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .anc-section--gc { background: #fff; }
+  .anc-section h2 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 20px; margin: 0 0 16px 0; }
+  .kpi-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .kpi-label-top { font-size: 13px; font-weight: 600; color: #555; line-height: 1.4; }
+  .kpi-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(122, 90, 248, 0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .kpi-icon svg { width: 16px; height: 16px; stroke: #7A5AF8; }
+  .kpi-bottom { }
+  .kpi-value { font-family: 'Bricolage Grotesque', sans-serif; font-size: 28px; font-weight: 700; line-height: 1.2; }
+  .kpi-unit { font-size: 13px; color: #888; margin-top: 2px; }
+  .anc-kpi { border-radius: 16px; padding: 18px 20px; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+  .anc-kpi:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+  .anc-kpi--aurora { background: linear-gradient(135deg, rgba(79,70,229,0.08), rgba(16,185,129,0.06)); }
+  .anc-kpi--cool { background: linear-gradient(135deg, rgba(20,184,166,0.08), rgba(59,130,246,0.06)); }
+  .anc-kpi--warm { background: linear-gradient(135deg, rgba(244,114,182,0.08), rgba(139,92,246,0.06)); }
+  .anc-kpi--ocean { background: linear-gradient(135deg, rgba(30,64,175,0.08), rgba(244,114,182,0.06)); }
+  .anc-kpi--arctic { background: linear-gradient(135deg, rgba(56,189,248,0.08), rgba(52,211,153,0.06)); }
+  .anc-kpi--flame { background: linear-gradient(135deg, rgba(251,146,60,0.08), rgba(190,18,60,0.06)); }
+  .anc-kpi--sunset { background: linear-gradient(135deg, rgba(251,113,133,0.08), rgba(251,191,36,0.06)); }
+  .anc-kpi--dusk { background: linear-gradient(135deg, rgba(148,163,184,0.08), rgba(244,114,182,0.06)); }
+  .anc-pill-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .anc-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+  .anc-pill--active { background: #d1fae5; color: #065f46; }
+  .anc-pill--warn { background: #fef3c7; color: #92400e; }
+  .anc-pill--review { background: #dbeafe; color: #1e40af; }
+  .anc-pill--done { background: #ede9fe; color: #5b21b6; }
+  .anc-pill--gen { background: #ede9fe; color: #5b21b6; }
+  .anc-divider { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+  .news-item { padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+  .news-item:last-child { border-bottom: none; }
+  .news-item .news-time { font-size: 12px; color: #999; }
+  .news-item .news-title { font-weight: 600; margin: 2px 0; }
+  .news-item .news-summary { font-size: 14px; color: #555; line-height: 1.5; }
+  .event-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; align-items: center; }
+  .event-item:last-child { border-bottom: none; }
+  .event-date { font-size: 13px; color: #666; min-width: 80px; font-weight: 500; }
+  .event-tag { padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .event-tag--macro { background: #dbeafe; color: #1e40af; }
+  .event-tag--earnings { background: #d1fae5; color: #065f46; }
+  .event-tag--data { background: #fef3c7; color: #92400e; }
+  .event-tag--risk { background: #fee2e2; color: #991b1b; }
+  .event-desc { font-size: 14px; color: #333; flex: 1; }
+  .event-importance { font-size: 12px; color: #999; }
+</style>
+</head>
+<body>
+  <!-- Page Header -->
+  <div class="page-header" data-anc="page-header" data-handles="refine">
+    <h1>今日市场总览</h1>
+    <div class="date">2026年5月27日 星期三 · 盘中更新</div>
+  </div>
+
+  <!-- Macro Overview -->
+  <section class="anc-section anc-section--gc" data-anc="macro" data-handles="refine,expand,lock" data-deps="">
+    <h2>宏观概览</h2>
+    <div class="anc-kpi-grid">
+      <div class="anc-kpi anc-kpi--aurora" data-anc="macro.spx" data-handles="refine">
+        <div class="kpi-top">
+          <div class="kpi-label-top">S&P 500</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">5,782</div>
+          <div class="kpi-unit">+0.4% · 纳指 +0.6%</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--cool" data-anc="macro.tnx" data-handles="refine">
+        <div class="kpi-top">
+          <div class="kpi-label-top">10Y 收益率</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">4.32%</div>
+          <div class="kpi-unit">-2bp · 2Y 4.08%</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--ocean" data-anc="macro.dxy" data-handles="refine">
+        <div class="kpi-top">
+          <div class="kpi-label-top">美元指数</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">99.8</div>
+          <div class="kpi-unit">-0.15 · 偏弱震荡</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--warm" data-anc="macro.vix" data-handles="refine">
+        <div class="kpi-top">
+          <div class="kpi-label-top">VIX 恐慌指数</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">14.2</div>
+          <div class="kpi-unit">低位 · 市场情绪平稳</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--arctic" data-anc="macro.oil" data-handles="refine">
+        <div class="kpi-top">
+          <div class="kpi-label-top">WTI 原油</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">$72.4</div>
+          <div class="kpi-unit">-0.8% · 供给预期宽松</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--flame" data-anc="macro.btc" data-handles="refine">
+        <div class="kpi-top">
+          <div class="kpi-label-top">BTC</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">$68,420</div>
+          <div class="kpi-unit">+1.2% · 突破6.8万关口</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Important News -->
+  <section class="anc-section anc-section--gc" data-anc="news" data-handles="refine,expand,lock" data-deps="">
+    <h2>重要新闻</h2>
+    <div class="anc-pill-row">
+      <span class="anc-pill anc-pill--active">宏观</span>
+      <span class="anc-pill anc-pill--review">科技</span>
+      <span class="anc-pill anc-pill--warn">地缘</span>
+    </div>
+    <div data-anc="news.list" data-handles="refine,expand,edit">
+      <div class="news-item">
+        <div class="news-time">今日 08:30</div>
+        <div class="news-title">美联储褐皮书：经济活动温和扩张，劳动力市场持续走软</div>
+        <div class="news-summary">5月褐皮书显示12个联储辖区中8个报告经济活动持平或下降，消费者支出放缓。市场对9月降息概率定价升至65%。</div>
+      </div>
+      <div class="news-item">
+        <div class="news-time">昨日 22:00</div>
+        <div class="news-title">英伟达 Q1 财报超预期，数据中心收入同比+210%</div>
+        <div class="news-summary">NVDA 盘后涨超5%，Q1 营收 $398亿（vs 预期 $382亿），Q2 指引 $420亿±2%。Blackwell 出货量上调20%。</div>
+      </div>
+      <div class="news-item">
+        <div class="news-time">昨日 15:30</div>
+        <div class="news-title">中美贸易谈判代表拟下周在日内瓦会晤</div>
+        <div class="news-summary">双方确认将于6月2-4日举行新一轮关税磋商，市场预期部分消费品关税有望下调5-10个百分点。</div>
+      </div>
+      <div class="news-item">
+        <div class="news-time">昨日 12:00</div>
+        <div class="news-title">拼多多(PDD) Q1 营收超预期，海外业务增长强劲</div>
+        <div class="news-summary">PDD 营收 $142亿（+88% YoY），Temu 全球 GMV 同比+150%。盘中涨超7%，创年内新高。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Risk Calendar -->
+  <section class="anc-section anc-section--gc" data-anc="calendar" data-handles="refine,expand,lock" data-deps="">
+    <h2>风险日历 <span style="font-size:14px;font-weight:400;color:#888;">本周关注</span></h2>
+    <div data-anc="calendar.list" data-handles="refine,expand">
+      <div class="event-item">
+        <div class="event-date">5/28 周四</div>
+        <span class="event-tag event-tag--data">经济数据</span>
+        <span class="event-desc">Q1 GDP 修正值 · 初请失业金</span>
+        <span class="event-importance">★★★★</span>
+      </div>
+      <div class="event-item">
+        <div class="event-date">5/29 周五</div>
+        <span class="event-tag event-tag--macro">央行</span>
+        <span class="event-desc">鲍威尔在芝加哥经济俱乐部讲话</span>
+        <span class="event-importance">★★★★★</span>
+      </div>
+      <div class="event-item">
+        <div class="event-date">5/30 周六</div>
+        <span class="event-tag event-tag--data">经济数据</span>
+        <span class="event-desc">4月核心PCE物价指数 (预期 2.7% YoY)</span>
+        <span class="event-importance">★★★★★</span>
+      </div>
+      <div class="event-item">
+        <div class="event-date">6/2 周一</div>
+        <span class="event-tag event-tag--risk">地缘</span>
+        <span class="event-desc">中美日内瓦关税磋商（6/2-6/4）</span>
+        <span class="event-importance">★★★★</span>
+      </div>
+      <div class="event-item">
+        <div class="event-date">6/5 周四</div>
+        <span class="event-tag event-tag--earnings">财报</span>
+        <span class="event-desc">CRM · DG · DOCU 财报</span>
+        <span class="event-importance">★★★</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Watchlist / Trackable Targets -->
+  <section class="anc-section anc-section--gc" data-anc="watchlist" data-handles="refine,expand,lock" data-deps="">
+    <h2>可追踪标的</h2>
+    <div class="anc-kpi-grid" data-anc="watchlist.grid" data-handles="refine,expand">
+      <div class="anc-kpi anc-kpi--cool" data-anc="watchlist.nvda">
+        <div class="kpi-top">
+          <div class="kpi-label-top">NVDA</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">$985</div>
+          <div class="kpi-unit">Q1超预期 · Blackwell放量</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--aurora" data-anc="watchlist.qqq">
+        <div class="kpi-top">
+          <div class="kpi-label-top">QQQ</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">$457</div>
+          <div class="kpi-unit">纳指ETF · 科技持仓集中</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--sunset" data-anc="watchlist.tsla">
+        <div class="kpi-top">
+          <div class="kpi-label-top">TSLA</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">$218</div>
+          <div class="kpi-unit">机器人axi日临近 · 波动加大</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--ocean" data-anc="watchlist.amzn">
+        <div class="kpi-top">
+          <div class="kpi-label-top">AMZN</div>
+          <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">$198</div>
+          <div class="kpi-unit">AWS增速回升 · 估值合理</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

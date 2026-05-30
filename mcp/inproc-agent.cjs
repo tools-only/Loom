@@ -1,26 +1,21 @@
-// Anchor in-process agent — Anthropic SDK tool-use loop running inside the
-// long-lived MCP Leader Node process. Replaces per-op `claude -p` subprocess.
-// All deps (SDK constructor, registry, loggers) are injected via create() so
+// Anchor in-process agent — provider-agnostic tool-use loop running inside
+// the long-lived MCP Leader Node process. Replaces per-op `claude -p` subprocess.
+// All deps (provider client, registry, loggers) are injected via create() so
 // this module stays pure and testable.
+// Supported providers via provider-adapter.cjs: Anthropic (default), OpenAI-compat.
 
 'use strict';
 
-const SYSTEM_PROMPT = [
-  'You are running an Anchor in-process auto-execute loop for ONE user op on an HTML document.',
-  '',
-  'Procedure:',
-  '1. Call anchor_get_pending_op once to receive the user intent (with target_ref, op name, instruction) plus either relevant_subtree (preferred) or current_html.',
-  '2. Call anchor_emit_event with type=thinking and payload {target_anchor: "<target>", summary: "<1-line plan>"}.',
-  '3. Apply the op ONLY to the target anchor and its data-deps. Preserve every data-anc, data-handles, data-deps attribute and CSS class. Do not touch unrelated sections.',
-  '4. Call anchor_patch with patches=[{anchor_id: "<target>", html_fragment: "<complete outerHTML for the target>"}]. If reverse-dependents must also change to stay consistent, include them as additional patch entries.',
-  '5. Call anchor_emit_event with type=complete and payload {target_anchor: "<target>", summary: "<1-line>"}.',
-  '',
-  'Rules:',
-  '- NEVER call anchor_render — whole-HTML replacement is disabled in this loop.',
-  '- Always include target_anchor in every anchor_emit_event payload.',
-  '- Output the patch via the tool call ONLY — do not echo the HTML in your text response.',
-  '- Make best-judgment decisions; do not ask follow-up questions.',
-].join('\n');
+const fs = require('fs');
+const path = require('path');
+
+// Content agent system prompt is defined in content-agent.md — separate from the
+// management-agent CLAUDE.md so infrastructure knowledge never bleeds into content generation.
+const CONTENT_AGENT_MD = path.join(__dirname, 'content-agent.md');
+const SYSTEM_PROMPT = (() => {
+  try { return fs.readFileSync(CONTENT_AGENT_MD, 'utf8'); }
+  catch (e) { process.stderr.write(`[inproc] WARN: could not load content-agent.md: ${e.message}\n`); return ''; }
+})();
 
 const TOOL_DEFS = [
   {
@@ -69,23 +64,31 @@ const TOOL_DEFS = [
 ];
 
 function buildUserMessage(op) {
-  const opKind = op?.intent?.op || '(unknown)';
-  const target = op?.intent?.target_ref || op?.target || '(unknown)';
-  const instruction = op?.intent?.instruction || op?.args?.instruction || op?.args?.value || '(no instruction)';
-  return [
-    `Process this user op now.`,
-    `Op kind: ${opKind}`,
-    `Target anchor: ${target}`,
-    `Instruction: ${instruction}`,
-    ``,
-    `Call anchor_get_pending_op first to receive the full op context, then follow the system procedure.`,
-  ].join('\n');
+  const opKind   = op?.intent?.op || '(unknown)';
+  const target   = op?.intent?.target_ref || op?.target || '(unknown)';
+  const instr    = op?.intent?.instruction || op?.args?.instruction || op?.args?.value || '';
+  const subtree  = op?.render_state?.relevant_subtree;
+  const html     = subtree?.target_html || subtree?.outerHTML || null;
+  const needsFull = ['restructure', 'branch'].includes(opKind) && !html;
+
+  const lines = [`Op: ${opKind} | Target: ${target}`];
+  if (instr) lines.push(`Instruction: ${instr}`);
+
+  if (html) {
+    lines.push('', 'Current HTML of target node:', '```html', html, '```',
+      '', 'Generate the modified outerHTML and call anchor_patch. Then call anchor_emit_event(complete).');
+  } else if (needsFull) {
+    lines.push('', 'This op needs full-page context. Call anchor_get_pending_op first, then patch.');
+  } else {
+    lines.push('', 'Call anchor_get_pending_op to receive target HTML, then call anchor_patch.');
+  }
+
+  return lines.join('\n');
 }
 
 function create(opts) {
   const {
-    Anthropic,
-    apiKey,
+    provider,
     model,
     toolRegistry,
     log,
@@ -93,11 +96,10 @@ function create(opts) {
     concurrency,
   } = opts;
 
-  if (!Anthropic) throw new Error('inproc-agent: Anthropic constructor required');
-  if (!apiKey) throw new Error('inproc-agent: apiKey required');
+  if (!provider) throw new Error('inproc-agent: provider required (use provider-adapter)');
   if (!toolRegistry) throw new Error('inproc-agent: toolRegistry required');
 
-  const client = new Anthropic({ apiKey });
+  const client = provider;
   const queue = [];
   let running = 0;
 
@@ -137,6 +139,11 @@ function create(opts) {
 
     const messages = [{ role: 'user', content: buildUserMessage(op) }];
 
+    // If target HTML was embedded in the user message, pre-consume the op so
+    // anchor_get_pending_op returns {pending:false} — the LLM has everything it needs.
+    const subtree = op?.render_state?.relevant_subtree;
+    if (subtree?.target_html || subtree?.outerHTML) ctx.opConsumed = true;
+
     let turn = 0;
     let lastError = null;
     let stopReason = null;
@@ -145,31 +152,13 @@ function create(opts) {
       while (turn < MAX_TURNS) {
         turn++;
 
-        let streamedText = '';
-        const isFirstTurn = turn === 1;
-
         const stream = client.messages.stream({
           model,
           max_tokens: MAX_TOKENS,
-          system: SYSTEM_PROMPT,
+          system: op?.systemPrompt || SYSTEM_PROMPT,
           tools: TOOL_DEFS,
           messages,
         });
-
-        if (isFirstTurn) {
-          stream.on('text', (delta) => {
-            streamedText += delta;
-            if (streamedText.trimStart().startsWith('<')) {
-              const handler = toolRegistry.anchor_emit_event;
-              if (handler) {
-                handler({ type: 'partial_render', payload: {
-                  target_anchor: ctx.target,
-                  html_fragment: streamedText,
-                }}, ctx).catch(() => {});
-              }
-            }
-          });
-        }
 
         const resp = await stream.finalMessage();
         stopReason = resp.stop_reason;

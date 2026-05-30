@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>美股市场总览 · 2026-05-28</title>
+<style>
+body { background: var(--paper); color: var(--ink); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 32px 0; }
+.anc-section { max-width: 1200px; margin: 0 auto 24px; padding: 0 24px; }
+.anc-section--gc { background: #fff; border-radius: 20px; padding: 28px 32px; margin-bottom: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.anc-section h2 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 22px; font-weight: 700; margin: 0 0 20px; }
+.anc-section h3 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 17px; font-weight: 600; margin: 16px 0 12px; color: var(--ink, #1a1a2e); }
+.anc-kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-bottom: 8px; }
+.anc-kpi { border-radius: 16px; padding: 20px; position: relative; overflow: hidden; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.anc-kpi:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+.anc-kpi--cool { background: linear-gradient(135deg, rgba(13,148,136,0.08), rgba(56,189,248,0.08)); }
+.anc-kpi--warm { background: linear-gradient(135deg, rgba(244,114,114,0.08), rgba(192,132,252,0.08)); }
+.anc-kpi--aurora { background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(52,211,153,0.08)); }
+.anc-kpi--ocean { background: linear-gradient(135deg, rgba(30,64,175,0.08), rgba(244,114,114,0.08)); }
+.anc-kpi--flame { background: linear-gradient(135deg, rgba(251,146,60,0.08), rgba(244,63,94,0.08)); }
+.anc-kpi--arctic { background: linear-gradient(135deg, rgba(147,197,253,0.08), rgba(167,243,208,0.08)); }
+.anc-kpi--forest { background: linear-gradient(135deg, rgba(22,163,74,0.08), rgba(180,83,9,0.08)); }
+.anc-kpi--sunset { background: linear-gradient(135deg, rgba(251,113,133,0.08), rgba(250,204,21,0.08)); }
+.anc-kpi--berry { background: linear-gradient(135deg, rgba(126,34,206,0.08), rgba(157,23,77,0.08)); }
+.anc-kpi--dusk { background: linear-gradient(135deg, rgba(100,116,139,0.08), rgba(244,114,182,0.08)); }
+.kpi-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.kpi-label-top { font-size: 14px; font-weight: 600; line-height: 1.4; color: #475569; }
+.kpi-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.kpi-bottom { }
+.kpi-value { font-family: 'Bricolage Grotesque', sans-serif; font-size: 32px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
+.kpi-unit { font-size: 13px; color: #64748b; margin-top: 2px; }
+.kpi-change { font-size: 13px; margin-top: 4px; font-weight: 600; }
+.kpi-change--up { color: #16a34a; }
+.kpi-change--down { color: #dc2626; }
+.anc-pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.anc-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #f1f5f9; color: #475569; }
+.anc-pill--warn { background: #fef3c7; color: #92400e; }
+.anc-pill--active { background: #dcfce7; color: #166534; }
+.anc-pill--gen { background: #eef2ff; color: #4338ca; }
+.anc-pill--review { background: #e0f2fe; color: #075985; }
+.anc-pill--done { background: #faf5ff; color: #6b21a8; }
+.anc-pill--draft { background: #fce7f3; color: #9d174d; }
+.anc-pill--lock { background: #f1f5f9; color: #64748b; }
+.anc-list { list-style: none; padding: 0; margin: 0; }
+.anc-list li { padding: 10px 0; border-bottom: 1px solid #f1f5f9; display: flex; align-items: flex-start; gap: 12px; }
+.anc-list li:last-child { border-bottom: none; }
+.anc-list .tag { flex-shrink: 0; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #eef2ff; color: #4338ca; }
+.anc-list .tag--red { background: #fee2e2; color: #991b1b; }
+.anc-list .tag--amber { background: #fef3c7; color: #92400e; }
+.anc-list .tag--green { background: #dcfce7; color: #166534; }
+.anc-list .tag--purple { background: #faf5ff; color: #6b21a8; }
+.anc-list .item-content { flex: 1; font-size: 14px; line-height: 1.5; }
+.anc-list .item-content strong { font-weight: 600; }
+.anc-divider { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0; }
+.anc-calendar { display: flex; flex-direction: column; gap: 8px; }
+.anc-cal-item { display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: #f8fafc; border-radius: 12px; }
+.anc-cal-time { font-size: 13px; font-weight: 700; color: #475569; min-width: 62px; font-family: 'JetBrains Mono', monospace; }
+.anc-cal-event { flex: 1; font-size: 14px; }
+.anc-cal-event .evt-name { font-weight: 600; }
+.anc-cal-event .evt-detail { color: #64748b; font-size: 13px; }
+.anc-cal-star { font-size: 13px; color: #f59e0b; }
+.anc-watchlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.anc-watch-card { padding: 16px; border-radius: 14px; background: #f8fafc; transition: transform 0.2s; }
+.anc-watch-card:hover { transform: translateY(-2px); }
+.anc-watch-ticker { font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px; font-weight: 700; color: #0f172a; }
+.anc-watch-name { font-size: 13px; color: #64748b; margin: 2px 0 8px; }
+.anc-watch-reason { font-size: 13px; line-height: 1.5; color: #334155; }
+.anc-watch-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; margin-bottom: 8px; background: #eef2ff; color: #4338ca; }
+.anc-watch-tag--green { background: #dcfce7; color: #166534; }
+.anc-watch-tag--amber { background: #fef3c7; color: #92400e; }
+.anc-watch-tag--red { background: #fee2e2; color: #991b1b; }
+.anc-news-item { margin-bottom: 6px; }
+.anc-news-item a { color: #1e293b; text-decoration: none; font-weight: 500; }
+.anc-news-item a:hover { color: #4338ca; }
+.anc-news-src { font-size: 12px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<!-- ==================== HEADER ==================== -->
+<section class="anc-section" data-anc="header" data-handles="refine" data-deps="">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <h1 style="font-family:'Bricolage Grotesque',sans-serif;font-size:28px;font-weight:800;margin:0;">美股市场总览</h1>
+    <span class="anc-pill anc-pill--active">2026-05-28 · 盘中</span>
+  </div>
+  <p style="color:#64748b;margin:0;font-size:15px;line-height:1.6;">
+    4月核心PCE同比+3.2%（预期+3.3%，持平前值）略低预期，三大指数盘中窄幅震荡。<br>
+    投资者等待PCE数据后的政策信号——油价暴跌（WTI -5.6%）与美伊和谈进展成最大变量。
+  </p>
+</section>
+
+<!-- ==================== 宏观总览 ==================== -->
+<section class="anc-section anc-section--gc" data-anc="macro" data-handles="refine,expand" data-deps="header">
+  <h2>📊 宏观总览</h2>
+
+  <div class="anc-kpi-grid">
+    <!-- S&P 500 -->
+    <div class="anc-kpi anc-kpi--aurora" data-anc="macro.spx" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top">S&P 500</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">7,520.36</div>
+        <div class="kpi-unit">历史收盘新高</div>
+        <div class="kpi-change kpi-change--up">+0.02% · 高盛目标 8,000</div>
+      </div>
+    </div>
+
+    <!-- Nasdaq -->
+    <div class="anc-kpi anc-kpi--cool" data-anc="macro.nasdaq" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Nasdaq</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">26,674.74</div>
+        <div class="kpi-unit">AI 板块回调</div>
+        <div class="kpi-change kpi-change--up">+0.07% · 芯片股领跌</div>
+      </div>
+    </div>
+
+    <!-- Dow Jones -->
+    <div class="anc-kpi anc-kpi--warm" data-anc="macro.dow" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top">道琼斯</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">50,644.28</div>
+        <div class="kpi-unit">消费/医疗领涨</div>
+        <div class="kpi-change kpi-change--up">+0.36% · 领涨三大指数</div>
+      </div>
+    </div>
+
+    <!-- 10Y Yield -->
+    <div class="anc-kpi anc-kpi--flame" data-anc="macro.10y" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top">10Y 收益率</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">4.518%</div>
+        <div class="kpi-unit">上行 +2.3bp</div>
+        <div class="kpi-change kpi-change--up">加息预期升温</div>
+      </div>
+    </div>
+
+    <!-- WTI -->
+    <div class="anc-kpi anc-kpi--ocean" data-anc="macro.wti" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top">WTI 原油</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$88.68</div>
+        <div class="kpi-unit">布伦特 $94.29</div>
+        <div class="kpi-change kpi-change--down">-5.55% · 美伊和谈预期</div>
+      </div>
+    </div>
+
+    <!-- Gold -->
+    <div class="anc-kpi anc-kpi--sunset" data-anc="macro.gold" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top">黄金</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$4,450</div>
+        <div class="kpi-unit">两月低位</div>
+        <div class="kpi-change kpi-change--down">-1.3% · 强美元压制</div>
+      </div>
+    </div>
+
+    <!-- DXY -->
+    <div class="anc-kpi anc-kpi--dusk" data-anc="macro.dxy" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top">美元指数</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M16 6H8m2 12h4"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">微涨</div>
+        <div class="kpi-unit">DXY 温和坚挺</div>
+        <div class="kpi-change kpi-change--up">加息预期支撑</div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="anc-divider">
+
+  <h3>🏭 板块轮动</h3>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--forest" data-anc="macro.sector.cs" data-handles="" data-deps="">
+      <div class="kpi-top"><div class="kpi-label-top">可选消费</div></div>
+      <div class="kpi-value">+1.9%</div>
+      <div class="kpi-unit">领涨板块</div>
+    </div>
+    <div class="anc-kpi anc-kpi--cool" data-anc="macro.sector.re" data-handles="" data-deps="">
+      <div class="kpi-top"><div class="kpi-label-top">房地产</div></div>
+      <div class="kpi-value">+3.72%</div>
+      <div class="kpi-unit">降息预期交易</div>
+    </div>
+    <div class="anc-kpi anc-kpi--warm" data-anc="macro.sector.energy" data-handles="" data-deps="">
+      <div class="kpi-top"><div class="kpi-label-top">能源</div></div>
+      <div class="kpi-value">-1.5%</div>
+      <div class="kpi-change kpi-change--down">油价暴跌拖累</div>
+    </div>
+    <div class="anc-kpi anc-kpi--berry" data-anc="macro.sector.tech" data-handles="" data-deps="">
+      <div class="kpi-top"><div class="kpi-label-top">科技</div></div>
+      <div class="kpi-value">+0.55%</div>
+      <div class="kpi-unit">窄幅 · AI 涨势暂歇</div>
+    </div>
+    <div class="anc-kpi anc-kpi--arctic" data-anc="macro.sector.hc" data-handles="" data-deps="">
+      <div class="kpi-top"><div class="kpi-label-top">医疗</div></div>
+      <div class="kpi-value">+1.59%</div>
+      <div class="kpi-unit">防御性流入</div>
+    </div>
+    <div class="anc-kpi anc-kpi--flame" data-anc="macro.sector.utilities" data-handles="" data-deps="">
+      <div class="kpi-top"><div class="kpi-label-top">公用事业</div></div>
+      <div class="kpi-value">+2.91%</div>
+      <div class="kpi-unit">防御轮动</div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 重要新闻 ==================== -->
+<section class="anc-section anc-section--gc" data-anc="news" data-handles="refine,expand" data-deps="macro">
+  <h2>📰 今日重要新闻</h2>
+
+  <ul class="anc-list">
+    <li>
+      <span class="tag tag--purple">PCE</span>
+      <div class="item-content">
+        <strong>4月核心PCE同比+3.2%</strong>，略低于预期的+3.3%，但持平前值仍远高于2%目标。<br>
+        市场反应温和，加息概率维持~50%（12月前）。美联储主席沃什面临首份通胀考卷。
+      </div>
+    </li>
+    <li>
+      <span class="tag tag--red">原油</span>
+      <div class="item-content">
+        <strong>WTI 暴跌 5.6% 至 $88.68</strong>，布伦特跌至 $94.29。伊朗国家电视台称"草案已就"——拟重开霍尔木兹海峡。<br>
+        白宫否认"全面捏造"，但市场选择交易和平预期。能源板块随之下挫。
+      </div>
+    </li>
+    <li>
+      <span class="tag tag--amber">AI</span>
+      <div class="item-content">
+        <strong>AI 涨势暂歇，芯片股回调</strong>：高通 -6%、Marvell -4.6%、英特尔 -1.4%、英伟达 -1%。<br>
+        分析师建议"avoid sector ETF, trade names"——精选个股优于板块配置。
+      </div>
+    </li>
+    <li>
+      <span class="tag" style="background:#eef2ff;color:#4338ca;">银行</span>
+      <div class="item-content">
+        <strong>摩根大通 -2.4%</strong>：CEO 戴蒙警告费用可能比预期高出 $10 亿。<br>
+        巴克莱下调评级，市场重估大型银行盈利前景。
+      </div>
+    </li>
+    <li>
+      <span class="tag tag--green">消费</span>
+      <div class="item-content">
+        <strong>可选消费 +1.9% 领涨</strong>：Bath & Body Works +10%（Q1 超预期）、<br>
+        Abercrombie & Fitch +9%（强劲利润）、Costco Q3 今日盘中。
+      </div>
+    </li>
+    <li>
+      <span class="tag tag--red">安全</span>
+      <div class="item-content">
+        <strong>Zscaler -31%</strong>：Q4 收入指引远低于预期，网络安全板块承压。
+      </div>
+    </li>
+  </ul>
+</section>
+
+<!-- ==================== 风险日历 ==================== -->
+<section class="anc-section anc-section--gc" data-anc="calendar" data-handles="refine,expand" data-deps="news">
+  <h2>📅 风险日历</h2>
+
+  <div class="anc-pill-row">
+    <span class="anc-pill anc-pill--warn">今日关键</span>
+    <span class="anc-pill anc-pill--active">已公布</span>
+    <span class="anc-pill anc-pill--review">待关注</span>
+  </div>
+
+  <h3>今日（5/28 周四）</h3>
+  <div class="anc-calendar">
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">07:30</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">核心 PCE（4月）</span>
+        <div class="evt-detail">实际 +3.2% YoY · 预期 +3.3% · 前值 +3.2%</div>
+      </div>
+      <span class="anc-cal-star">★</span>
+    </div>
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">07:30</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">GDP 修正值（Q1）</span>
+        <div class="evt-detail">实际 +2.0% · 初值 +0.5%</div>
+      </div>
+      <span class="anc-cal-star">★</span>
+    </div>
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">07:30</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">首次申领失业金</span>
+        <div class="evt-detail">预期 209K · 前值 209K</div>
+      </div>
+    </div>
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">07:30</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">耐用品订单（4月）</span>
+        <div class="evt-detail">预期 +4.0% · 前值 +0.8%</div>
+      </div>
+    </div>
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">07:55</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">FOMC 威廉姆斯讲话</span>
+        <div class="evt-detail">纽约联储主席</div>
+      </div>
+    </div>
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">09:00</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">新屋销售（4月）</span>
+        <div class="evt-detail">预期 661K · 前值 682K</div>
+      </div>
+    </div>
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">11:00</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">EIA 原油库存</span>
+        <div class="evt-detail">前值 -7.863M</div>
+      </div>
+    </div>
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">14:00</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">FOMC 巴尔金讲话</span>
+        <div class="evt-detail">里士满联储主席</div>
+      </div>
+    </div>
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">盘后</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">Dell · Costco · MongoDB · 盘后财报</span>
+        <div class="evt-detail">DELL 预期 EPS $2.94 · 隐含波动 ~±11%</div>
+      </div>
+      <span class="anc-cal-star">★</span>
+    </div>
+  </div>
+
+  <hr class="anc-divider">
+
+  <h3>未来关注</h3>
+  <div class="anc-calendar">
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">6/6</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">非农就业（5月）</span>
+        <div class="evt-detail">劳动力市场热度关键验证</div>
+      </div>
+      <span class="anc-cal-star">★</span>
+    </div>
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">6/10</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">CPI（5月）</span>
+        <div class="evt-detail">PCE 之后下一个通胀锚点</div>
+      </div>
+      <span class="anc-cal-star">★</span>
+    </div>
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">6/17-18</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">FOMC 利率决议</span>
+        <div class="evt-detail">市场定价 ~99% 维持 3.50-3.75%</div>
+      </div>
+      <span class="anc-cal-star">★</span>
+    </div>
+    <div class="anc-cal-item">
+      <span class="anc-cal-time">~6月</span>
+      <div class="anc-cal-event">
+        <span class="evt-name">美伊谈判进展</span>
+        <div class="evt-detail">霍尔木兹海峡通航博弈 · 油价最大变量</div>
+      </div>
+      <span class="anc-cal-star">★</span>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 可追踪标的 ==================== -->
+<section class="anc-section anc-section--gc" data-anc="watchlist" data-handles="refine,expand" data-deps="calendar,news">
+  <h2>🎯 可追踪标的</h2>
+
+  <div class="anc-watchlist">
+    <div class="anc-watch-card" data-anc="watchlist.decl" data-handles="refine,expand" data-deps="">
+      <span class="anc-watch-tag">盘后财报</span>
+      <div class="anc-watch-ticker">DELL</div>
+      <div class="anc-watch-name">Dell Technologies</div>
+      <div class="anc-watch-reason">AI 服务器收入 ~$13B 预期，隐含波动 ±11%。毛利率是否企稳是关键信号——若利润率改善将带动板块重估。</div>
+    </div>
+
+    <div class="anc-watch-card" data-anc="watchlist.crm" data-handles="refine,expand" data-deps="">
+      <span class="anc-watch-tag anc-watch-tag--amber">财报后走势</span>
+      <div class="anc-watch-ticker">CRM</div>
+      <div class="anc-watch-name">Salesforce</div>
+      <div class="anc-watch-reason">Q1 超预期（EPS $3.88）但 Q2 指引微miss，盘后 -1.4%。关注次日市场如何消化——企业软件需求风向标。</div>
+    </div>
+
+    <div class="anc-watch-card" data-anc="watchlist.snow" data-handles="refine,expand" data-deps="">
+      <span class="anc-watch-tag anc-watch-tag--green">暴涨</span>
+      <div class="anc-watch-ticker">SNOW</div>
+      <div class="anc-watch-name">Snowflake</div>
+      <div class="anc-watch-reason">盘后 +29%！Q1 超预期 + AWS $6B 合作。数据云赛道情绪指标，关注次日是否高开低走。</div>
+    </div>
+
+    <div class="anc-watch-card" data-anc="watchlist.mrvl" data-handles="refine,expand" data-deps="">
+      <span class="anc-watch-tag anc-watch-tag--green">暴涨</span>
+      <div class="anc-watch-ticker">MRVL</div>
+      <div class="anc-watch-name">Marvell Technology</div>
+      <div class="anc-watch-reason">Q1 beat（EPS $0.80, 营收 $2.42B）+ 乐观 Q2 指引，盘后 +8%。AI 连接芯片需求强劲，昨日 -4.6% 后强势反转。</div>
+    </div>
+
+    <div class="anc-watch-card" data-anc="watchlist.qcom" data-handles="refine,expand" data-deps="">
+      <span class="anc-watch-tag anc-watch-tag--red">回调</span>
+      <div class="anc-watch-ticker">QCOM</div>
+      <div class="anc-watch-name">Qualcomm</div>
+      <div class="anc-watch-reason">-6% 领跌芯片板块。AI 涨势 pause 中跌幅最大，关注 PCE 落地后是否反弹。PC+AI 芯片双驱动逻辑未变。</div>
+    </div>
+
+    <div class="anc-watch-card" data-anc="watchlist.jpm" data-handles="refine,expand" data-deps="">
+      <span class="anc-watch-tag anc-watch-tag--amber">利空</span>
+      <div class="anc-watch-ticker">JPM</div>
+      <div class="anc-watch-name">JPMorgan Chase</div>
+      <div class="anc-watch-reason">戴蒙警告费用 +$10亿，巴克莱下调。但若美伊和谈推动油价下行→通胀缓和→加息概率下降，银行将受益于利率预期稳定。</div>
+    </div>
+
+    <div class="anc-watch-card" data-anc="watchlist.zs" data-handles="refine,expand" data-deps="">
+      <span class="anc-watch-tag anc-watch-tag--red">暴跌</span>
+      <div class="anc-watch-ticker">ZS</div>
+      <div class="anc-watch-name">Zscaler</div>
+      <div class="anc-watch-reason">-31% 因 Q4 指引远弱于预期。网络安全板块整体承压，观察是否有 contagion 效应扩散至 CRWD、PANW。</div>
+    </div>
+
+    <div class="anc-watch-card" data-anc="watchlist.xle" data-handles="refine,expand" data-deps="">
+      <span class="anc-watch-tag anc-watch-tag--amber">地缘</span>
+      <div class="anc-watch-ticker">XLE</div>
+      <div class="anc-watch-name">能源板块 ETF</div>
+      <div class="anc-watch-reason">上周 +3.43% 最强势板块，今日因油价暴跌回落。美伊谈判是双刃剑——若协议破裂能源将报复性反弹。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== FOOTER ==================== -->
+<section class="anc-section" data-anc="footer" data-handles="" data-deps="">
+  <div style="text-align:center;padding:16px 0;color:#94a3b8;font-size:13px;">
+    数据来源：Bloomberg · TradingEconomics · Investing.com · 数据截至 2026-05-28 盘中<br>
+    本页面由 Anchor 自动生成，不构成投资建议
+  </div>
+</section>
+
+</body>
+</html>

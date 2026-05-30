@@ -55,7 +55,12 @@ Available resource IDs (call resource_api to get current list if unsure):
 Write ONLY this JSON line to stdout (no other text, no newlines inside):
 
 ```json
-{"type": "run.artifact", "artifact": {"metadata": {"confidence": 0.75, "gaps": ["data gap descriptions"], "key_claims": ["judgment 1", "judgment 2"]}, "narrative": "2-4 paragraph Chinese market assessment"}}
+{"type": "run.artifact", "artifact": {"metadata": {"resources_used": ["fred", "reuters-rss"], "key_claims": ["judgment 1", "judgment 2"], "gaps": ["data gap descriptions"]}, "narrative": "2-4 paragraph Chinese market assessment"}}
 ```
 
-The outer `{"type":"run.artifact","artifact":{...}}` wrapper is required. Loom Core reads it to extract the artifact. Do not emit any other text on stdout.
+- `resources_used`: list every resource ID you fetched this session (e.g. `"fred"`, `"reuters-rss"`, `"finnhub"`). Loom uses this to assess source authority — do not omit or fabricate.
+- `key_claims`: 2-5 concrete analytical judgments derived from sourced data.
+- `gaps`: data you needed but could not fetch or was stale.
+- Do not include a `confidence` field — credibility is assessed by Loom from source tiers and user feedback.
+
+The outer `{"type":"run.artifact","artifact":{...}}` wrapper is required. Do not emit any other text on stdout.

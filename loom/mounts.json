@@ -1,0 +1,8 @@
+{
+  "market": {
+    "endpoint": "http://localhost:8080/v1/chat/completions",
+    "description": "",
+    "timeout_s": 90.0,
+    "auth_token": ""
+  }
+}

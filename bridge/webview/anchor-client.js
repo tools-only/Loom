@@ -56,10 +56,12 @@ const Anchor = {
     if (window.TimelinePanel)    TimelinePanel.init(this);
     if (window.HistoryPanel)     HistoryPanel.init(this);
     if (window.DebateOverlay)    DebateOverlay.init(this);
+    if (window.SettingsPanel)   SettingsPanel.init(this);
     this._initSidePanelToggles();
     this._initExecuteAll();
     this._initShutdown();
     this._initHomeNav();
+    this._initBranchChips();
     this._initPromptBar();
     this._initHomeSuggestions();
     this._initHashRouting();
@@ -75,7 +77,6 @@ const Anchor = {
       this._syncHomeVisibility();
       this._updateToolbarTabs('');
     }
-    else if (hash === 'overview') { this._loadOverview(); }
     else if (['market','position','target','sentiment'].includes(hash)) { this._loadBlogDomain(hash); }
   },
 
@@ -87,126 +88,12 @@ const Anchor = {
       this._syncHomeVisibility();
       this._updateToolbarTabs('');
     }
-    else if (hash === 'overview') { this._loadOverview(); }
     else if (['market','position','target','sentiment'].includes(hash)) { this._loadBlogDomain(hash); }
     else {
       this.currentHtml = '';
       this.container.innerHTML = '';
       this._syncHomeVisibility();
     }
-  },
-
-  async _loadOverview() {
-    window.location.hash = 'overview';
-    try {
-      const [mRes, tRes, sRes] = await Promise.all([
-        fetch('/api/inbox/market').then(r => r.json()),
-        fetch('/api/inbox/target').then(r => r.json()),
-        fetch('/api/inbox/sentiment').then(r => r.json())
-      ]);
-      this._renderOverview({
-        market: mRes.items || [],
-        target: tRes.items || [],
-        sentiment: sRes.items || [],
-        counts: { ...(mRes.meta||{}), ...(tRes.meta||{}), ...(sRes.meta||{}) }
-      });
-      this._syncHomeVisibility();
-      this._updateToolbarTabs('overview');
-    } catch (e) { console.error('[_loadOverview]', e); }
-  },
-
-  _renderOverview(data) {
-    const sourceTag = (src) => {
-      if (!src) return '';
-      if (src.startsWith('feed:')) src = src.slice(5);
-      return '<span class="blog-source-tag">' + _escHtml(src.split(':')[0].split('-').map(w => w[0] ? w[0].toUpperCase() : '').join('')) + '</span>';
-    };
-    const timeAgo = (ts) => {
-      if (!ts) return '';
-      const diff = Date.now() - new Date(ts).getTime();
-      if (diff < 60000) return '刚刚';
-      if (diff < 3600000) return Math.floor(diff/60000)+'m前';
-      if (diff < 86400000) return Math.floor(diff/3600000)+'h前';
-      return new Date(ts).toLocaleDateString('zh-CN',{month:'short',day:'numeric'});
-    };
-    const icon = (name) => '<i class="ph-bold ' + name + '"></i>';
-
-    const card = (id, color, icon, title, summary, source, ts, url, tags) =>
-      `<section class="anc-section anc-section--gc anc-section--${color}" data-anc="overview.card.${_escHtml(id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
-        <div class="blog-card-header">
-          <span class="blog-card-icon">${icon}</span>
-          <div>
-            <div class="blog-card-title" data-anc="overview.card.title" data-handles="edit,refine">${_escHtml(title)}</div>
-            <div class="blog-card-meta">${sourceTag(source)} · ${timeAgo(ts)}</div>
-          </div>
-        </div>
-        <p class="blog-card-summary" data-anc="overview.card.summary" data-handles="shorten,longer,edit,refine">${_escHtml(summary||'')}</p>
-        ${url ? '<a class="blog-card-link" href="'+_escHtml(url)+'" target="_blank" rel="noopener">查看原文 ↗</a>' : ''}
-        ${tags ? '<div class="blog-card-tags">'+tags.map(t=>'<span class="blog-ticker-tag">'+_escHtml(t)+'</span>').join('')+'</div>' : ''}
-      </section>`;
-
-    // Market highlights: filings + macro + news
-    const mFilings = data.market.filter(i => i.payload?.kind==='filing').slice(0,2);
-    const mNews    = data.market.filter(i => ['news','macro','commentary'].includes(i.payload?.kind)).slice(0,2);
-    const mAnalyst = data.market.filter(i => ['price_alert','analyst'].includes(i.payload?.kind)).slice(0,2);
-
-    // Target highlights
-    const tTop = data.target.slice(0,2);
-
-    // Sentiment highlights
-    const sFear = data.sentiment.filter(i => i.source?.includes('fear-greed')).slice(0,1);
-    const stTop = data.sentiment.filter(i => i.source?.includes('stocktwits')).slice(0,1);
-    const rTop  = data.sentiment.filter(i => i.source?.includes('reddit')).slice(0,1);
-
-    const total = (data.market.length + data.target.length + data.sentiment.length);
-
-    const html = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head><meta charset="UTF-8"><title>市场总览</title></head>
-<body>
-<div class="blog-page blog-page--overview">
-  <header class="blog-header anc-section anc-section--gc anc-section--aurora" data-anc="overview.header" data-handles="refine,restructure">
-    <div class="blog-header-inner">
-      <span class="blog-domain-icon">${icon('ph-chart-pie-slice')}</span>
-      <div>
-        <h1 class="blog-domain-title" data-anc="overview.title" data-handles="edit,refine">市场总览</h1>
-        <p class="blog-domain-count" data-anc="overview.count" data-handles="edit,refine">市场 <strong>${data.market.length}</strong> · 标的 <strong>${data.target.length}</strong> · 情绪 <strong>${data.sentiment.length}</strong> · 共 <strong>${total}</strong> 条</p>
-      </div>
-    </div>
-  </header>
-
-  <main class="blog-content">
-    <div class="blog-section-label"><i class="ph-bold ph-newspaper"></i> 重要文件 & 宏观</div>
-    <div class="blog-card-grid">
-      ${mFilings.map(it => card(it.id, 'aurora', icon('ph-file-text'), it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
-      ${mNews.map(it => card(it.id, 'arctic', it.payload?.kind==='macro'?icon('ph-chart-line-up'):icon('ph-newspaper'), it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
-      ${mAnalyst.map(it => card(it.id, 'warm', icon('ph-crosshair'), it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
-      ${(mFilings.length+mNews.length+mAnalyst.length)===0?'<div class="blog-empty-row">暂无市场数据</div>':''}
-    </div>
-
-    <div class="blog-section-label"><i class="ph-bold ph-crosshair"></i> 热门标的</div>
-    <div class="blog-card-grid">
-      ${tTop.map(it => card(it.id, 'warm', icon('ph-crosshair'), it.title, it.summary, it.source, it.timestamp, it.payload?.url, it.payload?.tickers)).join('')}
-      ${tTop.length===0?'<div class="blog-empty-row">暂无标的数据</div>':''}
-    </div>
-
-    <div class="blog-section-label"><i class="ph-bold ph-pulse"></i> 市场情绪</div>
-    <div class="blog-card-grid">
-      ${sFear.map(it => card(it.id, 'flame', icon('ph-pulse'), it.title, it.summary, 'fear-greed', it.timestamp, null, null)).join('')}
-      ${stTop.map(it => card(it.id, 'cool', it.payload?.bull_ratio>0.5?icon('ph-trend-up'):icon('ph-trend-down'), it.title, it.summary, 'stocktwits', it.timestamp, null, null)).join('')}
-      ${rTop.map(it => card(it.id, 'aurora', icon('ph-chat-circle-text'), it.title, it.summary, it.source, it.timestamp, null, it.payload?.tickers)).join('')}
-      ${(sFear.length+stTop.length+rTop.length)===0?'<div class="blog-empty-row">暂无情绪数据</div>':''}
-    </div>
-  </main>
-</div>
-</body>
-</html>`;
-
-    this.currentHtml = html;
-    this.container.innerHTML = '';
-    const template = document.createElement('template');
-    template.innerHTML = html;
-    document.getElementById('anchor-content').appendChild(template.content.cloneNode(true));
   },
 
   async _loadBlogDomain(domain) {
@@ -465,10 +352,24 @@ const Anchor = {
   _navigateToRoute(route) {
     const next = String(route || '').trim();
     if (!next) return;
+    // Guard: don't allow branch switch while an op is processing
+    const BRANCH_DOMAINS = ['market', 'position', 'target', 'sentiment'];
+    if (BRANCH_DOMAINS.includes(next) && this._isProcessing) {
+      this.toast('请等待当前操作完成后再切换');
+      return;
+    }
+    // Activate branch on server (fire-and-forget; navigation proceeds immediately)
+    if (BRANCH_DOMAINS.includes(next)) {
+      fetch('/branch/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branch: next })
+      }).catch(() => {});
+    }
     const current = window.location.hash.slice(1);
     if (current === next) {
       if (next === 'overview') this._loadOverview();
-      else if (['market','position','target','sentiment'].includes(next)) this._loadBlogDomain(next);
+      else if (BRANCH_DOMAINS.includes(next)) this._loadBlogDomain(next);
       return;
     }
     window.location.hash = next;
@@ -529,12 +430,11 @@ const Anchor = {
 
   _inferRoute(text) {
     const t = (text || '').toLowerCase();
-    if (/市场总览|market.?brief|overview|宏观.*新闻|风险日历|today/.test(t)) return 'overview';
     if (/持仓|仓位|portfolio|position|复盘/.test(t)) return 'position';
     if (/标的|target|tracker|nvda|aapl|tsla|触发/.test(t)) return 'target';
     if (/情绪|sentiment|fear.?greed|reddit|stocktwits/.test(t)) return 'sentiment';
-    if (/宏观|风险偏好|market.?intel|macro/.test(t)) return 'market';
-    return 'overview';
+    if (/宏观|市场|today|market|overview|风险/.test(t)) return 'market';
+    return 'market';
   },
 
   submitPrompt(text, route = '') {
@@ -545,6 +445,14 @@ const Anchor = {
     this._allowIncomingHtml = true;
     const effectiveRoute = String(route || '').trim() || this._inferRoute(text);
     this._pendingPromptRoute = effectiveRoute;
+    // Initialize timing for prompt-based generation
+    this._timing = {
+      op: 'prompt',
+      target: effectiveRoute,
+      t0_click: performance.now(),
+      t1_built: performance.now(),
+      _agentContext: this._activeBranch ? 'branch:' + this._activeBranch : 'content-agent',
+    };
     // Navigate immediately without waiting for hashchange (avoids async flicker over home)
     history.pushState(null, '', '#' + effectiveRoute);
     const home = document.getElementById('anchor-home');
@@ -589,6 +497,29 @@ const Anchor = {
     });
   },
 
+  _initBranchChips() {
+    const input = document.getElementById('anchor-prompt-input');
+    document.querySelectorAll('.branch-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const branch = chip.dataset.branch;
+        if (!branch) return;
+        // Update active chip UI
+        document.querySelectorAll('.branch-chip').forEach(c => c.classList.remove('is-active'));
+        chip.classList.add('is-active');
+        // Update input placeholder to branch context
+        if (input && chip.dataset.placeholder) input.placeholder = chip.dataset.placeholder;
+        // Activate branch on server
+        fetch('/branch/activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ branch })
+        }).catch(() => {});
+        this._activeBranch = branch;
+        this._updateBranchIndicator(branch);
+      });
+    });
+  },
+
   _initHomeNav() {
     const logo  = document.querySelector('.toolbar-logo');
     const brand = document.querySelector('.toolbar-brand');
@@ -630,7 +561,6 @@ const Anchor = {
     this._initFloatingTrigger('trigger-context', 'anchor-context-panel');
     this._initFloatingTrigger('trigger-timeline', 'anchor-timeline-panel');
     this._initFloatingTrigger('trigger-inbox', 'anchor-inbox-panel');
-
     // Resize handles
     this._initPanelResize('anchor-context-panel');
     this._initPanelResize('anchor-timeline-panel');
@@ -754,6 +684,10 @@ const Anchor = {
           this.ws.send(JSON.stringify({ type: 'ping' }));
         }
       }, 30000);
+      // Sync active branch indicator on connect
+      fetch('/branch/active').then(r => r.json()).then(d => {
+        if (d.branch) { this._activeBranch = d.branch; this._updateBranchIndicator(d.branch); }
+      }).catch(() => {});
     };
 
     this.ws.onmessage = (event) => {
@@ -826,6 +760,10 @@ const Anchor = {
         this._handleAgentEvent(evt);
         break;
       }
+      case 'branch_activated':
+        this._activeBranch = msg.branch;
+        this._updateBranchIndicator(msg.branch);
+        break;
       case 'shutdown':
         this.shuttingDown = true;
         this.setStatus('', msg.message || 'Shutting down...');
@@ -868,11 +806,11 @@ const Anchor = {
 
   showProcessing(label, isError) {
     if (!this.processingEl) return;
+    this._isProcessing = true;
     this.processingEl.style.display = 'flex';
     this.processingLabel.textContent = label || 'AI 处理中';
     this.processingTarget.textContent = '';
     this.processingEl.className = 'toolbar-processing' + (isError ? ' is-error' : '');
-    // Auto-hide after 30s if no response
     var self = this;
     if (this._processingTimer) clearTimeout(this._processingTimer);
     this._processingTimer = setTimeout(function () {
@@ -882,9 +820,19 @@ const Anchor = {
 
   hideProcessing() {
     if (!this.processingEl) return;
+    this._isProcessing = false;
     this.processingEl.style.display = 'none';
     this.processingEl.className = 'toolbar-processing';
     if (this._processingTimer) { clearTimeout(this._processingTimer); this._processingTimer = null; }
+  },
+
+  _updateBranchIndicator(branch) {
+    // Highlight the matching domain tab as the active branch
+    document.querySelectorAll('.domain-tab').forEach(tab => {
+      tab.classList.toggle('branch-active', tab.dataset.domain === branch);
+    });
+    const el = document.getElementById('toolbar-active-branch');
+    if (el) el.textContent = branch || '';
   },
 
   markAnchorProcessing(targetRef) {
@@ -902,6 +850,14 @@ const Anchor = {
       if (el) el.classList.remove('anc-processing');
     });
     this._processingAnchors.clear();
+    // Trigger timing panel on processing end — regardless of message type
+    if (this._timing && !this._timing.t6_dom) {
+      this._timing.t6_dom = performance.now();
+    }
+    if (this._timing) {
+      // Use setTimeout to let DOM settle before measuring
+      setTimeout(() => this._showTimings(), 0);
+    }
   },
 
   // Rendering
@@ -952,7 +908,13 @@ const Anchor = {
     patches.forEach(p => {
       const el = this.container.querySelector('[data-anc="' + p.anchor_id.replace(/"/g, '\\"') + '"]');
       if (!el) return;
-      el.outerHTML = p.html_fragment;
+      if (this.currentHtml) {
+        var oldOuter = el.outerHTML;
+        el.outerHTML = p.html_fragment;
+        this.currentHtml = this.currentHtml.replace(oldOuter, p.html_fragment);
+      } else {
+        el.outerHTML = p.html_fragment;
+      }
     });
     const _tp1 = performance.now();
     // Re-inject handles + collapse into each patched node's replacement
@@ -987,32 +949,38 @@ const Anchor = {
       }
     });
     const _tp2 = performance.now();
-    this.currentHtml = this.container.innerHTML;
-    const _tp3 = performance.now();
     this.infoEl.textContent = this.countAnchors() + ' anchors';
-    if (prevHtml && prevHtml !== this.currentHtml && window.HistoryPanel) {
-      HistoryPanel.save(prevHtml, this.countAnchors());
-    }
-    if (window.WorkspacePanel) WorkspacePanel.persistCurrentHtml(this.currentHtml);
     if (window.PromptPanel) PromptPanel.clearSelection();
     this.clearProcessing();
-    // Sync currentHtml back to leader so it stays in sync with DOM truth
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
-        type: 'html_synced',
-        html: this.currentHtml,
-        sig: 'sig:' + Date.now()
-      }));
-    }
+
+    // Record t6_dom here — the moment the patched DOM is visible and processing indicators are cleared
     if (this._timing) {
       this._timing.t6_dom = performance.now();
       this._timing._patch_detail = {
         outerhtml_ms: Math.round(_tp1 - _tp0),
         inject_handles_ms: Math.round(_tp2 - _tp1),
-        serialize_html_ms: Math.round(_tp3 - _tp2),
       };
-      this._showTimings();
     }
+
+    // Defer slow side-effects so the patched DOM renders first
+    var _prevHtml = prevHtml;
+    setTimeout(() => {
+      if (_prevHtml && _prevHtml !== this.currentHtml && window.HistoryPanel) {
+        HistoryPanel.save(_prevHtml, this.countAnchors());
+      }
+      if (window.WorkspacePanel) WorkspacePanel.persistCurrentHtml(this.currentHtml);
+      // Sync currentHtml back to leader so it stays in sync with DOM truth
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({
+          type: 'html_synced',
+          html: this.currentHtml,
+          sig: 'sig:' + Date.now()
+        }));
+      }
+      if (this._timing) {
+        this._showTimings();
+      }
+    }, 0);
   },
 
   injectHandles(rootEl) {
@@ -1880,6 +1848,8 @@ const Anchor = {
       target: anchorId,
       t0_click: _t_click,
       t1_built: _t_built,
+      // Record which context agent was active when the op was sent
+      _agentContext: this._activeBranch ? 'branch:' + this._activeBranch : 'content-agent',
     };
     this.sendEnvelope(envelope);
     this._tempOverride = null;  // reset per-op override
@@ -1887,85 +1857,119 @@ const Anchor = {
 
   // ── Timing waterfall ─────────────────────────────────────────────
 
+  _timingAgentHtml(ctx) {
+    if (!ctx) return '';
+    const labels = {
+      'branch:market':    { label: '市场研判', color: '#5B8FF9' },
+      'branch:position':  { label: '仓位管理', color: '#F6AD55' },
+      'branch:target':    { label: '投资逻辑', color: '#68D391' },
+      'branch:sentiment': { label: '情绪追踪', color: '#FC8181' },
+      'content-agent':    { label: '通用内容', color: '#A0AEC0' },
+      'spawned-cc':       { label: 'CC 子进程', color: '#B794F4' },
+    };
+    const entry = labels[ctx] || { label: ctx, color: '#666' };
+    return `<span style="display:inline-block;font-size:9px;font-weight:600;padding:2px 8px;border-radius:999px;background:${entry.color}22;color:${entry.color};border:1px solid ${entry.color}44">${entry.label}</span>`;
+  },
+
   _showTimings() {
     const t = this._timing;
     if (!t || !t.t6_dom || !t.t0_click) return;
 
     const fmt = (ms) => {
-      if (ms == null || isNaN(ms) || ms < 0) return '—';
-      return ms >= 1000 ? (ms / 1000).toFixed(1) + 's' : Math.round(ms) + 'ms';
+      if (ms == null || isNaN(ms) || ms < 0) return "--";
+      return ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : Math.round(ms) + "ms";
     };
     const pct = (ms, tot) => {
       if (!ms || ms <= 0 || !tot) return 0;
       return Math.max(2, Math.min(100, Math.round(ms / tot * 100)));
     };
     const total = t.t6_dom - t.t0_click;
+    const BRAIN_URL = "http://127.0.0.1:3001";
 
-    const stages = [
-      { name: 'Build Envelope',      ms: t.t1_built ? t.t1_built - t.t0_click : null,                                        color: '#5B8FF9' },
-      { name: 'WS → Server ACK',     ms: t.t3_ack && t.t2_sent ? t.t3_ack - t.t2_sent : null,                                color: '#5B8FF9' },
-      { name: 'ACK → Thinking',      ms: t.t4_thinking && t.t3_ack ? t.t4_thinking - t.t3_ack : null,                        color: '#5B8FF9' },
-      { name: '★ Claude Generation', ms: t.t5_patch && (t.t4_thinking || t.t3_ack) ? t.t5_patch - (t.t4_thinking || t.t3_ack) : null, color: '#FFD700' },
-      { name: 'Patch → DOM Done',    ms: t.t6_dom && t.t5_patch ? t.t6_dom - t.t5_patch : null,                              color: '#5B8FF9' },
-    ].filter(s => s.ms != null && s.ms >= 0);
+    (async () => {
+      let stages = [], domDetail = [], serverTimings = [], op = "?", target = "?", agentCtx = "";
+      try {
+        const r = await fetch(`${BRAIN_URL}/timing/stages`, {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ timing: t }),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          stages = data.stages || [];
+          domDetail = data.dom_detail || [];
+          serverTimings = data.server_timings || [];
+          op = data.op || "?"; target = data.target || "?";
+          agentCtx = data.agent_context || "";
+        } else throw new Error("not ok");
+      } catch (_) {
+        stages = [
+          { name: "Build Envelope", ms: t.t1_built ? t.t1_built - t.t0_click : null, color: "#5B8FF9" },
+          { name: "WS -> Server ACK", ms: t.t3_ack && t.t2_sent ? t.t3_ack - t.t2_sent : null, color: "#5B8FF9" },
+          { name: "ACK -> Thinking", ms: t.t4_thinking && t.t3_ack ? t.t4_thinking - t.t3_ack : null, color: "#5B8FF9" },
+          { name: "Patch -> DOM Done", ms: t.t6_dom && t.t5_patch ? t.t6_dom - t.t5_patch : null, color: "#5B8FF9" },
+        ].filter((s) => s.ms != null && s.ms >= 0);
+        const pd = t._patch_detail || {};
+        domDetail = [
+          { name: "outerHTML replace", ms: pd.outerhtml_ms },
+          { name: "inject handles", ms: pd.inject_handles_ms },
+          { name: "serialize HTML", ms: pd.serialize_html_ms },
+        ].filter((s) => s.ms != null && s.ms > 0);
+        const srv = t.server || {};
+        if (srv.ms_hand_agent != null || srv.ms_loom_agent != null) {
+          if (srv.ms_hand_agent != null) serverTimings.push({ name: "Hand Agent", ms: srv.ms_hand_agent, color: "#FFD700" });
+          if (srv.ms_loom_agent != null) serverTimings.push({ name: "Loom Agent -> Browser", ms: srv.ms_loom_agent, color: "#F6AD55" });
+          if (srv.ms_broadcast != null) serverTimings.push({ name: "broadcast patches", ms: srv.ms_broadcast, color: "#555" });
+        } else if (srv.ms_claude_gen != null) {
+          if (srv.ms_op_to_resolve != null) serverTimings.push({ name: "op recv -> CC dispatched", ms: srv.ms_op_to_resolve, color: "#555" });
+          serverTimings.push({ name: "CC dispatch -> anchor_patch", ms: srv.ms_claude_gen, color: "#F6AD55" });
+          if (srv.ms_broadcast != null) serverTimings.push({ name: "broadcast patches", ms: srv.ms_broadcast, color: "#555" });
+        }
+        op = t.op || "?"; target = t.target || "?";
+        agentCtx = (t.server && t.server.agent_context) || t._agentContext || "";
+      }
 
-    // DOM detail breakdown (sub-stages of "Patch → DOM Done")
-    const pd = t._patch_detail || {};
-    const domDetail = [
-      { name: '  └ outerHTML replace', ms: pd.outerhtml_ms },
-      { name: '  └ inject handles',    ms: pd.inject_handles_ms },
-      { name: '  └ serialize HTML',    ms: pd.serialize_html_ms },
-    ].filter(s => s.ms != null && s.ms > 0);
+      let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:11px;font-weight:700;color:#7A5AF8;letter-spacing:.06em">交互时序分析</span>
+        <button onclick="document.getElementById('anc-timing-panel').remove()" style="background:none;border:none;color:#999;cursor:pointer;font-size:18px;padding:0 2px;line-height:1">×</button>
+      </div>
+      <div style="color:#888;font-size:10px;margin-bottom:10px">op: <b style="color:#666">${op}</b> · target: <b style="color:#666">${target}</b></div>
+      <div style="margin-bottom:8px">${this._timingAgentHtml(agentCtx)}</div>`;
 
-    // Server report breakdown
-    const srv = t.server || {};
-
-    let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <span style="font-size:11px;font-weight:700;color:#7A5AF8;letter-spacing:.06em">⏱ 交互时序分析</span>
-      <button onclick="document.getElementById('anc-timing-panel').remove()" style="background:none;border:none;color:#555;cursor:pointer;font-size:18px;padding:0 2px;line-height:1">×</button>
-    </div>
-    <div style="color:#666;font-size:10px;margin-bottom:10px">op: <b style="color:#aaa">${t.op||'?'}</b> · target: <b style="color:#aaa">${t.target||'?'}</b></div>`;
-
-    stages.forEach(s => {
-      const w = pct(s.ms, total);
-      const isStar = s.name.startsWith('★');
-      html += `<div style="margin-bottom:5px">
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:${isStar?'#FFD700':'#aaa'};margin-bottom:2px">
-          <span>${s.name}</span><span>${fmt(s.ms)}</span>
-        </div>
-        <div style="height:6px;border-radius:3px;background:#1a1a2e;overflow:hidden">
-          <div style="height:100%;width:${w}%;background:${s.color};border-radius:3px;transition:width .3s"></div>
-        </div>
-      </div>`;
-    });
-
-    if (domDetail.length) {
-      html += `<div style="color:#555;font-size:10px;margin:6px 0 4px">DOM sub-stages:</div>`;
-      domDetail.forEach(d => {
-        html += `<div style="display:flex;justify-content:space-between;font-size:10px;color:#555;margin-bottom:1px"><span>${d.name}</span><span>${fmt(d.ms)}</span></div>`;
+      const rows = stages;
+      rows.forEach((s, idx) => {
+        const w = pct(s.ms, total);
+        const isEmphasis = s.emphasis || idx < stages.length;
+        html += `<div style="margin-bottom:5px">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:${isEmphasis ? s.color : "#888"};margin-bottom:2px">
+            <span>${s.name}</span><span>${fmt(s.ms)}</span>
+          </div>
+          <div style="height:6px;border-radius:3px;background:#f0f0f5;overflow:hidden">
+            <div style="height:100%;width:${w}%;background:${s.color};border-radius:3px;transition:width .3s"></div>
+          </div>
+        </div>`;
       });
-    }
 
-    if (srv.ms_claude_gen != null) {
-      html += `<div style="color:#555;font-size:10px;margin:6px 0 4px">Server timings:</div>`;
-      html += `<div style="display:flex;justify-content:space-between;font-size:10px;color:#555"><span>  op recv → CC dispatched</span><span>${fmt(srv.ms_op_to_resolve)}</span></div>`;
-      html += `<div style="display:flex;justify-content:space-between;font-size:10px;color:#F6AD55"><span>  ★ CC dispatch → anchor_patch</span><span>${fmt(srv.ms_claude_gen)}</span></div>`;
-      html += `<div style="display:flex;justify-content:space-between;font-size:10px;color:#555"><span>  broadcast patches</span><span>${fmt(srv.ms_broadcast)}</span></div>`;
-    }
+      if (domDetail.length) {
+        html += `<div style="color:#888;font-size:10px;margin:6px 0 4px">DOM sub-stages:</div>`;
+        domDetail.forEach(d => {
+          html += `<div style="display:flex;justify-content:space-between;font-size:10px;color:#888;margin-bottom:1px"><span>${d.name}</span><span>${fmt(d.ms)}</span></div>`;
+        });
+      }
 
-    html += `<div style="margin-top:10px;border-top:1px solid #222;padding-top:8px;display:flex;justify-content:space-between;align-items:center">
-      <span style="color:#555;font-size:10px">Total (client)</span>
-      <span style="color:#7A5AF8;font-size:13px;font-weight:700">${fmt(total)}</span>
-    </div>`;
+      html += `<div style="margin-top:10px;border-top:1px solid #e5e7eb;padding-top:8px;display:flex;justify-content:space-between;align-items:center">
+        <span style="color:#888;font-size:10px">Total (client)</span>
+        <span style="color:#7A5AF8;font-size:13px;font-weight:700">${fmt(total)}</span>
+      </div>`;
 
-    let panel = document.getElementById('anc-timing-panel');
-    if (!panel) {
-      panel = document.createElement('div');
-      panel.id = 'anc-timing-panel';
-      panel.style.cssText = 'position:fixed;bottom:16px;left:16px;background:rgba(8,8,16,0.95);color:#ccc;border-radius:14px;padding:16px 18px;font-family:JetBrains Mono,monospace;font-size:11px;z-index:99998;min-width:300px;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.07);backdrop-filter:blur(12px);';
-      document.body.appendChild(panel);
-    }
-    panel.innerHTML = html;
+      let panel = document.getElementById("anc-timing-panel");
+      if (!panel) {
+        panel = document.createElement("div");
+        panel.id = "anc-timing-panel";
+        panel.style.cssText = "position:fixed;bottom:16px;left:16px;background:rgba(255,255,255,0.96);color:#333;border-radius:14px;padding:16px 18px;font-family:JetBrains Mono,monospace;font-size:11px;z-index:99998;min-width:300px;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,0.1);border:1px solid rgba(0,0,0,0.08);backdrop-filter:blur(12px);";
+        document.body.appendChild(panel);
+      }
+      panel.innerHTML = html;
+    })();
   },
 
   // Helpers
@@ -3407,28 +3411,33 @@ window.HistoryPanel = {
   },
 
   save(html, anchorCount) {
-    const entry = {
+    const meta = {
       id: 'hist_' + Date.now().toString(36),
       timestamp: new Date().toISOString(),
       anchorCount,
-      html,
       summary: anchorCount + ' anchors, ' + html.length + ' bytes'
     };
-    this.entries.unshift(entry);
+    this.entries.unshift(meta);
     if (this.entries.length > this.MAX_ENTRIES) this.entries.pop();
     this._saveToStorage();
-    this._saveToServer(entry);
+    this._saveToServer({ ...meta, html }); // html sent to server for disk offload
     this._render();
   },
 
   restore(entryId) {
     const entry = this.entries.find(e => e.id === entryId);
-    if (!entry || !this.anchor) return;
-    this.anchor.currentHtml = entry.html;
-    this.anchor.container.innerHTML = entry.html;
-    this.anchor.injectHandles();
-    this.anchor.infoEl.textContent = entry.anchorCount + ' anchors (restored)';
-    this.anchor.toast('Restored: ' + entry.summary);
+    if (!entry || !this.anchor || !this.fileId) return;
+    fetch('/workspace/file/' + encodeURIComponent(this.fileId) + '/history/' + encodeURIComponent(entryId))
+      .then(r => r.json())
+      .then(data => {
+        if (!data.ok || !data.html) { this.anchor.toast('Cannot load history entry'); return; }
+        this.anchor.currentHtml = data.html;
+        this.anchor.container.innerHTML = data.html;
+        this.anchor.injectHandles();
+        this.anchor.infoEl.textContent = entry.anchorCount + ' anchors (restored)';
+        this.anchor.toast('Restored: ' + entry.summary);
+      })
+      .catch(() => this.anchor.toast('Failed to restore history'));
   },
 
   _render() {
@@ -3476,18 +3485,9 @@ window.HistoryPanel = {
 
   _saveToStorage() {
     try {
-      // Don't store full HTML in localStorage (size limits); keep last 20
-      const toSave = this.entries.slice(0, 20);
       const key = this.fileId ? 'anchor.history.' + this.fileId : 'anchor.history';
-      localStorage.setItem(key, JSON.stringify(toSave));
-    } catch (e) {
-      // If quota exceeded, trim further
-      try {
-        const slim = this.entries.slice(0, 5).map(e => ({ ...e, html: e.html.substring(0, 5000) }));
-        const key = this.fileId ? 'anchor.history.' + this.fileId : 'anchor.history';
-        localStorage.setItem(key, JSON.stringify(slim));
-      } catch { /* give up */ }
-    }
+      localStorage.setItem(key, JSON.stringify(this.entries.slice(0, 20)));
+    } catch { /* quota exceeded — silently ignore */ }
   },
 
   _saveToServer(entry) {
@@ -3664,10 +3664,542 @@ function _escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+// Settings panel — provider & model config
+const SettingsPanel = {
+  init(anchor) {
+    this._anchor = anchor;
+    this._panel = document.getElementById('anchor-settings-panel');
+    this._saveBtn = document.getElementById('settings-save');
+    this._resetBtn = document.getElementById('settings-reset');
+    this._msgEl = document.getElementById('settings-message');
+    this._providerSel = document.getElementById('settings-provider');
+    this._modelInput = document.getElementById('settings-model');
+    this._baseUrlInput = document.getElementById('settings-baseurl');
+    this._activeEl = document.getElementById('settings-active');
+
+    if (!this._saveBtn) return;  // panel removed — settings now in modal
+
+    this._saveBtn.addEventListener('click', () => this._save());
+    this._resetBtn.addEventListener('click', () => this._reset());
+    this._providerSel.addEventListener('change', () => this._onProviderChange());
+  },
+
+  _toggle() {
+    if (!this._panel) return;
+    const isOpen = !this._panel.classList.contains('collapsed');
+    if (isOpen) {
+      this._panel.classList.add('collapsed');
+    } else {
+      this._panel.classList.remove('collapsed');
+      this._load();
+    }
+  },
+
+  async _load() {
+    try {
+      const r = await fetch('/config');
+      const cfg = await r.json();
+      this._providerSel.value = cfg.provider || 'anthropic';
+      this._modelInput.value = cfg.model || '';
+      this._baseUrlInput.value = cfg.baseUrl || '';
+      this._activeEl.textContent = cfg.provider + ' / ' + cfg.model;
+      this._onProviderChange();
+    } catch (e) {
+      this._showMsg('Failed to load config: ' + e.message, 'err');
+    }
+  },
+
+  async _save() {
+    this._showMsg('', '');
+    const body = {
+      provider: this._providerSel.value,
+      model: this._modelInput.value.trim(),
+      baseUrl: this._baseUrlInput.value.trim(),
+    };
+    if (!body.model) { this._showMsg('Model is required', 'err'); return; }
+    this._saveBtn.disabled = true;
+    this._saveBtn.textContent = 'Applying...';
+    try {
+      const r = await fetch('/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const cfg = await r.json();
+      if (cfg.ok) {
+        this._activeEl.textContent = cfg.provider + ' / ' + cfg.model;
+        this._showMsg('Saved. Provider hot-reloaded: ' + cfg.provider + ' / ' + cfg.model, 'ok');
+      } else {
+        this._showMsg(cfg.error || 'Save failed', 'err');
+      }
+    } catch (e) {
+      this._showMsg('Failed to save: ' + e.message, 'err');
+    } finally {
+      this._saveBtn.disabled = false;
+      this._saveBtn.textContent = 'Save & Apply';
+    }
+  },
+
+  async _reset() {
+    this._showMsg('', '');
+    try {
+      const r = await fetch('/config/reset', { method: 'POST' });
+      const cfg = await r.json();
+      this._modelInput.value = cfg.model || '';
+      this._baseUrlInput.value = cfg.baseUrl || '';
+      this._activeEl.textContent = cfg.provider + ' / ' + cfg.model;
+      this._providerSel.value = cfg.provider || 'anthropic';
+      this._onProviderChange();
+      this._showMsg('Reset to defaults: ' + cfg.provider + ' / ' + cfg.model, 'ok');
+    } catch (e) {
+      this._showMsg('Failed to reset: ' + e.message, 'err');
+    }
+  },
+
+  _onProviderChange() {
+    const isCompatible = this._providerSel.value !== 'anthropic';
+    const section = this._baseUrlInput.closest('.settings-section');
+    if (section) section.style.display = isCompatible ? '' : 'none';
+    this._baseUrlInput.placeholder = isCompatible ? 'https://api.openai.com/v1' : '';
+  },
+
+  _showMsg(text, kind) {
+    if (!this._msgEl) return;
+    this._msgEl.hidden = !text;
+    this._msgEl.textContent = text;
+    this._msgEl.className = 'settings-message';
+    if (kind === 'ok') this._msgEl.classList.add('settings-message--ok');
+    if (kind === 'err') this._msgEl.classList.add('settings-message--err');
+  },
+};
+window.SettingsPanel = SettingsPanel;
+
+// ────────────────────────────────────────────────────────────────────
+// Schedule & Connector panel — list and toggle background tasks
+const SchedulePanel = {
+  init(anchor) {
+    this._anchor = anchor;
+    this._listEl = document.getElementById('schedule-list');
+    if (!this._listEl) return;
+    this._load();
+  },
+
+  async _load() {
+    try {
+      const [schedRes, connRes] = await Promise.all([
+        fetch('/schedules').then(r => r.json()),
+        fetch('/connectors').then(r => r.json()),
+      ]);
+      const schedules = schedRes.schedules || [];
+      const connectors = connRes.connectors || [];
+      this._render(schedules, connectors);
+    } catch (e) {
+      if (this._listEl) this._listEl.innerHTML = '<div class="schedule-empty">加载失败</div>';
+    }
+  },
+
+  _render(schedules, connectors) {
+    if (!this._listEl) return;
+    if (!schedules.length && !connectors.length) {
+      this._listEl.innerHTML = '<div class="schedule-empty">暂无定时任务</div>';
+      return;
+    }
+
+    let html = '';
+    // Connectors first (they're the actual data collectors)
+    for (const c of connectors) {
+      const isOn = c.enabled && c.running;
+      html += `<div class="schedule-item" data-type="connector" data-id="${c.id}">
+        <div class="schedule-info">
+          <div class="schedule-name">${c.name || c.id}</div>
+          <div class="schedule-purpose">${c.purpose || ''}</div>
+          <div class="schedule-cron">${c.running ? '运行中' : '已停止'}${c.error ? ' · ' + c.error : ''}</div>
+        </div>
+        <button class="schedule-toggle ${isOn ? 'is-on' : ''}" data-type="connector" data-id="${c.id}"></button>
+      </div>`;
+    }
+    // Schedules
+    for (const s of schedules) {
+      const isOn = s.enabled !== false;
+      html += `<div class="schedule-item" data-type="schedule" data-id="${s.id}">
+        <div class="schedule-info">
+          <div class="schedule-name">${s.title || s.id}</div>
+          <div class="schedule-cron">${s.cron || ''}${s.summary ? ' · ' + s.summary : ''}</div>
+        </div>
+        <button class="schedule-toggle ${isOn ? 'is-on' : ''}" data-type="schedule" data-id="${s.id}"></button>
+      </div>`;
+    }
+    this._listEl.innerHTML = html;
+
+    // Bind toggle clicks
+    this._listEl.querySelectorAll('.schedule-toggle').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const type = btn.dataset.type;
+        const id = btn.dataset.id;
+        const currentlyOn = btn.classList.contains('is-on');
+        const endpoint = type === 'connector' ? '/connectors/' : '/schedules/';
+        try {
+          const res = await fetch(endpoint + id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: !currentlyOn }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            btn.classList.toggle('is-on');
+          }
+        } catch (e) { /* ignore */ }
+      });
+    });
+  },
+};
+window.SchedulePanel = SchedulePanel;
+
+// ────────────────────────────────────────────────────────────────────
+
+// Settings modal — Brain / Hands / Connector tabs
+const LoomHandsModal = {
+  _HANDS_API: 'http://localhost:3000/loom',
+  _HANDS: ['market', 'sentiment', 'target', 'position'],
+  _activeTab: 'models',
+
+  init() {
+    this._backdrop  = document.getElementById('loom-hands-modal');
+    this._saveBtn   = document.getElementById('loom-modal-save');
+    this._cancelBtn = document.getElementById('loom-modal-cancel');
+    this._closeBtn  = document.getElementById('loom-modal-close');
+    this._openBtn   = document.getElementById('loom-modal-open-panel');
+    this._msgEl     = document.getElementById('loom-modal-msg');
+    this._statusEl  = document.getElementById('loom-modal-status');
+
+    if (!this._backdrop) return;
+
+    document.getElementById('anchor-hands-config-btn')?.addEventListener('click', () => this.open('models'));
+    this._closeBtn?.addEventListener('click',  () => this.close());
+    this._cancelBtn?.addEventListener('click', () => this.close());
+    this._saveBtn?.addEventListener('click',   () => this._saveHands());
+    this._openBtn?.addEventListener('click',   () => { this.close(); window.open('/loom', '_blank'); });
+
+    // Mode select dropdowns
+    this._HANDS.forEach(h => {
+      document.getElementById('hmode-' + h)?.addEventListener('change', e => this._setHandMode(h, e.target.value));
+    });
+
+    this._backdrop.addEventListener('click', e => { if (e.target === this._backdrop) this.close(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !this._backdrop.hidden) this.close(); });
+
+    // Tab bar
+    this._backdrop.querySelectorAll('.loom-modal-tab').forEach(btn => {
+      btn.addEventListener('click', () => this._switchTab(btn.dataset.tab));
+    });
+
+    // Preset buttons
+    this._backdrop.querySelectorAll('.loom-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._set('lm-def-provider', btn.dataset.provider);
+        this._set('lm-def-model',    btn.dataset.model);
+      });
+    });
+
+    // Brain inline buttons
+    document.getElementById('br-save')?.addEventListener('click',  () => this._saveBrain());
+    document.getElementById('br-reset')?.addEventListener('click', () => this._resetBrain());
+    document.getElementById('br-provider')?.addEventListener('change', () => this._onBrainProviderChange());
+  },
+
+  open(tab = 'brain') {
+    this._backdrop.hidden = false;
+    document.body.style.overflow = 'hidden';
+    this._switchTab(tab);
+  },
+
+  close() {
+    this._backdrop.hidden = true;
+    document.body.style.overflow = '';
+    this._setMsg('');
+  },
+
+  _switchTab(tab) {
+    this._activeTab = tab;
+    this._backdrop.querySelectorAll('.loom-modal-tab').forEach(btn => {
+      btn.classList.toggle('loom-modal-tab--active', btn.dataset.tab === tab);
+    });
+    this._backdrop.querySelectorAll('.loom-tab-panel').forEach(panel => {
+      panel.classList.toggle('loom-tab-panel--hidden', panel.dataset.panel !== tab);
+    });
+    if (this._saveBtn) this._saveBtn.style.display = tab === 'models' ? '' : 'none';
+    this._setStatus('', '');
+    if (tab === 'models')    { this._loadBrain(); this._loadHands(); }
+    if (tab === 'connector') this._loadConnectors();
+  },
+
+  // ── Brain ────────────────────────────────────────────────────────────
+  async _loadBrain() {
+    this._setStatus('loading', '加载中…');
+    try {
+      const r = await fetch('/config', { signal: AbortSignal.timeout(3000) });
+      const cfg = await r.json();
+      this._set('br-provider', cfg.provider || 'anthropic');
+      this._set('br-model',    cfg.model    || '');
+      this._set('br-baseurl',  cfg.baseUrl  || '');
+      const active = document.getElementById('br-active');
+      if (active) active.textContent = (cfg.provider || '') + ' / ' + (cfg.model || '');
+      this._onBrainProviderChange();
+      this._setStatus('ok', 'Brain 已连接');
+    } catch {
+      this._setStatus('err', 'Brain 服务未响应');
+    }
+  },
+
+  async _saveBrain() {
+    const saveBtn = document.getElementById('br-save');
+    const brMsg   = document.getElementById('br-msg');
+    const body = {
+      provider: this._get('br-provider'),
+      model:    this._get('br-model'),
+      baseUrl:  this._get('br-baseurl'),
+    };
+    if (!body.model) {
+      if (brMsg) { brMsg.textContent = 'Model is required'; brMsg.className = 'loom-modal-msg loom-msg-err'; }
+      return;
+    }
+    if (saveBtn) saveBtn.disabled = true;
+    try {
+      const r = await fetch('/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const cfg = await r.json();
+      if (cfg.ok) {
+        const active = document.getElementById('br-active');
+        if (active) active.textContent = cfg.provider + ' / ' + cfg.model;
+        if (brMsg) { brMsg.textContent = '✓ 已保存'; brMsg.className = 'loom-modal-msg loom-msg-ok'; }
+      } else {
+        if (brMsg) { brMsg.textContent = cfg.error || '保存失败'; brMsg.className = 'loom-modal-msg loom-msg-err'; }
+      }
+    } catch (e) {
+      if (brMsg) { brMsg.textContent = '❌ ' + e.message; brMsg.className = 'loom-modal-msg loom-msg-err'; }
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  },
+
+  async _resetBrain() {
+    const brMsg = document.getElementById('br-msg');
+    try {
+      const r = await fetch('/config/reset', { method: 'POST' });
+      const cfg = await r.json();
+      this._set('br-provider', cfg.provider || 'anthropic');
+      this._set('br-model',    cfg.model    || '');
+      this._set('br-baseurl',  cfg.baseUrl  || '');
+      const active = document.getElementById('br-active');
+      if (active) active.textContent = cfg.provider + ' / ' + cfg.model;
+      this._onBrainProviderChange();
+      if (brMsg) { brMsg.textContent = '重置完成: ' + cfg.provider + ' / ' + cfg.model; brMsg.className = 'loom-modal-msg loom-msg-ok'; }
+    } catch (e) {
+      if (brMsg) { brMsg.textContent = '❌ ' + e.message; brMsg.className = 'loom-modal-msg loom-msg-err'; }
+    }
+  },
+
+  _onBrainProviderChange() {
+    const sel = document.getElementById('br-provider');
+    const grp = document.getElementById('br-baseurl-group');
+    if (sel && grp) grp.style.display = sel.value !== 'anthropic' ? '' : 'none';
+  },
+
+  // ── Hands ────────────────────────────────────────────────────────────
+  _setHandMode(hand, mode) {
+    const sel = document.getElementById('hmode-' + hand);
+    if (sel) sel.value = mode;
+    const apiEl   = document.getElementById('hf-api-'   + hand);
+    const agentEl = document.getElementById('hf-agent-' + hand);
+    if (apiEl)   apiEl.style.display   = mode === 'api'   ? '' : 'none';
+    if (agentEl) agentEl.style.display = mode === 'agent' ? '' : 'none';
+    if (apiEl)   apiEl.classList.toggle('is-active', mode === 'api');
+    if (agentEl) agentEl.classList.toggle('is-active', mode === 'agent');
+  },
+
+  _getHandMode(hand) {
+    return document.getElementById('hmode-' + hand)?.value || 'api';
+  },
+
+  async _loadHands() {
+    this._setStatus('loading', '正在连接 Loom Brain…');
+    try {
+      // Load SDK config
+      const r = await fetch(this._HANDS_API + '/config', { signal: AbortSignal.timeout(3000) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const cfg = await r.json();
+      const def = cfg.default || {};
+      this._set('lm-def-provider', def.provider || 'anthropic');
+      this._set('lm-def-model',    def.model    || '');
+      this._set('lm-def-apikey',   def.api_key  || '');
+      this._set('lm-def-baseurl',  def.base_url || '');
+      const hands = cfg.hands || {};
+      this._HANDS.forEach(h => {
+        const hc = hands[h] || {};
+        this._set('lm-' + h + '-provider', hc.provider || '');
+        this._set('lm-' + h + '-model',    hc.model    || '');
+        this._set('lm-' + h + '-apikey',   hc.api_key  || '');
+        this._set('lm-' + h + '-baseurl',  hc.base_url || '');
+      });
+      // Load mount states — set mode toggle based on current mount
+      await Promise.all(this._HANDS.map(async h => {
+        try {
+          const mr = await fetch(this._HANDS_API + '/hand/' + h + '/mount', { signal: AbortSignal.timeout(2000) });
+          if (!mr.ok) return;
+          const md = await mr.json();
+          if (md.mounted) {
+            this._set('ag-ep-' + h, md.endpoint || '');
+            this._setHandMode(h, 'agent');
+          } else {
+            this._setHandMode(h, 'api');
+          }
+        } catch (_) { this._setHandMode(h, 'api'); }
+      }));
+      this._setStatus('ok', 'Loom Brain 已连接 · 修改后点击保存立即生效');
+    } catch {
+      this._setStatus('err', 'Loom Brain 未运行 — 启动: scripts\\start-anchor.bat');
+    }
+  },
+
+  async _saveHands() {
+    if (this._saveBtn) this._saveBtn.disabled = true;
+    this._setMsg('保存中…');
+    try {
+      // Save SDK config for API-mode hands
+      const cfg = {
+        default: {
+          provider: this._get('lm-def-provider'),
+          model:    this._get('lm-def-model'),
+          api_key:  this._get('lm-def-apikey'),
+          base_url: this._get('lm-def-baseurl'),
+        },
+        hands: Object.fromEntries(this._HANDS.map(h => [h, {
+          provider: this._get('lm-' + h + '-provider'),
+          model:    this._get('lm-' + h + '-model'),
+          api_key:  this._get('lm-' + h + '-apikey'),
+          base_url: this._get('lm-' + h + '-baseurl'),
+        }])),
+      };
+      const r = await fetch(this._HANDS_API + '/config', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg),
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || 'SDK 配置保存失败');
+
+      // Handle agent mounts per hand
+      await Promise.all(this._HANDS.map(async h => {
+        const mode     = this._getHandMode(h);
+        const endpoint = this._get('ag-ep-' + h);
+        const desc     = this._get('ag-desc-' + h);
+        const curR     = await fetch(this._HANDS_API + '/hand/' + h + '/mount', { signal: AbortSignal.timeout(2000) }).catch(() => null);
+        const cur      = curR?.ok ? await curR.json() : { mounted: false };
+        if (mode === 'agent' && endpoint) {
+          if (!cur.mounted || cur.endpoint !== endpoint) {
+            if (cur.mounted) await fetch(this._HANDS_API + '/hand/' + h + '/mount', { method: 'DELETE' });
+            await fetch(this._HANDS_API + '/hand/' + h + '/mount', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ endpoint, description: desc }),
+            });
+          }
+        } else if (cur.mounted) {
+          await fetch(this._HANDS_API + '/hand/' + h + '/mount', { method: 'DELETE' });
+        }
+      }));
+
+      this._setMsg('✓ 已保存，立即生效', 'ok');
+      setTimeout(() => this.close(), 1800);
+    } catch (e) {
+      this._setMsg('❌ ' + e.message, 'err');
+    } finally {
+      if (this._saveBtn) this._saveBtn.disabled = false;
+    }
+  },
+
+  // ── Connector ─────────────────────────────────────────────────────────
+  async _loadConnectors() {
+    const listEl = document.getElementById('loom-connector-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="schedule-empty">加载中...</div>';
+    try {
+      const [schedRes, connRes] = await Promise.all([
+        fetch('/schedules').then(r => r.json()),
+        fetch('/connectors').then(r => r.json()),
+      ]);
+      const schedules  = schedRes.schedules  || [];
+      const connectors = connRes.connectors  || [];
+      if (!schedules.length && !connectors.length) {
+        listEl.innerHTML = '<div class="schedule-empty">暂无定时任务</div>';
+        return;
+      }
+      let html = '';
+      for (const c of connectors) {
+        const isOn = c.enabled && c.running;
+        html += `<div class="schedule-item" data-type="connector" data-id="${c.id}">
+          <div class="schedule-info">
+            <div class="schedule-name">${c.name || c.id}</div>
+            <div class="schedule-purpose">${c.purpose || ''}</div>
+            <div class="schedule-cron">${c.running ? '运行中' : '已停止'}${c.error ? ' · ' + c.error : ''}</div>
+          </div>
+          <button class="schedule-toggle ${isOn ? 'is-on' : ''}" data-type="connector" data-id="${c.id}"></button>
+        </div>`;
+      }
+      for (const s of schedules) {
+        const isOn = s.enabled !== false;
+        html += `<div class="schedule-item" data-type="schedule" data-id="${s.id}">
+          <div class="schedule-info">
+            <div class="schedule-name">${s.title || s.id}</div>
+            <div class="schedule-cron">${s.cron || ''}${s.summary ? ' · ' + s.summary : ''}</div>
+          </div>
+          <button class="schedule-toggle ${isOn ? 'is-on' : ''}" data-type="schedule" data-id="${s.id}"></button>
+        </div>`;
+      }
+      listEl.innerHTML = html;
+      listEl.querySelectorAll('.schedule-toggle').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const type = btn.dataset.type, id = btn.dataset.id;
+          const on   = btn.classList.contains('is-on');
+          const ep   = type === 'connector' ? '/connectors/' : '/schedules/';
+          try {
+            const res = await fetch(ep + id, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ enabled: !on }),
+            });
+            if ((await res.json()).ok) btn.classList.toggle('is-on');
+          } catch {}
+        });
+      });
+    } catch {
+      listEl.innerHTML = '<div class="schedule-empty">加载失败</div>';
+    }
+  },
+
+  // ── Helpers ──────────────────────────────────────────────────────────
+  _setStatus(type, msg) {
+    if (!this._statusEl) return;
+    this._statusEl.className = 'loom-modal-status' + (type ? ' loom-status-' + type : '');
+    this._statusEl.textContent = msg;
+    this._statusEl.style.display = msg ? '' : 'none';
+  },
+  _setMsg(msg, type = '') {
+    if (!this._msgEl) return;
+    this._msgEl.className = 'loom-modal-msg' + (type ? ' loom-msg-' + type : '');
+    this._msgEl.textContent = msg;
+  },
+  _get(id) { return document.getElementById(id)?.value?.trim() || ''; },
+  _set(id, v) { const el = document.getElementById(id); if (el) el.value = v || ''; },
+};
+window.LoomHandsModal = LoomHandsModal;
+
 // ────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', function() {
   Anchor.init();
   InboxPanel.init();
   _initDomainCards();
+  SchedulePanel.init(window.Anchor);
+  LoomHandsModal.init();
 });

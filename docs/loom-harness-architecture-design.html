@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loom Core Agent Harness 架构设计</title>
+  <style>
+    :root {
+      --bg: #f6f5ef;
+      --panel: #ffffff;
+      --panel-soft: #fbfaf5;
+      --ink: #18201b;
+      --muted: #687067;
+      --line: #d9d5c8;
+      --accent: #1f7a6a;
+      --accent-2: #365c9f;
+      --warn: #a75d18;
+      --danger: #9b2f35;
+      --ok: #2e7d4f;
+      --code: #27302c;
+      --code-bg: #eef0e8;
+      --shadow: 0 18px 45px rgba(34, 39, 34, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 40px 24px 72px;
+    }
+
+    header {
+      padding: 36px 0 28px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(32px, 5vw, 56px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 42px 0 16px;
+      font-size: 26px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 28px 0 10px;
+      font-size: 19px;
+      line-height: 1.3;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    a {
+      color: var(--accent-2);
+    }
+
+    .subtitle {
+      max-width: 900px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel-soft);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      margin: 22px 0;
+      box-shadow: var(--shadow);
+    }
+
+    .band {
+      border-top: 1px solid var(--line);
+      padding-top: 24px;
+      margin-top: 30px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cell {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      background: var(--panel-soft);
+    }
+
+    .cell strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--ink);
+    }
+
+    .cell p {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .note {
+      border-left: 4px solid var(--accent);
+      background: #edf6f2;
+      padding: 14px 16px;
+      border-radius: 0 8px 8px 0;
+      color: #214239;
+      margin: 16px 0;
+    }
+
+    .warning {
+      border-left-color: var(--warn);
+      background: #fff4e5;
+      color: #5f3a12;
+    }
+
+    ul, ol {
+      margin: 10px 0 16px 22px;
+      padding: 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      font-family: "Cascadia Mono", Consolas, monospace;
+      color: var(--code);
+      background: var(--code-bg);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      background: #17201d;
+      color: #f4f0df;
+      border-radius: 8px;
+      padding: 18px;
+      font-size: 13px;
+      line-height: 1.5;
+      border: 1px solid #26332e;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 22px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #ebe8dc;
+      color: var(--ink);
+      font-weight: 650;
+    }
+
+    td {
+      background: var(--panel);
+    }
+
+    .svg-wrap {
+      overflow-x: auto;
+      background: #fdfcf7;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      margin: 18px 0;
+    }
+
+    svg {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .caption {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    .decision {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 14px 0;
+    }
+
+    .decision div {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .decision div:nth-child(odd) {
+      background: #ebe8dc;
+      font-weight: 650;
+    }
+
+    .decision div:nth-last-child(-n+2) {
+      border-bottom: 0;
+    }
+
+    footer {
+      margin-top: 48px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 820px) {
+      main {
+        padding: 24px 14px 48px;
+      }
+
+      .section {
+        padding: 18px;
+      }
+
+      .grid,
+      .grid.two {
+        grid-template-columns: 1fr;
+      }
+
+      .decision {
+        grid-template-columns: 1fr;
+      }
+
+      .decision div:nth-child(odd) {
+        border-bottom: 0;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Loom Core Agent Harness 架构设计</h1>
+    <p class="subtitle">
+      一个面向美股市场研判的 managed-agents 架构：Loom core agent 作为策略 brain，
+      content agents 作为执行 hands，harness 负责基于 human-agent 交互进行策略选择、策略优化、资源治理与反馈学习。
+    </p>
+    <div class="meta">
+      <span class="pill">版本：v1.0</span>
+      <span class="pill">日期：2026-05-28</span>
+      <span class="pill">领域：US Equities Research Agent</span>
+      <span class="pill">核心原则：Brain / Hands / Session / Harness 解耦</span>
+    </div>
+  </header>
+
+  <section class="section">
+    <h2>1. 设计结论</h2>
+    <p>
+      推荐采用 <strong>Event-Sourced Adaptive Harness</strong>：Loom core agent 不直接承担具体研究内容，
+      而是作为策略脑，围绕用户交互、资源信誉、分析策略、内容 agent 产物质量和用户反馈进行持续 harness。
+    </p>
+    <p>
+      content agents 负责具体工作，例如大盘、标的基本面、新闻归因、技术指标、期权情绪、KOL 叙事、买卖逻辑正反博弈等。
+      Loom core 通过统一任务接口调度它们，再对结果进行证据整合、冲突处理、置信度校准和面向用户的策略性输出。
+    </p>
+    <div class="note">
+      关键边界：Loom core 是 meta-harness brain，不是内容生产者；content agents 是可替换的 worker hands，不是长期记忆拥有者；
+      session/event log 是独立状态层，不绑定某一次模型上下文窗口。
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>2. 抽象原则映射</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>抽象</th>
+          <th>在本架构中的角色</th>
+          <th>设计要求</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Brain</td>
+          <td>Loom core agent</td>
+          <td>只负责策略选择、调度、评估、反馈编译和策略优化。</td>
+        </tr>
+        <tr>
+          <td>Hands</td>
+          <td>Content agents</td>
+          <td>通过统一 <code>execute(agent, envelope)</code> 接口执行具体研究任务。</td>
+        </tr>
+        <tr>
+          <td>Session</td>
+          <td>Interaction/event ledger</td>
+          <td>保存交互、策略、调用、证据、反馈、配置变更和 thesis 状态。</td>
+        </tr>
+        <tr>
+          <td>Harness</td>
+          <td>Evaluation + resource + policy + feedback loop</td>
+          <td>不写死 workflow，但写死质量契约、反馈转化规则和安全边界。</td>
+        </tr>
+        <tr>
+          <td>Tools / Resources</td>
+          <td>数据源、新闻源、KOL、技术指标、外部平台</td>
+          <td>通过资源注册表和信誉分动态选择，不隐式成为事实依据。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>3. 总体架构图</h2>
+    <div class="svg-wrap">
+      <svg viewBox="0 0 1120 680" role="img" aria-label="Loom harness architecture diagram">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#56635b"></path>
+          </marker>
+          <style>
+            .box { fill: #ffffff; stroke: #cfcabc; stroke-width: 1.5; rx: 8; }
+            .brain { fill: #e8f4f0; stroke: #1f7a6a; stroke-width: 2; rx: 8; }
+            .hands { fill: #edf1fb; stroke: #365c9f; stroke-width: 1.6; rx: 8; }
+            .store { fill: #fff4e5; stroke: #a75d18; stroke-width: 1.6; rx: 8; }
+            .gate { fill: #f8eaea; stroke: #9b2f35; stroke-width: 1.6; rx: 8; }
+            .title { font: 700 17px "Segoe UI", Arial, sans-serif; fill: #18201b; }
+            .small { font: 13px "Segoe UI", Arial, sans-serif; fill: #687067; }
+            .label { font: 14px "Segoe UI", Arial, sans-serif; fill: #18201b; }
+            .line { stroke: #56635b; stroke-width: 1.4; fill: none; marker-end: url(#arrow); }
+            .dash { stroke-dasharray: 6 5; }
+          </style>
+        </defs>
+
+        <rect x="30" y="270" width="150" height="74" class="box"></rect>
+        <text x="105" y="300" text-anchor="middle" class="title">Human</text>
+        <text x="105" y="322" text-anchor="middle" class="small">问题 / 反馈 / 偏好</text>
+
+        <rect x="245" y="250" width="190" height="112" class="store"></rect>
+        <text x="340" y="283" text-anchor="middle" class="title">Session Event Log</text>
+        <text x="340" y="309" text-anchor="middle" class="small">交互、调用、证据</text>
+        <text x="340" y="331" text-anchor="middle" class="small">反馈、策略、配置变更</text>
+
+        <rect x="510" y="222" width="210" height="168" class="brain"></rect>
+        <text x="615" y="258" text-anchor="middle" class="title">Loom Core Agent</text>
+        <text x="615" y="284" text-anchor="middle" class="small">Strategy Brain</text>
+        <text x="615" y="309" text-anchor="middle" class="small">选择策略 / 调度 hands</text>
+        <text x="615" y="331" text-anchor="middle" class="small">整合证据 / 编译反馈</text>
+        <text x="615" y="353" text-anchor="middle" class="small">优化资源与权重</text>
+
+        <rect x="785" y="68" width="260" height="74" class="hands"></rect>
+        <text x="915" y="99" text-anchor="middle" class="title">Market Regime Agent</text>
+        <text x="915" y="121" text-anchor="middle" class="small">大盘环境 / 利率 / 流动性</text>
+
+        <rect x="785" y="166" width="260" height="74" class="hands"></rect>
+        <text x="915" y="197" text-anchor="middle" class="title">Ticker Fundamentals Agent</text>
+        <text x="915" y="219" text-anchor="middle" class="small">财报 / 预期 / 估值 / 竞争格局</text>
+
+        <rect x="785" y="264" width="260" height="74" class="hands"></rect>
+        <text x="915" y="295" text-anchor="middle" class="title">Technical / Options Agent</text>
+        <text x="915" y="317" text-anchor="middle" class="small">趋势 / 量价 / 期权 / 拥挤度</text>
+
+        <rect x="785" y="362" width="260" height="74" class="hands"></rect>
+        <text x="915" y="393" text-anchor="middle" class="title">News & KOL Scout Agent</text>
+        <text x="915" y="415" text-anchor="middle" class="small">新闻归因 / 叙事 / 观点发现</text>
+
+        <rect x="785" y="460" width="260" height="74" class="hands"></rect>
+        <text x="915" y="491" text-anchor="middle" class="title">Thesis Debate Agent</text>
+        <text x="915" y="513" text-anchor="middle" class="small">买卖逻辑正反博弈 / 推翻条件</text>
+
+        <rect x="510" y="500" width="210" height="74" class="gate"></rect>
+        <text x="615" y="531" text-anchor="middle" class="title">Policy & Quality Gate</text>
+        <text x="615" y="553" text-anchor="middle" class="small">事实/解释/推测分离，禁止越权建议</text>
+
+        <rect x="245" y="505" width="190" height="74" class="store"></rect>
+        <text x="340" y="536" text-anchor="middle" class="title">Resource Registry</text>
+        <text x="340" y="558" text-anchor="middle" class="small">来源分层 / 信誉 / 用途 / 权限</text>
+
+        <rect x="245" y="92" width="190" height="74" class="store"></rect>
+        <text x="340" y="123" text-anchor="middle" class="title">Preference Store</text>
+        <text x="340" y="145" text-anchor="middle" class="small">用户偏好 / watchlist / 策略权重</text>
+
+        <path d="M180 307 C205 307 220 306 245 306" class="line"></path>
+        <path d="M435 306 C465 306 480 306 510 306" class="line"></path>
+        <path d="M720 276 C750 210 760 120 785 105" class="line"></path>
+        <path d="M720 295 C750 250 760 215 785 203" class="line"></path>
+        <path d="M720 306 C747 304 758 302 785 301" class="line"></path>
+        <path d="M720 321 C750 345 760 386 785 399" class="line"></path>
+        <path d="M720 342 C750 405 760 485 785 497" class="line"></path>
+        <path d="M785 536 C760 548 750 546 720 538" class="line dash"></path>
+        <path d="M615 390 C615 430 615 460 615 500" class="line"></path>
+        <path d="M510 542 C480 542 465 542 435 542" class="line"></path>
+        <path d="M340 505 C340 455 390 420 510 366" class="line dash"></path>
+        <path d="M340 166 C340 205 435 215 510 252" class="line dash"></path>
+        <path d="M510 536 C420 485 265 400 180 334" class="line"></path>
+        <path d="M615 222 C575 155 500 130 435 129" class="line dash"></path>
+      </svg>
+      <div class="caption">图 1：Loom core 作为策略脑，content agents 作为执行手，session/resource/preference 作为独立状态层。</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>4. 核心组件</h2>
+    <div class="grid">
+      <div class="cell">
+        <strong>Loom Core Agent</strong>
+        <p>负责理解用户意图、选择分析策略、调度 content agents、合并结果、检测冲突、生成最终输出，并把用户反馈转为可审计的策略更新。</p>
+      </div>
+      <div class="cell">
+        <strong>Content Agents</strong>
+        <p>负责具体内容工作。它们可以内部推理，但对 Loom core 来说必须像工具一样可调用、可替换、可评估。</p>
+      </div>
+      <div class="cell">
+        <strong>Session Event Log</strong>
+        <p>保存人类输入、agent 输出、策略选择、任务调用、证据、反馈、资源升降权和 thesis 状态。</p>
+      </div>
+      <div class="cell">
+        <strong>Resource Registry</strong>
+        <p>管理信息平台、数据源、新闻源、KOL、技术指标来源，记录用途、层级、时效、冲突规则和历史表现。</p>
+      </div>
+      <div class="cell">
+        <strong>Evaluation Harness</strong>
+        <p>评估 content agent 产物质量：事实性、证据充分性、冲突展示、来源合规、时效性、对用户偏好的贴合度。</p>
+      </div>
+      <div class="cell">
+        <strong>Policy Gate</strong>
+        <p>金融场景安全边界：不直接给买卖指令，必须区分事实、解释、推测，弱来源不能覆盖官方数据。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>5. Loom Core 职责边界</h2>
+    <div class="grid two">
+      <div class="cell">
+        <strong>Loom core 应该负责</strong>
+        <ul>
+          <li>识别用户当前意图和时间尺度。</li>
+          <li>选择本轮分析策略和 content agents。</li>
+          <li>分配资源预算和可信来源优先级。</li>
+          <li>整合 claims、evidence、counter-evidence。</li>
+          <li>处理来源冲突和置信度校准。</li>
+          <li>把用户反馈编译为策略、资源、权重调整建议。</li>
+          <li>维护 thesis 的确认、削弱、推翻状态。</li>
+        </ul>
+      </div>
+      <div class="cell">
+        <strong>Loom core 不应该负责</strong>
+        <ul>
+          <li>直接抓取所有行情、新闻和原始数据。</li>
+          <li>亲自计算所有技术指标。</li>
+          <li>硬编码 KOL 列表或新闻平台优先级。</li>
+          <li>把社交媒体或 KOL 观点当作事实依据。</li>
+          <li>在未确认时静默修改长期用户偏好。</li>
+          <li>直接输出“应该买入/卖出”的指令式建议。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>6. Content Agents 设计</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Agent</th>
+          <th>职责</th>
+          <th>典型输入</th>
+          <th>典型输出</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Market Regime Agent</td>
+          <td>分析大盘环境、利率、流动性、信用、波动率、宏观事件。</td>
+          <td>市场、时间尺度、关注指标、来源政策。</td>
+          <td>市场状态、驱动因素、冲突信号、推翻条件。</td>
+        </tr>
+        <tr>
+          <td>Sector Rotation Agent</td>
+          <td>识别板块轮动、相对强弱、资金流、盈利修正和行业景气。</td>
+          <td>板块列表、市场状态、近期事件。</td>
+          <td>领先/落后板块、轮动判断、资金确认。</td>
+        </tr>
+        <tr>
+          <td>Ticker Fundamentals Agent</td>
+          <td>跟踪核心标的基本盘、财报、预期差、估值、竞争格局。</td>
+          <td>ticker、用户 thesis、财报窗口。</td>
+          <td>基本面 claims、证据、风险、数据缺口。</td>
+        </tr>
+        <tr>
+          <td>Technical / Options Agent</td>
+          <td>分析趋势结构、成交量、关键位、期权、IV、拥挤度。</td>
+          <td>ticker、时间尺度、价格数据。</td>
+          <td>技术结构、期权情绪、触发位、风险提醒。</td>
+        </tr>
+        <tr>
+          <td>News & KOL Scout Agent</td>
+          <td>发现新闻归因、叙事变化和 KOL 观点，但只作为事实解释或假设生成。</td>
+          <td>主题、ticker、允许来源、排除来源。</td>
+          <td>事件摘要、叙事变化、弱信号、需验证假设。</td>
+        </tr>
+        <tr>
+          <td>Thesis Debate Agent</td>
+          <td>围绕用户买入/卖出/持有逻辑进行正反博弈追踪。</td>
+          <td>原始交易逻辑、持仓状态、新证据。</td>
+          <td>bull/bear case、假设变化、推翻条件状态。</td>
+        </tr>
+        <tr>
+          <td>Source Discovery Agent</td>
+          <td>根据任务寻找可加入资源注册表的新平台、新数据源、新 KOL。</td>
+          <td>信息缺口、用户反馈、现有资源表现。</td>
+          <td>候选资源、用途、风险、建议 tier。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>7. 统一任务接口</h2>
+    <p>
+      Loom core 调度 content agents 时不发送模糊指令，而是发送结构化任务信封。
+      这样 hands 可以扩展，但 brain 的调用方式稳定。
+    </p>
+    <pre><code>interface TaskEnvelope {
+  task_id: string;
+  agent_name: string;
+  objective: string;
+
+  subject: {
+    type: "market" | "sector" | "ticker" | "thesis" | "resource";
+    ticker?: string;
+    sector?: string;
+    theme?: string;
+  };
+
+  user_context: {
+    horizon: "intraday" | "days" | "weeks" | "quarters";
+    current_thesis?: string;
+    known_preferences?: string[];
+    watchlist?: string[];
+  };
+
+  required_output: Array&lt;
+    "claims" |
+    "evidence" |
+    "counter_evidence" |
+    "freshness" |
+    "confidence" |
+    "reversal_conditions" |
+    "data_gaps"
+  &gt;;
+
+  resource_policy: {
+    allowed_tiers: Array&lt;"A" | "B" | "C" | "D" | "E" | "F"&gt;;
+    preferred_sources?: string[];
+    excluded_sources?: string[];
+    kol_usage: "hypothesis_only" | "sentiment_only" | "disabled";
+  };
+}</code></pre>
+
+    <h3>统一返回产物</h3>
+    <pre><code>interface AgentArtifact {
+  task_id: string;
+  agent_name: string;
+  summary: string;
+  claims: Claim[];
+  evidence: Evidence[];
+  counter_evidence: Evidence[];
+  source_usage: SourceUsage[];
+  confidence: number;
+  freshness: "live" | "recent" | "stale" | "unknown";
+  gaps: string[];
+  recommended_next_tasks: TaskSuggestion[];
+}</code></pre>
+  </section>
+
+  <section class="section">
+    <h2>8. Session / Event Log</h2>
+    <p>
+      Session 是可恢复、可重放、可审计的事实来源。Loom core 不应该把长期状态只保存在模型上下文里，
+      而应该每次从 event log 中恢复必要切片。
+    </p>
+    <div class="svg-wrap">
+      <svg viewBox="0 0 1020 360" role="img" aria-label="Event sourced session flow">
+        <defs>
+          <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#56635b"></path>
+          </marker>
+          <style>
+            .step { fill: #fff; stroke: #cfcabc; stroke-width: 1.5; rx: 8; }
+            .core { fill: #e8f4f0; stroke: #1f7a6a; stroke-width: 2; rx: 8; }
+            .log { fill: #fff4e5; stroke: #a75d18; stroke-width: 1.8; rx: 8; }
+            .t { font: 700 16px "Segoe UI", Arial, sans-serif; fill: #18201b; }
+            .s { font: 13px "Segoe UI", Arial, sans-serif; fill: #687067; }
+            .a { stroke: #56635b; stroke-width: 1.4; fill: none; marker-end: url(#arrow2); }
+          </style>
+        </defs>
+        <rect x="35" y="132" width="140" height="78" class="step"></rect>
+        <text x="105" y="164" text-anchor="middle" class="t">Human Input</text>
+        <text x="105" y="187" text-anchor="middle" class="s">问题 / 反馈</text>
+
+        <rect x="230" y="112" width="160" height="118" class="log"></rect>
+        <text x="310" y="147" text-anchor="middle" class="t">Append Event</text>
+        <text x="310" y="171" text-anchor="middle" class="s">user.question</text>
+        <text x="310" y="193" text-anchor="middle" class="s">human.feedback</text>
+
+        <rect x="445" y="112" width="160" height="118" class="core"></rect>
+        <text x="525" y="147" text-anchor="middle" class="t">Wake Loom</text>
+        <text x="525" y="171" text-anchor="middle" class="s">恢复上下文</text>
+        <text x="525" y="193" text-anchor="middle" class="s">选择策略</text>
+
+        <rect x="660" y="112" width="160" height="118" class="step"></rect>
+        <text x="740" y="147" text-anchor="middle" class="t">Run Hands</text>
+        <text x="740" y="171" text-anchor="middle" class="s">content agents</text>
+        <text x="740" y="193" text-anchor="middle" class="s">return artifacts</text>
+
+        <rect x="875" y="112" width="110" height="118" class="log"></rect>
+        <text x="930" y="147" text-anchor="middle" class="t">Emit</text>
+        <text x="930" y="171" text-anchor="middle" class="s">claims</text>
+        <text x="930" y="193" text-anchor="middle" class="s">strategy</text>
+        <text x="930" y="215" text-anchor="middle" class="s">output</text>
+
+        <path d="M175 171 C195 171 210 171 230 171" class="a"></path>
+        <path d="M390 171 C410 171 425 171 445 171" class="a"></path>
+        <path d="M605 171 C625 171 640 171 660 171" class="a"></path>
+        <path d="M820 171 C840 171 855 171 875 171" class="a"></path>
+        <path d="M930 230 C865 304 360 318 310 230" class="a"></path>
+      </svg>
+      <div class="caption">图 2：每轮交互都以 event log 为中心，Loom core 可恢复、可重放、可替换。</div>
+    </div>
+
+    <pre><code>type HarnessEvent =
+  | "user.question"
+  | "agent.strategy.selected"
+  | "content_agent.called"
+  | "content_agent.artifact_returned"
+  | "claim.created"
+  | "evidence.attached"
+  | "resource.used"
+  | "human.feedback"
+  | "config.patch.proposed"
+  | "config.patch.accepted"
+  | "resource.promoted"
+  | "resource.demoted"
+  | "thesis.confirmed"
+  | "thesis.weakened"
+  | "thesis.invalidated";</code></pre>
+  </section>
+
+  <section class="section">
+    <h2>9. Claim & Evidence Ledger</h2>
+    <p>
+      所有分析结论都先成为可追踪 claim，而不是只存在于自然语言回答中。
+      这是后续评估、纠错、反馈学习和 thesis 博弈追踪的基础。
+    </p>
+    <pre><code>interface Claim {
+  claim_id: string;
+  subject: "market" | "sector" | "ticker" | "position_logic";
+  ticker?: string;
+  text: string;
+  stance: "bullish" | "bearish" | "neutral" | "mixed";
+  time_horizon: "intraday" | "days" | "weeks" | "quarters";
+  confidence: number;
+  evidence_ids: string[];
+  counter_evidence_ids: string[];
+  reversal_conditions: ReversalCondition[];
+  status: "active" | "weakened" | "invalidated" | "confirmed";
+}</code></pre>
+  </section>
+
+  <section class="section">
+    <h2>10. Resource Harness</h2>
+    <p>
+      信息平台和 KOL 不应该写死在 workflow 里，而应该作为可学习、可升降权、可禁用的资源对象。
+      Loom core 负责对资源的使用进行 harness：用途是否正确、是否越权、是否被用户纠正、是否值得加入长期资源池。
+    </p>
+    <pre><code>resources:
+  - id: sec-edgar
+    type: document_source
+    scope: ticker
+    trust_tier: A
+    use_for: [filings, fundamentals, risk_factors]
+    authority: fact_base
+    conflict_policy: authoritative
+
+  - id: reuters
+    type: news_source
+    scope: market
+    trust_tier: C
+    use_for: [event_attribution, breaking_news]
+    authority: news_fact
+    conflict_policy: corroborate
+
+  - id: kol-example
+    type: kol
+    scope: macro_liquidity
+    trust_tier: F
+    use_for: [narrative_discovery, contrarian_view]
+    authority: hypothesis_only
+    conflict_policy: background_only
+    performance:
+      accepted_by_user: 0
+      corrected_by_user: 0
+      stale_or_noisy: 0</code></pre>
+    <div class="note warning">
+      KOL 和社交来源默认只能用于假设生成、叙事发现或情绪观察，不能直接覆盖官方数据、公司披露或主流新闻事实。
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>11. Human Feedback Compiler</h2>
+    <p>
+      用户反馈不是简单追加到 prompt，而是被编译成结构化事件，再映射为可审计的策略、资源或配置调整。
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>用户反馈类型</th>
+          <th>结构化分类</th>
+          <th>Harness 动作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>“这个事实不对”</td>
+          <td><code>wrong_fact</code></td>
+          <td>检查来源；降低相关资源权重；要求 A/B/C 层来源确认。</td>
+        </tr>
+        <tr>
+          <td>“太依赖宏观了”</td>
+          <td><code>too_macro_heavy</code></td>
+          <td>降低宏观权重；提高标的基本面或技术结构权重。</td>
+        </tr>
+        <tr>
+          <td>“这个 KOL 不靠谱”</td>
+          <td><code>bad_kol_choice</code></td>
+          <td>将资源降权或标记为仅背景参考。</td>
+        </tr>
+        <tr>
+          <td>“这次反方说得有用”</td>
+          <td><code>useful_counter_evidence</code></td>
+          <td>提升冲突证据展示权重；强化 thesis debate agent。</td>
+        </tr>
+        <tr>
+          <td>“以后总是帮我看流动性”</td>
+          <td><code>preferred_dimension</code></td>
+          <td>提出 config patch，经用户确认后持久化。</td>
+        </tr>
+      </tbody>
+    </table>
+    <pre><code>feedback_loop:
+  human_feedback
+    -> classify_feedback
+    -> locate_affected_claim_or_resource
+    -> propose_strategy_or_config_patch
+    -> require_user_confirmation_for_durable_changes
+    -> persist_patch
+    -> use_next_session</code></pre>
+  </section>
+
+  <section class="section">
+    <h2>12. Thesis Debate Harness</h2>
+    <p>
+      对用户买入、卖出、持有、观望逻辑，harness 不直接替用户决策，而是持续追踪该逻辑的正反证据和推翻条件。
+    </p>
+    <pre><code>interface TradingThesis {
+  thesis_id: string;
+  ticker: string;
+  user_intent: "buy" | "sell" | "hold" | "watch";
+  original_logic: string;
+
+  bull_case: Claim[];
+  bear_case: Claim[];
+  key_assumptions: string[];
+  invalidation_triggers: string[];
+
+  watched_dimensions: Array&lt;
+    "fundamentals" |
+    "expectations" |
+    "valuation" |
+    "technical" |
+    "options" |
+    "macro" |
+    "sector" |
+    "sentiment" |
+    "news"
+  &gt;;
+
+  debate_state: {
+    bull_score: number;
+    bear_score: number;
+    uncertainty: number;
+    last_reviewed_at: string;
+  };
+}</code></pre>
+    <p>
+      新信息进入时，Thesis Debate Agent 只回答：它支持原始逻辑、削弱原始逻辑、构成噪音，还是触发了推翻条件。
+      这样用户可以稳定追踪自己的判断质量，而不是被每条新闻带着走。
+    </p>
+  </section>
+
+  <section class="section">
+    <h2>13. Analysis Contract</h2>
+    <p>
+      不写死 workflow，但必须写死输出质量契约。Loom core 可以自由选择策略和 hands，但最终输出必须满足以下要求。
+    </p>
+    <pre><code>analysis_contract:
+  required:
+    - conclusion
+    - claims
+    - evidence
+    - counter_evidence
+    - source_tiers
+    - freshness
+    - confidence
+    - reversal_conditions
+    - data_gaps
+
+  rules:
+    - facts_interpretations_and_speculations_must_be_separated
+    - weak_social_or_kol_sources_cannot_override_official_or_vendor_data
+    - missing_or_stale_data_must_be_labeled
+    - high_confidence_claims_require_strong_source_support
+    - direct_buy_sell_instruction_is_disallowed
+    - conflict_resolution_must_be_explicit</code></pre>
+  </section>
+
+  <section class="section">
+    <h2>14. 最小可行实现</h2>
+    <ol>
+      <li><strong>Resource Registry</strong>：先把已有 connectors、新闻源、KOL、指标来源注册起来。</li>
+      <li><strong>Claim Ledger</strong>：让每次分析输出结构化 claim/evidence/counter-evidence。</li>
+      <li><strong>Task Envelope</strong>：统一 Loom core 调 content agents 的接口。</li>
+      <li><strong>Feedback Compiler</strong>：把用户反馈转为分类、影响对象和 config patch。</li>
+      <li><strong>Thesis Debate Tracker</strong>：围绕用户买卖逻辑持续记录正反证据和推翻状态。</li>
+      <li><strong>Policy Gate</strong>：先实现最重要的金融安全与来源层级规则。</li>
+    </ol>
+    <div class="note">
+      第一版不要让系统自动大幅修改长期策略。建议采用“反馈累计 -> patch 提案 -> 用户确认 -> 持久化”的节奏。
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>15. 关键架构决策</h2>
+    <div class="decision">
+      <div>决策</div>
+      <div>Loom core 只做策略脑，content agents 做执行手。</div>
+      <div>理由</div>
+      <div>降低耦合；便于增加新信息源、新分析维度、新 agent；也便于单独评估每个 content agent 的质量。</div>
+      <div>代价</div>
+      <div>需要定义清晰的任务接口、产物格式和评估规则。</div>
+      <div>缓解</div>
+      <div>使用统一 <code>TaskEnvelope</code> 与 <code>AgentArtifact</code>，并让所有产物进入 Claim Ledger。</div>
+    </div>
+    <div class="decision">
+      <div>决策</div>
+      <div>Session 独立于 Loom core 的模型上下文。</div>
+      <div>理由</div>
+      <div>支持恢复、回放、审计、长期反馈学习和模型替换。</div>
+      <div>代价</div>
+      <div>需要事件 schema 和状态重建逻辑。</div>
+      <div>缓解</div>
+      <div>从最小事件集开始：question、strategy、agent call、artifact、claim、feedback、patch。</div>
+    </div>
+    <div class="decision">
+      <div>决策</div>
+      <div>资源选择由 Resource Harness 管理，而不是写死在 workflow 中。</div>
+      <div>理由</div>
+      <div>信息平台和 KOL 的价值会随市场、用户偏好和历史表现变化。</div>
+      <div>代价</div>
+      <div>资源需要元数据和评分。</div>
+      <div>缓解</div>
+      <div>先记录 tier、use_for、conflict_policy、用户反馈计数，再逐步加入自动评分。</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>16. 风险与缓解</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>风险</th>
+          <th>影响</th>
+          <th>缓解策略</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Loom core 重新变成大而全 agent</td>
+          <td>难评估、难扩展、难替换。</td>
+          <td>严格限制 Loom core 职责，只允许它调度、整合、评估和学习。</td>
+        </tr>
+        <tr>
+          <td>content agents 输出自然语言不可审计</td>
+          <td>无法追踪错误来源和反馈影响。</td>
+          <td>要求所有 agents 返回结构化 <code>AgentArtifact</code>。</td>
+        </tr>
+        <tr>
+          <td>KOL 或社交来源越权</td>
+          <td>弱信号被误当事实依据。</td>
+          <td>资源注册表声明 authority；Policy Gate 阻止弱来源覆盖强来源。</td>
+        </tr>
+        <tr>
+          <td>用户反馈被过度拟合</td>
+          <td>系统因单次反馈产生不稳定偏好。</td>
+          <td>区分 session-level adjustment 与 durable preference；长期变更需要用户确认。</td>
+        </tr>
+        <tr>
+          <td>自动策略优化不可解释</td>
+          <td>用户不知道为什么 agent 改变分析方式。</td>
+          <td>所有 config patch 以事件记录，并展示“为什么调整”。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    本文档为 Loom Core Agent Harness 架构设计稿。核心目标是让市场研判 agent 在 human-agent 交互中持续学习，
+    但保持证据可追踪、资源可治理、策略可审计、输出有边界。
+  </footer>
+</main>
+</body>
+</html>

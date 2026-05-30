@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>美股市场总览 · 2026-05-28</title>
+<link rel="stylesheet" href="resource/colors_and_type.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Ambient workspace background -->
+<div class="refraction-bg">
+  <div class="blob blob1"></div>
+  <div class="blob blob2"></div>
+  <div class="blob blob3"></div>
+  <div class="light light1"></div>
+  <div class="light light2"></div>
+  <div class="grain"></div>
+</div>
+
+<main id="anchor-output" class="anchor-output" style="max-width:1200px;margin:0 auto;padding:32px 24px">
+
+  <!-- ===== Page Header ===== -->
+  <div data-anc="page.header" data-handles="refine" data-deps="">
+    <div class="anc-pill-row" style="margin-bottom:8px">
+      <span class="anc-pill anc-pill--live">实时</span>
+      <span class="anc-pill anc-pill--gen">AI 生成</span>
+      <span class="anc-pill anc-pill--done">2026-05-28</span>
+    </div>
+    <h1 style="margin:0 0 4px;font-size:32px;letter-spacing:-0.3px">美股市场总览</h1>
+    <p style="margin:0 0 24px;color:var(--ink-60);font-size:16px">三大指数再创收盘新高 · AI 涨势暂歇 · 周四 PCE 定方向</p>
+  </div>
+
+  <!-- ===== Section 1: 大盘总览 ===== -->
+  <section class="anc-section anc-section--gc" data-anc="market.overview" data-handles="refine,expand,shorten" data-deps="page.header">
+    <h2 style="display:flex;align-items:center;gap:8px;margin:0 0 16px">
+      <i class="ph-bold ph-chart-line" style="font-size:22px;color:var(--accent-iris)"></i>
+      大盘总览
+    </h2>
+    <div class="anc-kpi-grid" style="--grid-min:220px">
+      <!-- Dow Jones -->
+      <div class="anc-kpi anc-kpi--warm" data-anc="market.overview.dow" data-handles="refine,edit" data-deps="market.overview">
+        <div class="kpi-top">
+          <div class="kpi-label-top">道琼斯</div>
+          <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">50,644</div>
+          <div class="kpi-unit">+182.60 (+0.36%)<br>收盘纪录新高</div>
+        </div>
+      </div>
+      <!-- S&P 500 -->
+      <div class="anc-kpi anc-kpi--cool" data-anc="market.overview.spx" data-handles="refine,edit" data-deps="market.overview">
+        <div class="kpi-top">
+          <div class="kpi-label-top">标普 500</div>
+          <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">7,520</div>
+          <div class="kpi-unit">+1.24 (+0.02%)<br>连续第二日新高</div>
+        </div>
+      </div>
+      <!-- Nasdaq -->
+      <div class="anc-kpi anc-kpi--aurora" data-anc="market.overview.nasdaq" data-handles="refine,edit" data-deps="market.overview">
+        <div class="kpi-top">
+          <div class="kpi-label-top">纳斯达克</div>
+          <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">26,675</div>
+          <div class="kpi-unit">+18.55 (+0.07%)<br>科技股涨势暂歇</div>
+        </div>
+      </div>
+      <!-- WTI Oil -->
+      <div class="anc-kpi anc-kpi--flame" data-anc="market.overview.oil" data-handles="refine,edit" data-deps="market.overview">
+        <div class="kpi-top">
+          <div class="kpi-label-top">WTI 原油</div>
+          <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L12 22M12 2L8 6M12 2L16 6"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">$88.68</div>
+          <div class="kpi-unit">-5.5% · 伊朗谈判推进<br>布伦特 $94.29</div>
+        </div>
+      </div>
+    </div>
+    <p style="margin:12px 0 0;color:var(--ink-60);font-size:14px">
+      <strong>资金轮动</strong>：AI/芯片获利回吐 → 医疗/消费防御板块领涨。道指受 P&G (+3.2%)、UnitedHealth (+1.9%) 支撑，半导体指数 SOX 跌 1.4%。
+    </p>
+  </section>
+
+  <!-- ===== Section 2: 宏观格局 ===== -->
+  <section class="anc-section anc-section--gc" data-anc="macro.overview" data-handles="refine,expand,shorten" data-deps="market.overview">
+    <h2 style="display:flex;align-items:center;gap:8px;margin:0 0 16px">
+      <i class="ph-bold ph-globe" style="font-size:22px;color:var(--accent-iris)"></i>
+      宏观格局
+    </h2>
+
+    <!-- KPI row: rates / inflation / GDP -->
+    <div class="anc-kpi-grid" style="--grid-min:200px;margin-bottom:20px">
+      <div class="anc-kpi anc-kpi--ocean" data-anc="macro.overview.fed" data-handles="refine" data-deps="macro.overview">
+        <div class="kpi-top">
+          <div class="kpi-label-top">联邦基金利率</div>
+          <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">3.50-3.75%</div>
+          <div class="kpi-unit">连续三次按兵不动<br>7月加息概率 62.5%</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--flame" data-anc="macro.overview.cpi" data-handles="refine" data-deps="macro.overview">
+        <div class="kpi-top">
+          <div class="kpi-label-top">核心 PCE</div>
+          <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">3.3%</div>
+          <div class="kpi-unit">同比 · 周四公布<br>预期 3.3% → 再加速</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--arctic" data-anc="macro.overview.gdp" data-handles="refine" data-deps="macro.overview">
+        <div class="kpi-top">
+          <div class="kpi-label-top">Q1 GDP 修正</div>
+          <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">2.0%</div>
+          <div class="kpi-unit">年化 · 初值仅 0.5%<br>AI 投资 +10.4% 成主力</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--dusk" data-anc="macro.overview.unemployment" data-handles="refine" data-deps="macro.overview">
+        <div class="kpi-top">
+          <div class="kpi-label-top">失业率</div>
+          <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value">4.3%</div>
+          <div class="kpi-unit">初请 20.9 万<br>就业市场仍稳健</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deep analysis -->
+    <div data-anc="macro.overview.analysis" data-handles="refine,expand,shorten" data-deps="macro.overview">
+      <h3 style="margin:0 0 8px;font-size:16px">核心逻辑</h3>
+      <ul style="margin:0;padding-left:20px;color:var(--ink-80);line-height:1.7">
+        <li><strong>Fed 深陷分歧</strong> — 4月 FOMC 出现 4 张反对票（1990 年来最多）。三位地区主席反对鸽派倾向，一位理事支持降息。候任主席 Kevin Warsh 即将接替鲍威尔。</li>
+        <li><strong>通胀再加速风险</strong> — 中东冲突推升能源成本，PPI 同比已达 6.0%。消费者 12 个月通胀预期升至 6.1%（Conference Board）。费城联储 Q2 通胀预测从 2.7% 大幅上调至 6.0%。</li>
+        <li><strong>GDP 结构分化</strong> — AI 相关商业投资强劲 (+10.4%)，但消费支出仅增 1.6%，净出口拖累 1.3 个百分点。Q2 GDPNow 跟踪值为 4.3%，但可持续性存疑。</li>
+        <li><strong>软着陆叙事承压</strong> — 密歇根消费者信心跌至 48.2（70 年最低），Conference Board 预期指数 72.2（低于衰退阈值 80）。能源通胀滞后效应可能进一步打压消费。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== Section 3: 重要新闻 ===== -->
+  <section class="anc-section anc-section--gc" data-anc="news.important" data-handles="refine,expand,shorten" data-deps="market.overview">
+    <h2 style="display:flex;align-items:center;gap:8px;margin:0 0 16px">
+      <i class="ph-bold ph-newspaper" style="font-size:22px;color:var(--accent-iris)"></i>
+      重要新闻
+    </h2>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <!-- News 1 -->
+      <div class="anc-section anc-section--gc anc-section--arctic" data-anc="news.important.iran" data-handles="refine,expand" data-deps="news.important" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div>
+            <div class="anc-pill-row" style="margin-bottom:4px">
+              <span class="anc-pill anc-pill--warn">地缘政治</span>
+            </div>
+            <strong style="font-size:15px">美伊谈判突破：霍尔木兹海峡或在一个月内恢复通航</strong>
+            <p style="margin:4px 0 0;color:var(--ink-60);font-size:14px">伊朗获得框架协议草案：以解除海军封锁换取恢复商业航运。油价暴跌 5%，WTI 跌破 $90。若协议落地，全球能源供应风险显著下降。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- News 2 -->
+      <div class="anc-section anc-section--gc anc-section--cool" data-anc="news.important.goldman" data-handles="refine,expand" data-deps="news.important" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div>
+            <div class="anc-pill-row" style="margin-bottom:4px">
+              <span class="anc-pill anc-pill--active">投行观点</span>
+            </div>
+            <strong style="font-size:15px">高盛上调标普 500 年终目标至 8,000 点</strong>
+            <p style="margin:4px 0 0;color:var(--ink-60);font-size:14px">从 7,600 上调，加入摩根士丹利和德银的看多阵营，理由是盈利增长持续性强。高盛此前已在 4 月将目标从 7,100 上调至 7,600。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- News 3 -->
+      <div class="anc-section anc-section--gc anc-section--flame" data-anc="news.important.jpm" data-handles="refine,expand" data-deps="news.important" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div>
+            <div class="anc-pill-row" style="margin-bottom:4px">
+              <span class="anc-pill anc-pill--warn">银行</span>
+            </div>
+            <strong style="font-size:15px">摩根大通跌 2.4%：Dimon 警告费用可能高出 $10 亿</strong>
+            <p style="margin:4px 0 0;color:var(--ink-60);font-size:14px">Dimon 表示全年支出可能比此前估计高出 10 亿美元，拖累银行板块。消息公布后 JPM 下跌 2.4%，拖累道指。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- News 4 -->
+      <div class="anc-section anc-section--gc anc-section--berry" data-anc="news.important.snow" data-handles="refine,expand" data-deps="news.important" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div>
+            <div class="anc-pill-row" style="margin-bottom:4px">
+              <span class="anc-pill anc-pill--live">盘后</span>
+            </div>
+            <strong style="font-size:15px">Snowflake 盘后暴涨 30%：与 AWS 签署 $60 亿合作协议</strong>
+            <p style="margin:4px 0 0;color:var(--ink-60);font-size:14px">五年期战略合作协议，将深度集成 AWS 基础设施。分析师认为这是 Snowflake 向云原生数据平台转型的关键里程碑。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Movers -->
+    <div data-anc="news.important.movers" data-handles="refine,expand" data-deps="news.important" style="margin-top:16px">
+      <h3 style="margin:0 0 8px;font-size:16px">其他异动</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead>
+          <tr style="border-bottom:1px solid var(--ink-10)">
+            <th style="text-align:left;padding:6px 8px;color:var(--ink-60);font-weight:500">标的</th>
+            <th style="text-align:right;padding:6px 8px;color:var(--ink-60);font-weight:500">涨跌幅</th>
+            <th style="text-align:left;padding:6px 8px;color:var(--ink-60);font-weight:500">原因</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--ink-06)">
+            <td style="padding:8px"><strong>Zscaler (ZS)</strong></td>
+            <td style="padding:8px;text-align:right;color:var(--accent-pink)">-31.5%</td>
+            <td style="padding:8px;color:var(--ink-60)">Q4 营收指引不及预期</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--ink-06)">
+            <td style="padding:8px"><strong>Bath & Body Works (BBWI)</strong></td>
+            <td style="padding:8px;text-align:right;color:var(--accent-green)">+9.7%</td>
+            <td style="padding:8px;color:var(--ink-60)">Q1 业绩超预期</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--ink-06)">
+            <td style="padding:8px"><strong>Micron (MU)</strong></td>
+            <td style="padding:8px;text-align:right;color:var(--accent-green)">+3.5%</td>
+            <td style="padding:8px;color:var(--ink-60)">UBS 看多，市值突破 $1 万亿</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--ink-06)">
+            <td style="padding:8px"><strong>GlobalFoundries (GFS)</strong></td>
+            <td style="padding:8px;text-align:right;color:var(--accent-pink)">-9.8%</td>
+            <td style="padding:8px;color:var(--ink-60)">大股东 Mubadala 拟售 $19.1 亿股份</td>
+          </tr>
+          <tr>
+            <td style="padding:8px"><strong>Dick's Sporting (DKS)</strong></td>
+            <td style="padding:8px;text-align:right;color:var(--accent-pink)">-6.0%</td>
+            <td style="padding:8px;color:var(--ink-60)">下调全年业绩指引</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- News 5 -->
+  <div class="anc-section anc-section--gc anc-section--arctic" data-anc="news.important.micron" data-handles="refine,expand" data-deps="news.important" style="padding:16px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div>
+        <div class="anc-pill-row" style="margin-bottom:4px">
+          <span class="anc-pill anc-pill--active">半导体</span>
+          <span class="anc-pill anc-pill--live">市值里程碑</span>
+        </div>
+        <strong style="font-size:15px">Micron 市值突破 $1 万亿：UBS 称股价可能再翻倍</strong>
+        <p style="margin:4px 0 0;color:var(--ink-60);font-size:14px">在前一日暴涨 19% 后继续上涨 3.5%，市值突破万亿美元。UBS 认为 AI 驱动的长期供应协议将推动 Micron 股价在当前基础上再翻一倍以上。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Section 4: 板块轮动 ===== -->
+  <section class="anc-section anc-section--gc" data-anc="sector.rotation" data-handles="refine,expand,shorten" data-deps="market.overview">
+    <h2 style="display:flex;align-items:center;gap:8px;margin:0 0 16px">
+      <i class="ph-bold ph-swap" style="font-size:22px;color:var(--accent-iris)"></i>
+      板块轮动
+    </h2>
+    <p style="margin:0 0 12px;color:var(--ink-60);font-size:14px">5 月市场呈现明显分歧，两条主线并存：<strong>防御性轮动</strong>（医疗/必选消费/公用事业）vs <strong>AI 增长</strong>（半导体/科技硬件）</p>
+    <div class="anc-kpi-grid" style="--grid-min:180px">
+      <div class="anc-kpi anc-kpi--aurora" data-anc="sector.rotation.tech" data-handles="refine" data-deps="sector.rotation">
+        <div class="kpi-top">
+          <div class="kpi-label-top">信息技术</div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value" style="color:var(--accent-green)">+19%</div>
+          <div class="kpi-unit">YTD 涨幅 · 近一月 +31%<br>AI 算力需求驱动</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--flame" data-anc="sector.rotation.energy" data-handles="refine" data-deps="sector.rotation">
+        <div class="kpi-top">
+          <div class="kpi-label-top">能源</div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value" style="color:var(--accent-pink)">-9%</div>
+          <div class="kpi-unit">Q2 回调 · 伊朗谈判<br>YTD 仍 +24%</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--cool" data-anc="sector.rotation.healthcare" data-handles="refine" data-deps="sector.rotation">
+        <div class="kpi-top">
+          <div class="kpi-label-top">医疗</div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value" style="color:var(--accent-green)">+3.2%</div>
+          <div class="kpi-unit">防御轮动受益者<br>UNH +1.9%</div>
+        </div>
+      </div>
+      <div class="anc-kpi anc-kpi--dusk" data-anc="sector.rotation.consdisc" data-handles="refine" data-deps="sector.rotation">
+        <div class="kpi-top">
+          <div class="kpi-label-top">可选消费</div>
+        </div>
+        <div class="kpi-bottom">
+          <div class="kpi-value" style="color:var(--accent-green)">+1.9%</div>
+          <div class="kpi-unit">昨日最强板块<br>消费韧性超预期</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;background:var(--ink-04);border-radius:12px;padding:12px 16px">
+      <p style="margin:0;font-size:13px;color:var(--ink-60);line-height:1.6">
+        <strong>机构仓位信号</strong>：多家机构正在削减科技超配头寸以增加防御配置。但 Q1 标普 500 盈利增速达 27.1%（疫情复苏以来最佳），84% 公司超预期。增长和防御的拉锯仍是 5-6 月主旋律。
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== Section 5: 风险日历 ===== -->
+  <section class="anc-section anc-section--gc" data-anc="risk.calendar" data-handles="refine,expand,shorten" data-deps="market.overview">
+    <h2 style="display:flex;align-items:center;gap:8px;margin:0 0 16px">
+      <i class="ph-bold ph-calendar-blank" style="font-size:22px;color:var(--accent-iris)"></i>
+      风险日历
+    </h2>
+
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      <thead>
+        <tr style="border-bottom:2px solid var(--ink-10)">
+          <th style="text-align:left;padding:8px;color:var(--ink-60);font-weight:500">时间</th>
+          <th style="text-align:left;padding:8px;color:var(--ink-60);font-weight:500">数据/事件</th>
+          <th style="text-align:center;padding:8px;color:var(--ink-60);font-weight:500">预期</th>
+          <th style="text-align:center;padding:8px;color:var(--ink-60);font-weight:500">前值</th>
+          <th style="text-align:center;padding:8px;color:var(--ink-60);font-weight:500">影响</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--ink-06)">
+          <td style="padding:10px 8px;white-space:nowrap">5/28 周四</td>
+          <td style="padding:10px 8px"><strong>核心 PCE 物价指数 (4月 YoY)</strong></td>
+          <td style="padding:10px 8px;text-align:center">3.3%</td>
+          <td style="padding:10px 8px;text-align:center">3.2%</td>
+          <td style="padding:10px 8px;text-align:center"><span class="anc-pill anc-pill--warn" style="font-size:11px">高</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--ink-06)">
+          <td style="padding:10px 8px;white-space:nowrap">5/28 周四</td>
+          <td style="padding:10px 8px"><strong>Q1 GDP 修正值</strong></td>
+          <td style="padding:10px 8px;text-align:center">2.0%</td>
+          <td style="padding:10px 8px;text-align:center">0.5%</td>
+          <td style="padding:10px 8px;text-align:center"><span class="anc-pill anc-pill--warn" style="font-size:11px">高</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--ink-06)">
+          <td style="padding:10px 8px;white-space:nowrap">5/28 周四</td>
+          <td style="padding:10px 8px">首次申请失业救济金人数</td>
+          <td style="padding:10px 8px;text-align:center">20.9 万</td>
+          <td style="padding:10px 8px;text-align:center">20.9 万</td>
+          <td style="padding:10px 8px;text-align:center"><span class="anc-pill anc-pill--gen" style="font-size:11px">中</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--ink-06)">
+          <td style="padding:10px 8px;white-space:nowrap">5/28 周四</td>
+          <td style="padding:10px 8px">耐用品订单 (4月)</td>
+          <td style="padding:10px 8px;text-align:center">+4.0%</td>
+          <td style="padding:10px 8px;text-align:center">+0.8%</td>
+          <td style="padding:10px 8px;text-align:center"><span class="anc-pill anc-pill--gen" style="font-size:11px">中</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--ink-06)">
+          <td style="padding:10px 8px;white-space:nowrap">5/28 周四</td>
+          <td style="padding:10px 8px">新屋销售 (4月)</td>
+          <td style="padding:10px 8px;text-align:center">66.1 万</td>
+          <td style="padding:10px 8px;text-align:center">68.2 万</td>
+          <td style="padding:10px 8px;text-align:center"><span class="anc-pill anc-pill--gen" style="font-size:11px">低</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--ink-06)">
+          <td style="padding:10px 8px;white-space:nowrap">5/28 周四</td>
+          <td style="padding:10px 8px">美联储官员讲话 (Williams/Barkin/Jefferson/Goolsbee)</td>
+          <td style="padding:10px 8px;text-align:center">—</td>
+          <td style="padding:10px 8px;text-align:center">—</td>
+          <td style="padding:10px 8px;text-align:center"><span class="anc-pill anc-pill--warn" style="font-size:11px">高</span></td>
+        </tr>
+        <tr>
+          <td style="padding:10px 8px;white-space:nowrap">5/29 周五</td>
+          <td style="padding:10px 8px">芝加哥 PMI (5月)</td>
+          <td style="padding:10px 8px;text-align:center">—</td>
+          <td style="padding:10px 8px;text-align:center">—</td>
+          <td style="padding:10px 8px;text-align:center"><span class="anc-pill anc-pill--gen" style="font-size:11px">中</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div data-anc="risk.calendar.analysis" data-handles="refine" data-deps="risk.calendar" style="margin-top:12px;background:var(--accent-iris-08);border-radius:12px;padding:12px 16px">
+      <p style="margin:0;font-size:13px;color:var(--ink-60);line-height:1.6">
+        <i class="ph-bold ph-warning-circle" style="color:var(--accent-amber)"></i>
+        <strong>关键节点</strong>：周四 8:30 AM ET 五项数据同时发布（GDP + PCE + 初请 + 耐用品 + 贸易），是本月最重要的宏观数据日。若核心 PCE 高于预期（3.3%+），7 月加息概率将进一步上升，可能触发股债双杀。
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== Section 6: 可追踪标的 ===== -->
+  <section class="anc-section anc-section--gc" data-anc="targets.trackable" data-handles="refine,expand,shorten" data-deps="market.overview">
+    <h2 style="display:flex;align-items:center;gap:8px;margin:0 0 16px">
+      <i class="ph-bold ph-crosshair" style="font-size:22px;color:var(--accent-iris)"></i>
+      可追踪标的
+    </h2>
+
+    <div class="anc-kpi-grid" style="--grid-min:240px">
+      <!-- NVDA -->
+      <div class="anc-section anc-section--gc anc-section--aurora" data-anc="targets.trackable.nvda" data-handles="refine,branch,annotate" data-deps="targets.trackable" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div>
+            <strong style="font-size:18px">NVDA</strong>
+            <span class="anc-pill anc-pill--gen" style="font-size:10px;margin-left:6px">AI 核心</span>
+          </div>
+          <span style="color:var(--accent-pink);font-weight:600">-1.0%</span>
+        </div>
+        <p style="margin:0;font-size:13px;color:var(--ink-60);line-height:1.5">
+          芯片股获利回吐，但 AI 基础设施 Capex 持续增长。Hyperscaler RPO 合计达 $2 万亿。关注 GTC 后续需求和 Blackwell 出货进度。
+        </p>
+        <div class="anc-pill-row" style="margin-top:8px">
+          <span class="anc-pill anc-pill--lock">催化剂：财报 8月</span>
+          <span class="anc-pill anc-pill--draft">关键位：$880</span>
+        </div>
+      </div>
+
+      <!-- MU -->
+      <div class="anc-section anc-section--gc anc-section--flame" data-anc="targets.trackable.mu" data-handles="refine,branch,annotate" data-deps="targets.trackable" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div>
+            <strong style="font-size:18px">MU</strong>
+            <span class="anc-pill anc-pill--live" style="font-size:10px;margin-left:6px">动量</span>
+          </div>
+          <span style="color:var(--accent-green);font-weight:600">+3.5%</span>
+        </div>
+        <p style="margin:0;font-size:13px;color:var(--ink-60);line-height:1.5">
+          市值突破 $1 万亿，UBS 极度看多。HBM 高带宽内存是 AI 训练关键瓶颈，供应协议可能带来长期收入能见度。
+        </p>
+        <div class="anc-pill-row" style="margin-top:8px">
+          <span class="anc-pill anc-pill--lock">催化剂：UBS 目标价翻倍</span>
+          <span class="anc-pill anc-pill--draft">风险：半导体周期</span>
+        </div>
+      </div>
+
+      <!-- SNOW -->
+      <div class="anc-section anc-section--gc anc-section--berry" data-anc="targets.trackable.snow" data-handles="refine,branch,annotate" data-deps="targets.trackable" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div>
+            <strong style="font-size:18px">SNOW</strong>
+            <span class="anc-pill anc-pill--live" style="font-size:10px;margin-left:6px">盘后 +30%</span>
+          </div>
+          <span style="color:var(--accent-green);font-weight:600">+30% AH</span>
+        </div>
+        <p style="margin:0;font-size:13px;color:var(--ink-60);line-height:1.5">
+          AWS $60 亿五年合作协议。标志性事件 — 证明 Snowflake 在 AI 时代的云数据平台价值。关注次日正式开盘走势。
+        </p>
+        <div class="anc-pill-row" style="margin-top:8px">
+          <span class="anc-pill anc-pill--lock">催化剂：AWS 合作落地</span>
+          <span class="anc-pill anc-pill--draft">关注：开盘承接力</span>
+        </div>
+      </div>
+
+      <!-- XOM -->
+      <div class="anc-section anc-section--gc anc-section--ocean" data-anc="targets.trackable.xom" data-handles="refine,branch,annotate" data-deps="targets.trackable" style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div>
+            <strong style="font-size:18px">XOM</strong>
+            <span class="anc-pill anc-pill--warn" style="font-size:10px;margin-left:6px">油价敏感</span>
+          </div>
+          <span style="color:var(--accent-pink);font-weight:600">-2.8%</span>
+        </div>
+        <p style="margin:0;font-size:13px;color:var(--ink-60);line-height:1.5">
+          伊朗谈判推动油价暴跌，能源板块承压。YTD 仍维持强劲涨幅。若美伊协议落地，油价可能继续回落，但中长期能源结构投资价值仍在。
+        </p>
+        <div class="anc-pill-row" style="margin-top:8px">
+          <span class="anc-pill anc-pill--lock">催化剂：伊朗谈判进展</span>
+          <span class="anc-pill anc-pill--draft">关键位：WTI $85</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin:12px 0 0;color:var(--ink-50);font-size:12px;text-align:center">
+      可对每个标的点击 refine 深入分析，或添加新标的跟踪
+    </p>
+  </section>
+
+</main>
+
+</body>
+</html>

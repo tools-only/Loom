@@ -43,14 +43,22 @@ const express = require(path.join(BRIDGE_NM, 'express'));
 const wsLib   = require(path.join(BRIDGE_NM, 'ws'));
 const { WebSocketServer } = wsLib;
 
-// Trading domain extension (lazy init — see bootstrap below)
-const tradingEvents = require('../trading/trading-events.cjs');
-const tradingRoutes = require('../trading/trading-routes.cjs');
-const tradingPolicyGate = require('../trading/policy-gate.cjs');
-const tradingCanvasRenderer = require('../trading/trading-canvas-renderer.cjs');
+// Trading domain extension — lazy init, gated behind file existence.
+// Finance logic is being migrated to the Python Core daemon (port 3001).
+// These imports will be removed once the migration is complete.
+let tradingEvents = null, tradingRoutes = null, tradingPolicyGate = null, tradingCanvasRenderer = null;
+try {
+  tradingEvents = require('../trading/trading-events.cjs');
+  tradingRoutes = require('../trading/trading-routes.cjs');
+  tradingPolicyGate = require('../trading/policy-gate.cjs');
+  tradingCanvasRenderer = require('../trading/trading-canvas-renderer.cjs');
+} catch (e) {
+  log('trading domain modules not available (migration to Python Core in progress): ' + e.message);
+}
 
 const inbox              = require('./inbox.cjs');
 const { PushBroker }     = require('./push-broker.cjs');
+const { buildAgentTimingPayload } = require('./lib/agent-timing.cjs');
 
 const ANTHROPIC_SDK_PATH = path.join(BRIDGE_NM, '..', 'node_modules', '@anthropic-ai', 'sdk');
 let inprocAgent = null;
@@ -425,6 +433,35 @@ function timelineMark(event) {
   try { fs.appendFileSync(TIMELINE_LOG, line, 'utf8'); } catch {}
 }
 
+function startInteractionTimeline() {
+  _tl = null;
+  _curTiming = { haStart: 0, haEnd: 0, haMs: null, renderTime: 0, loomMs: null, context: null, _emitted: false };
+  timelineMark('user_click_received');
+}
+
+let _curTiming = { haStart: 0, haEnd: 0, haMs: null, renderTime: 0, loomMs: null, context: null, _emitted: false };
+
+function _tryEmitTiming() {
+  if (_curTiming._emitted) return;
+  // Always show split timing: if no hand agent was invoked, set haMs = 0
+  if (_curTiming.haMs == null) _curTiming.haMs = 0;
+  // Calculate loomMs if render completed
+  if (_curTiming.loomMs == null && _curTiming.renderTime > 0) {
+    const base = _curTiming.haEnd > 0 ? _curTiming.haEnd : _curTiming.haStart;
+    _curTiming.loomMs = base > 0 ? _curTiming.renderTime - base : _curTiming.renderTime - _curTiming.haStart;
+  }
+  if (_curTiming.loomMs == null) return;
+  const payload = {
+    ms_hand_agent: _curTiming.haMs,
+    ms_loom_agent: _curTiming.loomMs,
+    agent_context: _curTiming.context,
+    timing_source: 'render',
+  };
+  broadcastAgentEvent({ type: 'timing', ...payload });
+  _curTiming._emitted = true;
+  log(`[timing] hand_agent=${_curTiming.haMs ?? '-'}ms · loom_agent=${_curTiming.loomMs ?? '-'}ms`);
+}
+
 // ── HTTP + WebSocket setup ────────────────────────────────────────────
 //
 // Two separate WS servers routed by path:
@@ -497,6 +534,114 @@ app.post('/event', (req, res) => {
   }
   res.json({ ok: true });
 });
+
+// ── Loom proxies ──────────────────────────────────────────────────────
+// CORE_PORT: Loom Core HTTP daemon (loom_core/__main__.py) — adapter registry, domains
+// BRAIN_PORT: Loom Brain FastAPI (loom/main.py) — /config, /run, /hand/*, /feedback
+const CORE_PORT  = parseInt(process.env.LOOM_CORE_PORT  || '3001');
+const BRAIN_PORT = parseInt(process.env.LOOM_BRAIN_PORT || '3002');
+
+function _makeProxy(port) {
+  return async function _proxy(req, res, targetPath) {
+    const method = req.method;
+    const rawBody = ['GET', 'HEAD', 'DELETE'].includes(method) ? null : JSON.stringify(req.body || {});
+    const opts = {
+      hostname: '127.0.0.1', port,
+      path: targetPath + (Object.keys(req.query || {}).length ? '?' + new URLSearchParams(req.query).toString() : ''),
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 30000,
+    };
+    if (rawBody) opts.headers['Content-Length'] = Buffer.byteLength(rawBody);
+    try {
+      const upstream = await new Promise((resolve, reject) => {
+        const r = http.request(opts, resolve);
+        r.on('error', reject);
+        r.on('timeout', () => { r.destroy(); reject(new Error('timeout')); });
+        if (rawBody) r.write(rawBody);
+        r.end();
+      });
+      let data = '';
+      upstream.on('data', c => data += c);
+      upstream.on('end', () => {
+        try { res.status(upstream.statusCode).json(JSON.parse(data)); }
+        catch { res.status(upstream.statusCode).send(data); }
+      });
+    } catch (e) {
+      res.status(502).json({ error: `Proxy :${port} unreachable: ${e.message}` });
+    }
+  };
+}
+
+const _proxyToBrain = _makeProxy(BRAIN_PORT);
+const _proxyToCore  = _makeProxy(CORE_PORT);
+
+// /loom/* → Brain FastAPI at port 3002 (strips /loom prefix)
+app.all(/^\/loom(\/.*)?$/, (req, res) => {
+  const brainPath = (req.params[0] || '/') || '/';
+  return _proxyToBrain(req, res, brainPath);
+});
+
+// /core/* → Loom Core HTTP daemon at port 3001
+app.all(/^\/core(?:\/(.*))?$/, async (req, res) => {
+  const corePath = req.params[0] ? '/' + req.params[0] : '/';
+  return _proxyToCore(req, res, corePath);
+});
+
+// ── Loom hand-agent invocation (generic, adapter-agnostic) ────────────
+// Calls Brain /run before delivering op to CC so CC gets pre-fetched artifact.
+function _callBrainRun(handId, task, context) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({ hand_id: handId, task: task || '', context: context || {} });
+    const opts = {
+      hostname: '127.0.0.1', port: BRAIN_PORT,
+      path: '/run', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+      timeout: 90000,
+    };
+    const req = http.request(opts, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch { reject(new Error('Brain /run: invalid JSON')); } });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Brain /run: timeout')); });
+    req.write(body);
+    req.end();
+  });
+}
+
+async function _enrichAndDeliverEnvelope(envelope) {
+  const handId = envelope.context_bundle?.loom_hand;
+  if (handId) {
+    const task = envelope.intent?.instruction || '';
+    _curTiming.haStart = Date.now();
+    log(`[loom] invoking hand=${handId} task=${JSON.stringify(task.slice(0, 60))}`);
+    broadcastAgentEvent({ type: 'thinking', summary: `Running hand agent: ${handId}...` });
+    try {
+      const result = await _callBrainRun(handId, task);
+      if (result.ok && result.artifact) {
+        envelope.context_bundle.loom_artifact = result.artifact;
+        _curTiming.haEnd = Date.now();
+        _curTiming.haMs = _curTiming.haEnd - _curTiming.haStart;
+        _tryEmitTiming();
+      } else if (!result.ok) {
+        log(`[loom] Brain /run error for ${handId}: ${result.error}`);
+      }
+    } catch (e) {
+      log(`[loom] hand invoke failed (${handId}): ${e.message} — proceeding without artifact`);
+    }
+  }
+  try {
+    if (!fs.existsSync(PENDING_PROMPT)) {
+      fs.writeFileSync(PENDING_PROMPT, formatEnvelopeAsPrompt(envelope), 'utf8');
+      fs.writeFileSync(PENDING_OP_JSON, JSON.stringify(envelope), 'utf8');
+    }
+  } catch {}
+  const delivered = deliverOp(envelope);
+  if (!delivered) pendingOps.push(envelope);
+  notifyPendingChanged();
+}
 
 // Patch broadcast (kept for external tooling)
 app.post('/patch', (req, res) => {
@@ -938,10 +1083,10 @@ app.post('/workspace/file', (req, res) => {
   var context = req.body?.context || { memory_ids: [], skill_ids: [], subagent_ids: [], resource_ids: [], subagent_id: null, context_mode: null };
   var isTrading = req.body?.domain === 'trading.private';
   var effectiveHtml = html;
-  if (isTrading) {
+  if (isTrading && tradingEvents) {
     context.domain = 'trading.private';
     context.trading_session_id = tradingEvents.initTradingSession(id, currentSession?.id);
-    if (!effectiveHtml) {
+    if (!effectiveHtml && tradingCanvasRenderer) {
       effectiveHtml = tradingCanvasRenderer.generateTradingCanvasHTML({
         trading_session_id: context.trading_session_id,
         title: title
@@ -1249,7 +1394,7 @@ wssBrowser.on('connection', (ws) => {
         ws.send(JSON.stringify({ type: 'ack', message: 'Op received', queue_length: pendingOps.length }));
 
       } else if (msg.type === 'envelope') {
-        timelineMark('user_click_received');
+        startInteractionTimeline();
         const result = validateEnvelope(msg.envelope);
         if (!result.ok) {
           ws.send(JSON.stringify({ type: 'error', code: result.code, message: result.message }));
@@ -1259,7 +1404,7 @@ wssBrowser.on('connection', (ws) => {
         lastUserIntentId = eid;
 
         // Trading domain extension — record trading-specific events
-        if (msg.envelope.domain && msg.envelope.domain.namespace === 'trading.private') {
+        if (msg.envelope.domain && msg.envelope.domain.namespace === 'trading.private' && tradingEvents) {
           try {
             const tKind = 'trading.' + String(msg.envelope.domain.action || 'unknown').toLowerCase();
             tradingEvents.recordTradingEvent(tKind, {
@@ -1281,37 +1426,51 @@ wssBrowser.on('connection', (ws) => {
           target: msg.envelope?.intent?.target_ref,
           subagent: msg.envelope?.context_bundle?.subagent_id
         });
-        // Persist fallback before delivery so Stop-hook recovery works if connection drops
-        try {
-          if (!fs.existsSync(PENDING_PROMPT)) {
-            fs.writeFileSync(PENDING_PROMPT, formatEnvelopeAsPrompt(msg.envelope), 'utf8');
-            fs.writeFileSync(PENDING_OP_JSON, JSON.stringify(msg.envelope), 'utf8');
-          }
-        } catch {}
-        const delivered = deliverOp(msg.envelope);
-        if (!delivered) pendingOps.push(msg.envelope);
-        notifyPendingChanged();
+        // Ack immediately; enrichment (optional Brain /run) and delivery happen async.
         ws.send(JSON.stringify({ type: 'ack', message: 'Envelope received', queue_length: pendingOps.length }));
+        _enrichAndDeliverEnvelope(msg.envelope).catch(e =>
+          log('[loom] envelope enrichment error: ' + e.message)
+        );
 
       } else if (msg.type === 'prompt') {
+        startInteractionTimeline();
         const text = (msg.text || '').trim();
         if (!text) { ws.send(JSON.stringify({ type: 'error', message: 'prompt text required' })); return; }
-        const op = {
-          intent: { op: 'initial_render', target_kind: 'anchor', target_ref: '__root__', instruction: text },
-          render_state: { anchor_tree: [], anchor_index: {} },
-          context_bundle: { memory_ids: [], skill_ids: [], subagent_ids: [], resource_ids: [] },
-          provenance: { session_id: null, event_id: 'prompt-' + Date.now(), parent_event_id: null,
-                        timestamp: new Date().toISOString(), client_version: '0.1.0' }
-        };
-        try {
-          if (!fs.existsSync(PENDING_PROMPT)) {
-            fs.writeFileSync(PENDING_PROMPT, `Generate an Anchor HTML page for:\n${text}\n\n${anchorLayoutContract()}\n\nWhen done, call anchor_render(html) with the complete document.\n`, 'utf8');
-          }
-        } catch {}
-        const delivered = deliverOp(op);
-        if (!delivered) pendingOps.push(op);
-        notifyPendingChanged();
-        ws.send(JSON.stringify({ type: 'ack', message: 'Prompt received' }));
+
+        // Parse \hand prefix — if present, route through Brain enrichment
+        const handMatch = text.match(/^\\(market|position|target|sentiment)\s+(.*)/s);
+        if (handMatch) {
+          const hand = handMatch[1];
+          const cleanPrompt = handMatch[2];
+          const envelope = {
+            schema_version: '1.0',
+            intent: { op: 'initial_render', target_kind: 'global', target_ref: null, instruction: cleanPrompt },
+            context_bundle: { memory_ids: [], skill_ids: [], subagent_ids: [], resource_ids: [],
+                             loom_hand: hand, file_id: msg.route || null },
+            render_state: { anchor_tree: [], anchor_index: {} },
+            provenance: { session_id: null, event_id: 'prompt-' + Date.now(), parent_event_id: null,
+                          timestamp: new Date().toISOString(), client_version: '0.1.0' }
+          };
+          ws.send(JSON.stringify({ type: 'ack', message: 'Prompt received with hand=' + hand }));
+          _enrichAndDeliverEnvelope(envelope).catch(e =>
+            log('[loom] envelope enrichment error: ' + e.message)
+          );
+        } else {
+          // Always use envelope path so all rendering goes through spawned processor, never mainAgentWs
+          const envelope = {
+            schema_version: '1.0',
+            intent: { op: 'initial_render', target_kind: 'global', target_ref: null, instruction: text },
+            context_bundle: { memory_ids: [], skill_ids: [], subagent_ids: [], resource_ids: [],
+                             file_id: msg.route || null },
+            render_state: { anchor_tree: [], anchor_index: {} },
+            provenance: { session_id: null, event_id: 'prompt-' + Date.now(), parent_event_id: null,
+                          timestamp: new Date().toISOString(), client_version: '0.1.0' }
+          };
+          ws.send(JSON.stringify({ type: 'ack', message: 'Prompt received' }));
+          _enrichAndDeliverEnvelope(envelope).catch(e =>
+            log('[loom] envelope enrichment error: ' + e.message)
+          );
+        }
 
       } else if (msg.type === 'context_changed') {
         recordEvent('user.context_changed', msg.bundle || {});
@@ -1539,6 +1698,9 @@ function handleAgentMessage(ws, msg, agentId) {
     if (currentSession) recordEvent('agent.render', { html_size: html.length });
     log(`[${label}] render ${html.length} bytes → ${webviewClients.size} browser(s)`);
     wsTrace('send', 'browser', 'html', { html_len: html.length, clients: webviewClients.size });
+    // Track render completion for loom agent timing calculation
+    _curTiming.renderTime = Date.now();
+    _tryEmitTiming();
     ack(true);
 
   } else if (type === 'patch') {
@@ -1550,6 +1712,7 @@ function handleAgentMessage(ws, msg, agentId) {
     timelineMark('agent_content_generated');
     broadcastPatches(patches);
     timelineMark('webview_patch_broadcast');
+    broadcastAgentTiming(label);
     wsTrace('send', 'browser', 'patch', { count: patches.length, anchors: patches.map(p => p.anchor_id) });
     emitPatchCompleteEvents(patches, 'updated');
     const missed = detectMissedCascades(patches, currentHtml);
@@ -1790,7 +1953,10 @@ function initInprocAgent() {
     anchor_patch: async (input, ctx) => {
       const { patches } = input;
       if (!Array.isArray(patches) || patches.length === 0) return 'no patches';
+      timelineMark('agent_content_generated');
       broadcastPatches(patches);
+      timelineMark('webview_patch_broadcast');
+      broadcastAgentTiming('inproc');
       ctx.completed = true;
       return 'patched ' + patches.length + ' node(s)';
     },
@@ -1877,9 +2043,6 @@ const SPAWN_LOG_MAX = 50;
 function addSpawnEvent(evt) {
   spawnLog.push({ ts: new Date().toISOString(), ...evt });
   if (spawnLog.length > SPAWN_LOG_MAX) spawnLog.shift();
-  // Also push to the webview timeline so the UI shows processor activity
-  broadcastAgentEvent({ type: evt.status === 'error' ? 'error' : evt.status === 'done' ? 'complete' : 'thinking',
-    summary: evt.msg, target_anchor: '__proc__' });
 }
 
 function buildProcessorPrompt(ops) {
@@ -1906,7 +2069,7 @@ function buildProcessorPrompt(ops) {
     '4. For op with subagent_id set in context_bundle: call Agent(subagent_type="<subagent_id>", prompt=...) to generate the patch, then call anchor_patch({patches:[...]}).',
     '5. For regular op: generate the modified outerHTML, then call anchor_patch({patches:[...]}).',
     '6. If context_bundle.skill_ids contains pending custom skills or context_bundle.resource_ids contains URLs, inspect those resources as task context before editing.',
-    '7. Repeat anchor_get_pending_op() until {pending:false}, then exit.',
+    '7. For initial_render: after the first anchor_render(), call anchor_get_html() to inspect the rendered page, then use anchor_patch() for a UI refinement pass — fix card grid distribution, spacing, alignment, and visual hierarchy.',
     '',
     'Never call anchor_await_op from this spawned processor.',
     'Preserve data-anc, data-handles, data-deps, and existing CSS classes in patched fragments.',
@@ -1920,7 +2083,32 @@ function buildProcessorPrompt(ops) {
     resourceSummary.length ? `Selected resources: ${Array.from(new Set(resourceSummary)).join(', ')}` : '',
     '',
     'Ops expected in this batch:',
-    summary || '(none)'
+    summary || '(none)',
+    '',
+    ...ops.flatMap(op => {
+      const artifact = op.context_bundle?.loom_artifact;
+      const handId   = op.context_bundle?.loom_hand;
+      if (!artifact) return [];
+      const claims = artifact.metadata?.key_claims || [];
+      return [
+        `--- HAND AGENT ANALYSIS (hand=${handId}) ---`,
+        ...claims.map((c, i) => `${i + 1}. ${c}`),
+        'Based on the above findings, render an Anchor HTML page with gradient KPI cards for key metrics and detailed analysis sections beneath.',
+        '---',
+      ];
+    }),
+    '',
+    '--- UI REFINEMENT PASS ---',
+    'After the initial render, do a second pass to polish the UI:',
+    '1. Call anchor_get_html() to fetch the rendered page.',
+    '2. Use anchor_patch() to fix layout issues:',
+    '   - KPI grid: ensure cards are evenly distributed (3 per row for 6 cards, NOT 4+2).',
+    '   - Text alignment: headings, values, and supporting text should be consistently aligned within each card.',
+    '   - Spacing: adequate gap between cards (use CSS gap or margin, not fixed widths).',
+    '   - Visual hierarchy: section titles should clearly separate topic areas; use anc-section--gc with appropriate color themes.',
+    '   - Responsive: cards should reflow naturally. Do NOT set inline widths or fixed column counts.',
+    '3. Call anchor_patch() with the refined fragments. Only patch what needs changing.',
+    '---',
   ].join('\n');
   return processorPrompt;
 }
@@ -1954,6 +2142,11 @@ function spawnCCProcessor() {
   // Count idle pool entries
   const idleCount = Array.from(processorPool.values()).filter(e => e.ws && e.ws.readyState === 1).length;
 
+  // Remove these ops from pendingOps so they aren't picked up again on respawn
+  const opSet = new Set(allOps);
+  const remaining = pendingOps.filter(o => !opSet.has(o));
+  pendingOps.splice(0, pendingOps.length, ...remaining);
+
   // Build partition list: one entry per subagent_id + one for all regular ops
   const partitions = [];
 
@@ -1984,11 +2177,14 @@ function spawnProcessorPartition(partitionId, ops, onDone) {
   const op = ops[0];
   const kind   = op.intent?.op || '?';
   const target = op.intent?.target_ref || '?';
+  const hasHandAgent = op.context_bundle?.loom_hand || op.context_bundle?.loom_artifact;
   processorSeq++;
   const procId = '__proc__' + processorSeq;  // unique agentId for this spawned processor
 
-  const msg = `spawning CC partition=${partitionId} op=${kind} target=${target} (${ops.length} op(s))`;
-  log('[spawn] ' + msg);
+  const msg = hasHandAgent
+    ? `Loom agent rendering hand agent data`
+    : `Generating page (${kind})`;
+  log(`[spawn] ${msg} partition=${partitionId} (${ops.length} op(s))`);
   addSpawnEvent({ status: 'start', msg, op_count: ops.length, partition: partitionId });
 
   const prompt = buildProcessorPrompt(ops);
@@ -2028,7 +2224,7 @@ function spawnProcessorPartition(partitionId, ops, onDone) {
     command: `${spawnBin} ${spawnArgs.join(' ')}`,
     metadata: { partition: partitionId, op: kind, target }
   }, child);
-  addSpawnEvent({ status: 'running', msg: `pid=${pid} partition=${partitionId} op=${kind}`, pid });
+  addSpawnEvent({ status: 'running', msg: hasHandAgent ? 'Loom agent processing' : 'Generating content', pid });
 
   let stdoutBuf = '';
   let stderrBuf = '';
@@ -2050,7 +2246,7 @@ function spawnProcessorPartition(partitionId, ops, onDone) {
     processorPool.delete(procId);
 
     if (code === 0 && hadPoolEntry) {
-      addSpawnEvent({ status: 'done', msg: `pid=${pid} partition=${partitionId} done; remaining_ops=${remainingAll.length}`, pid });
+      addSpawnEvent({ status: 'done', msg: hasHandAgent ? 'Loom agent complete' : 'Generation complete', pid });
     } else if (code === 0) {
       addSpawnEvent({ status: 'error', msg: `pid=${pid} exited without WS connection (${output.slice(0, 120)})`, pid });
     } else {
@@ -2676,20 +2872,28 @@ httpServer.listen(PORT, () => {
   initSession();
   loadEnvelopeSchema();
 
-  // Trading domain extension — initialize with DI
-  tradingEvents.initialize({
-    recordEvent: recordEvent,
-    generateEventId: generateEventId,
-    createId: createId,
-    nowIso: nowIso,
-    get currentSession() { return currentSession; }
-  });
-  tradingRoutes.mountTradingRoutes(app, {
-    tradingEvents: tradingEvents,
-    policyGate: tradingPolicyGate,
-    recordEvent: recordEvent,
-    get currentSession() { return currentSession; }
-  });
+  // Trading domain extension — initialize if available (migration to Python Core)
+  if (tradingEvents) {
+    try {
+      tradingEvents.initialize({
+        recordEvent: recordEvent,
+        generateEventId: generateEventId,
+        createId: createId,
+        nowIso: nowIso,
+        get currentSession() { return currentSession; }
+      });
+    } catch (e) { log('tradingEvents init failed: ' + e.message); }
+  }
+  if (tradingRoutes) {
+    try {
+      tradingRoutes.mountTradingRoutes(app, {
+        tradingEvents: tradingEvents,
+        policyGate: tradingPolicyGate,
+        recordEvent: recordEvent,
+        get currentSession() { return currentSession; }
+      });
+    } catch (e) { log('tradingRoutes mount failed: ' + e.message); }
+  }
 
   recoverPendingFallback();
   maybeAutoOpenBrowser();

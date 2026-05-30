@@ -29,6 +29,16 @@ class AgentAdapterRegistry:
                 return adapter
         return None
 
+    def upsert(self, adapter: AgentAdapter) -> None:
+        """Register or replace an adapter with the same id."""
+        self._adapters = [a for a in self._adapters if a.id != adapter.id]
+        self._adapters.append(adapter)
+
+    def unregister(self, adapter_id: str) -> bool:
+        before = len(self._adapters)
+        self._adapters = [a for a in self._adapters if a.id != adapter_id]
+        return len(self._adapters) < before
+
 
 def create_adapter_registry() -> AgentAdapterRegistry:
     return AgentAdapterRegistry()

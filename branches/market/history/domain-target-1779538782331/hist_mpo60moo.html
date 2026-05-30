@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>美股 CPO（共封装光学）产业链全景分析 — 2026年5月</title>
+<style>
+  body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--paper, #f5f5f7); color: var(--ink, #1a1a2e); margin: 0; padding: 24px; }
+  .anc-section { background: var(--paper, #fff); border-radius: 20px; padding: 24px 28px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .anc-section--gc { background: #fff; border-radius: 20px; padding: 24px 28px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+  .anc-section--gc.anc-section--arctic { background: linear-gradient(135deg, #f0f9ff 0%, #f5fdf7 100%); }
+  .anc-section--gc.anc-section--warm { background: linear-gradient(135deg, #fff5f5 0%, #faf5ff 100%); }
+  .anc-section--gc.anc-section--aurora { background: linear-gradient(135deg, #eef2ff 0%, #ecfdf5 100%); }
+  .anc-section--gc.anc-section--flame { background: linear-gradient(135deg, #fff7ed 0%, #fef2f2 100%); }
+  .anc-section--gc.anc-section--ocean { background: linear-gradient(135deg, #eff6ff 0%, #fef2f2 100%); }
+  .anc-section--gc.anc-section--berry { background: linear-gradient(135deg, #faf5ff 0%, #fef2f2 100%); }
+  .anc-section--gc.anc-section--cool { background: linear-gradient(135deg, #f0fdfa 0%, #f0f9ff 100%); }
+  h1, h2, h3, h4 { font-family: 'Bricolage Grotesque', system-ui, sans-serif; margin-top: 0; }
+  h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
+  h2 { font-size: 22px; font-weight: 600; margin-bottom: 16px; }
+  h3 { font-size: 17px; font-weight: 600; margin-bottom: 10px; }
+  p { line-height: 1.6; margin: 8px 0; font-size: 14px; color: #444; }
+  .anc-kpi-grid { display: flex; flex-wrap: wrap; gap: 16px; margin: 12px 0; }
+  .anc-kpi { border-radius: 16px; padding: 18px 20px; min-width: 200px; flex: 1 1 220px; position: relative; overflow: hidden; }
+  .anc-kpi--warm { background: linear-gradient(135deg, #ffe4e0 0%, #f3e8ff 100%); }
+  .anc-kpi--cool { background: linear-gradient(135deg, #ccfbf1 0%, #dbeafe 100%); }
+  .anc-kpi--aurora { background: linear-gradient(135deg, #e0e7ff 0%, #d1fae5 100%); }
+  .anc-kpi--ocean { background: linear-gradient(135deg, #bfdbfe 0%, #fce7f3 100%); }
+  .anc-kpi--berry { background: linear-gradient(135deg, #e9d5ff 0%, #fecdd3 100%); }
+  .anc-kpi--arctic { background: linear-gradient(135deg, #e0f2fe 0%, #a7f3d0 100%); }
+  .anc-kpi--flame { background: linear-gradient(135deg, #fed7aa 0%, #fecaca 100%); }
+  .anc-kpi--sunset { background: linear-gradient(135deg, #fecaca 0%, #fef08a 100%); }
+  .anc-kpi--forest { background: linear-gradient(135deg, #bbf7d0 0%, #fde68a 100%); }
+  .anc-kpi--dusk { background: linear-gradient(135deg, #e2e8f0 0%, #fce7f3 100%); }
+  .kpi-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .kpi-label-top { font-size: 14px; font-weight: 600; line-height: 1.3; }
+  .kpi-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .kpi-bottom { }
+  .kpi-value { font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-size: 36px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
+  .kpi-unit { font-size: 12px; color: #666; margin-top: 2px; }
+  .anc-pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .anc-pill { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+  .anc-pill--active { background: #dcfce7; color: #166534; }
+  .anc-pill--gen { background: #e0e7ff; color: #3730a3; }
+  .anc-pill--warn { background: #fef3c7; color: #92400e; }
+  .anc-pill--done { background: #f3e8ff; color: #6b21a8; }
+  .anc-pill--lock { background: #f1f5f9; color: #475569; }
+  .anc-pill--edit { background: #fef9c3; color: #854d0e; }
+  .anc-pill--draft { background: #fce7f3; color: #9d174d; }
+  .anc-pill--review { background: #dbeafe; color: #1e40af; }
+  .anc-divider { border: none; border-top: 1px solid #e5e7eb; margin: 20px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 12px; background: #f8fafc; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+  td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+  tr:hover td { background: #f8fafc; }
+  .ticker { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; }
+  .up { color: #16a34a; }
+  .down { color: #dc2626; }
+  .hero-sub { font-size: 15px; color: #64748b; margin-top: 4px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .tag-red { background: #fef2f2; color: #dc2626; }
+  .tag-green { background: #f0fdf4; color: #16a34a; }
+  .tag-blue { background: #eff6ff; color: #2563eb; }
+  .tag-purple { background: #faf5ff; color: #7c3aed; }
+  .tag-amber { background: #fffbeb; color: #d97706; }
+  .summary-box { background: #f8fafc; border-radius: 12px; padding: 16px 20px; margin: 12px 0; border-left: 4px solid #7c3aed; }
+  .summary-box p { margin: 4px 0; font-size: 14px; }
+  .chain-flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+  .chain-node { background: #fff; border-radius: 12px; padding: 12px 16px; text-align: center; min-width: 120px; flex: 1; box-shadow: 0 1px 4px rgba(0,0,0,0.06); font-size: 13px; font-weight: 600; }
+  .chain-arrow { font-size: 20px; color: #94a3b8; }
+  .chain-node.upstream { border-top: 3px solid #7c3aed; }
+  .chain-node.midstream { border-top: 3px solid #2563eb; }
+  .chain-node.downstream { border-top: 3px solid #16a34a; }
+  .kpi-change { font-size: 13px; font-weight: 600; }
+  .catalyst-list { list-style: none; padding: 0; }
+  .catalyst-list li { padding: 10px 0; border-bottom: 1px solid #f1f5f9; display: flex; gap: 12px; align-items: flex-start; }
+  .catalyst-list li:last-child { border-bottom: none; }
+  .catalyst-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+  .catalyst-text { font-size: 14px; line-height: 1.5; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="anc-section--gc anc-section--arctic" data-anc="hero" data-handles="refine,expand" data-deps="">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h1 style="margin-bottom:4px;">CPO 共封装光学 · 产业链全景</h1>
+      <p class="hero-sub">美股核心标的 · 2026年5月27日  |  以近一个月价格锚定</p>
+    </div>
+    <div class="anc-pill-row">
+      <span class="anc-pill anc-pill--active">AI 光互连</span>
+      <span class="anc-pill anc-pill--gen">CAGR 142%</span>
+      <span class="anc-pill anc-pill--warn">高波动</span>
+    </div>
+  </div>
+
+  <div class="summary-box">
+    <p><strong>核心观点：</strong>CPO 成为 AI 数据中心光互连主航道。英伟达、博通、Coherent 等巨头密集布局，1.6T 光模块步入爆发期。产业链上中下游均出现结构性机会，但部分标的短期涨幅巨大，需关注估值消化与产能爬坡节奏。</p>
+  </div>
+
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--aurora">
+      <div class="kpi-top">
+        <div class="kpi-label-top">CPO 市场<br>规模预测</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">142%</div>
+        <div class="kpi-unit">2026-2030 CAGR（不含ELS）</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--flame">
+      <div class="kpi-top">
+        <div class="kpi-label-top">全球光模块<br>市场规模</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$270B</div>
+        <div class="kpi-unit">2026E（同比+55-75%）</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--ocean">
+      <div class="kpi-top">
+        <div class="kpi-label-top">AI 数据中心<br>TAM</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$1.7T</div>
+        <div class="kpi-unit">美银2030E（上修前$1.4T）</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--warm">
+      <div class="kpi-top">
+        <div class="kpi-label-top">CPO 产业<br>关键转折</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">2026H2</div>
+        <div class="kpi-unit">CPO 交换机批量出货预期</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INDUSTRY CHAIN MAP -->
+<section class="anc-section--gc" data-anc="chain-map" data-handles="refine,expand" data-deps="">
+  <h2>产业链全景图</h2>
+  <div class="chain-flow">
+    <div class="chain-node upstream">光芯片·材料<br><span style="font-weight:400;font-size:12px;color:#666;">上游</span></div>
+    <span class="chain-arrow">→</span>
+    <div class="chain-node midstream">CPO模块·交换芯片<br><span style="font-weight:400;font-size:12px;color:#666;">中游</span></div>
+    <span class="chain-arrow">→</span>
+    <div class="chain-node downstream">光纤·AI基础设施<br><span style="font-weight:400;font-size:12px;color:#666;">下游</span></div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <h3 style="font-size:15px;color:#7c3aed;">⬤ 上游 — 光芯片 & 材料</h3>
+      <p style="font-size:13px;">EML激光器 · 磷化铟(InP)衬底 · CW DFB阵列 · 硅光PIC</p>
+      <p style="font-size:13px;"><strong>核心标的：</strong>LITE, COHR, SIVE, AXTI, MTSI</p>
+    </div>
+    <div>
+      <h3 style="font-size:15px;color:#2563eb;">⬤ 中游 — CPO模块 & 交换芯片</h3>
+      <p style="font-size:13px;">CPO交换机 · DSP · 硅光引擎 · 先进封装</p>
+      <p style="font-size:13px;"><strong>核心标的：</strong>AVGO, MRVL, TSEM, GFS</p>
+    </div>
+    <div>
+      <h3 style="font-size:15px;color:#16a34a;">⬤ 下游 — 光纤 & AI基础设施</h3>
+      <p style="font-size:13px;">低损耗光纤 · AI数据中心 · 云服务</p>
+      <p style="font-size:13px;"><strong>核心标的：</strong>GLW, NVDA, ANET, MSFT, AMZN</p>
+    </div>
+    <div>
+      <h3 style="font-size:15px;color:#d97706;">⬤ 弹性标的 — 高波动高 beta</h3>
+      <p style="font-size:13px;">二线光模块 · 衬底材料 · 测试设备</p>
+      <p style="font-size:13px;"><strong>核心标的：</strong>AAOI, AXTI, SIVE, TER</p>
+    </div>
+  </div>
+</section>
+
+<!-- UPSTREAM: 光芯片 & 材料 -->
+<section class="anc-section--gc anc-section--aurora" data-anc="upstream" data-handles="refine,expand,lock" data-deps="chain-map">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <h2 style="margin-bottom:0;">上游 · 光芯片 & 光学材料</h2>
+    <span class="anc-pill anc-pill--active">年度涨幅 106-179%</span>
+  </div>
+  <p>核心驱动：英伟达1.6T光模块需求爆发，EML激光器供不应求，磷化铟衬底产能紧缺</p>
+
+  <div class="anc-kpi-grid">
+    <!-- LITE -->
+    <div class="anc-kpi anc-kpi--cool" data-anc="upstream.lite" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top"><span class="ticker">LITE</span><br>Lumentum</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">~$870</div>
+        <div class="kpi-unit">当前价格（52周高 $1,086）</div>
+        <div class="kpi-change up">+179% YTD · +155% 年初至今</div>
+      </div>
+      <div class="anc-pill-row" style="margin-top:8px;">
+        <span class="anc-pill anc-pill--active">EML全球#1</span>
+        <span class="anc-pill anc-pill--gen">NVDA战略伙伴</span>
+      </div>
+      <p style="font-size:12px;margin-top:6px;">Q3营收$808M(+90% YoY)；获NVDA ~$20亿采购+投资承诺；Raymond James目标价$1,014</p>
+    </div>
+
+    <!-- COHR -->
+    <div class="anc-kpi anc-kpi--warm" data-anc="upstream.cohr" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top"><span class="ticker">COHR</span><br>Coherent</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$381</div>
+        <div class="kpi-unit">May 26收盘（52周高 $413）</div>
+        <div class="kpi-change up">+106% YTD · +19% 五月至今</div>
+      </div>
+      <div class="anc-pill-row" style="margin-top:8px;">
+        <span class="anc-pill anc-pill--active">CPO超大订单</span>
+        <span class="anc-pill anc-pill--gen">InP量产突破</span>
+      </div>
+      <p style="font-size:12px;margin-top:6px;">订单出货比>4x；6英寸磷化铟晶圆量产突破；能见度延伸至2027年；CEO随川普访华</p>
+    </div>
+
+    <!-- SIVE -->
+    <div class="anc-kpi anc-kpi--flame" data-anc="upstream.sive" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top"><span class="ticker">SIVE</span><br>Sivers Semi</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">54 SEK</div>
+        <div class="kpi-unit">52周范围 2.85-59.85 SEK</div>
+        <div class="kpi-change up">+1,240% 年度涨幅</div>
+      </div>
+      <div class="anc-pill-row" style="margin-top:8px;">
+        <span class="anc-pill anc-pill--warn">超高波动</span>
+        <span class="anc-pill anc-pill--gen">CW DFB激光器</span>
+      </div>
+      <p style="font-size:12px;margin-top:6px;">CPO高端CW DFB阵列激光器专业供应商；Serenity持续喊单；市值仅~$2.3B</p>
+    </div>
+
+    <!-- AXTI -->
+    <div class="anc-kpi anc-kpi--berry" data-anc="upstream.axti" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top"><span class="ticker">AXTI</span><br>AXT Inc</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">~$105-141</div>
+        <div class="kpi-unit">五月波动剧烈（52周低 $1.32）</div>
+        <div class="kpi-change up">+711% YTD</div>
+      </div>
+      <div class="anc-pill-row" style="margin-top:8px;">
+        <span class="anc-pill anc-pill--warn">极度高估</span>
+        <span class="anc-pill anc-pill--edit">6.3亿融资</span>
+      </div>
+      <p style="font-size:12px;margin-top:6px;">磷化铟/砷化镓衬底；完成$6.3亿融资扩产；GF估值仅$2.60；分析师目标$87.75</p>
+    </div>
+  </div>
+</section>
+
+<!-- MIDSTREAM: CPO模块 & 交换芯片 -->
+<section class="anc-section--gc anc-section--ocean" data-anc="midstream" data-handles="refine,expand,lock" data-deps="chain-map">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <h2 style="margin-bottom:0;">中游 · CPO模块 & 交换芯片</h2>
+    <span class="anc-pill anc-pill--active">AI 算力核心</span>
+  </div>
+  <p>核心驱动：博通Tomahawk CPO交换机出货、Marvell DSP+定制ASIC双轮驱动、1.6T时代DSP需求翻倍</p>
+
+  <div class="anc-kpi-grid">
+    <!-- AVGO -->
+    <div class="anc-kpi anc-kpi--aurora" data-anc="midstream.avgo" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top"><span class="ticker">AVGO</span><br>Broadcom</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$435</div>
+        <div class="kpi-unit">May 26收盘（52周高 $442）</div>
+        <div class="kpi-change up">+5.05%（当日）</div>
+      </div>
+      <div class="anc-pill-row" style="margin-top:8px;">
+        <span class="anc-pill anc-pill--active">市值$1.06T</span>
+        <span class="anc-pill anc-pill--gen">AI ASIC $12B</span>
+      </div>
+      <p style="font-size:12px;margin-top:6px;">硅光PIC市占>40%；已出货CPO交换机；Q1 AI营收$8.4B(+106% YoY)；TD Cowen目标$500</p>
+    </div>
+
+    <!-- MRVL -->
+    <div class="anc-kpi anc-kpi--cool" data-anc="midstream.mrvl" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top"><span class="ticker">MRVL</span><br>Marvell</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$208</div>
+        <div class="kpi-unit">May 26收盘（52周高 $217）</div>
+        <div class="kpi-change up">+145% YTD · +6.08%（当日）</div>
+      </div>
+      <div class="anc-pill-row" style="margin-top:8px;">
+        <span class="anc-pill anc-pill--active">DSP全球#2</span>
+        <span class="anc-pill anc-pill--gen">HSBC目标$300</span>
+      </div>
+      <p style="font-size:12px;margin-top:6px;">Q4营收$2.22B(record,+22% YoY)；5/27财报；定制ASIC$1.5B；HSBC升级买入目标$300</p>
+    </div>
+
+    <!-- AVGO vs MRVL comparison -->
+    <div class="anc-kpi anc-kpi--dusk" data-anc="midstream.compare" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top">AVGO vs MRVL<br>定制ASIC对比</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">8x</div>
+        <div class="kpi-unit">AVGO AI ASIC营收 = MRVL × 8</div>
+      </div>
+      <p style="font-size:12px;margin-top:6px;">AVGO $12B vs MRVL $1.5B；但MRVL获Google TPU设计，2028-29贡献收入</p>
+    </div>
+  </div>
+</section>
+
+<!-- DOWNSTREAM: 光纤 & AI基础设施 -->
+<section class="anc-section--gc anc-section--cool" data-anc="downstream" data-handles="refine,expand,lock" data-deps="chain-map">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <h2 style="margin-bottom:0;">下游 · 光纤 & AI基础设施</h2>
+    <span class="anc-pill anc-pill--active">英伟达生态</span>
+  </div>
+  <p>核心驱动：英伟达GPU-HBM光纤互连方案"Optical-In Copper-Out"；康宁获$32亿投资承诺</p>
+
+  <div class="anc-kpi-grid">
+    <!-- GLW -->
+    <div class="anc-kpi anc-kpi--arctic" data-anc="downstream.glw" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top"><span class="ticker">GLW</span><br>Corning</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$196</div>
+        <div class="kpi-unit">May 26收盘（52周高 $212）</div>
+        <div class="kpi-change up">+106% YTD</div>
+      </div>
+      <div class="anc-pill-row" style="margin-top:8px;">
+        <span class="anc-pill anc-pill--active">NVDA $32亿合作</span>
+        <span class="anc-pill anc-pill--gen">光纤产量+50%</span>
+      </div>
+      <p style="font-size:12px;margin-top:6px;">NVDA承诺最高$32亿投资；在美新建三厂；Q1净利润+136%；Oppenheimer目标$210</p>
+    </div>
+
+    <!-- AAOI -->
+    <div class="anc-kpi anc-kpi--flame" data-anc="downstream.aaoi" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top"><span class="ticker">AAOI</span><br>Applied Opto</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">~$167</div>
+        <div class="kpi-unit">五月波动区间$149-$234</div>
+        <div class="kpi-change up">+441% YTD</div>
+      </div>
+      <div class="anc-pill-row" style="margin-top:8px;">
+        <span class="anc-pill anc-pill--warn">高弹性高波动</span>
+        <span class="anc-pill anc-pill--gen">微软800G订单</span>
+      </div>
+      <p style="font-size:12px;margin-top:6px;">800G/1.6T光模块；微软多载波800G订单；1.6T样品已交付；beta 3.76；营收$151M</p>
+    </div>
+
+    <!-- NVDA reference -->
+    <div class="anc-kpi anc-kpi--dusk" data-anc="downstream.nvda" data-handles="refine" data-deps="">
+      <div class="kpi-top">
+        <div class="kpi-label-top">英伟达<br>CPO生态布局</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">4</div>
+        <div class="kpi-unit">核心CPO生态伙伴</div>
+      </div>
+      <p style="font-size:12px;margin-top:6px;">LITE($20亿采购) · GLW($32亿投资) · COHR · MRVL；GPU-HBM光纤互连"光进铜退"</p>
+    </div>
+  </div>
+</section>
+
+<!-- MAY PRICE PERFORMANCE TABLE -->
+<section class="anc-section--gc anc-section--warm" data-anc="performance" data-handles="refine,expand,lock" data-deps="">
+  <h2>五月价格表现一览</h2>
+  <p>近一个月（5/1 - 5/26）核心标的涨跌幅及关键价格区间</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>标的</th>
+        <th>5/1 开盘</th>
+        <th>5/26 收盘</th>
+        <th>月涨跌幅</th>
+        <th>月内高</th>
+        <th>月内低</th>
+        <th>YTD</th>
+        <th>市值</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="ticker">LITE</td>
+        <td>~$580</td>
+        <td>~$870</td>
+        <td class="up">+50%</td>
+        <td>$1,086</td>
+        <td>~$540</td>
+        <td class="up">+179%</td>
+        <td>~$62B</td>
+      </tr>
+      <tr>
+        <td class="ticker">COHR</td>
+        <td>~$320</td>
+        <td>$381</td>
+        <td class="up">+19%</td>
+        <td>$413</td>
+        <td>~$315</td>
+        <td class="up">+106%</td>
+        <td>~$75B</td>
+      </tr>
+      <tr>
+        <td class="ticker">AVGO</td>
+        <td>~$375</td>
+        <td>$435</td>
+        <td class="up">+16%</td>
+        <td>$442</td>
+        <td>~$370</td>
+        <td class="up">+48%</td>
+        <td>~$1.06T</td>
+      </tr>
+      <tr>
+        <td class="ticker">MRVL</td>
+        <td>~$130</td>
+        <td>$208</td>
+        <td class="up">+60%</td>
+        <td>$217</td>
+        <td>~$128</td>
+        <td class="up">+145%</td>
+        <td>~$182B</td>
+      </tr>
+      <tr>
+        <td class="ticker">GLW</td>
+        <td>~$130</td>
+        <td>$196</td>
+        <td class="up">+51%</td>
+        <td>$212</td>
+        <td>~$127</td>
+        <td class="up">+106%</td>
+        <td>~$169B</td>
+      </tr>
+      <tr>
+        <td class="ticker">AAOI</td>
+        <td>$163</td>
+        <td>~$167</td>
+        <td class="up">+2%</td>
+        <td>$234</td>
+        <td>$149</td>
+        <td class="up">+441%</td>
+        <td>~$13B</td>
+      </tr>
+      <tr>
+        <td class="ticker">AXTI</td>
+        <td>$96</td>
+        <td>~$120</td>
+        <td class="up">+25%</td>
+        <td>$143</td>
+        <td>$92</td>
+        <td class="up">+711%</td>
+        <td>~$7B</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size:12px;color:#94a3b8;margin-top:8px;">* 价格为近似值，盘中区间内取整。LITE/AXTI/AAOI因数据频率差异可能存在偏差。</p>
+</section>
+
+<!-- CATALYSTS TIMELINE -->
+<section class="anc-section--gc" data-anc="catalysts" data-handles="refine,expand" data-deps="">
+  <h2>关键催化剂时间线</h2>
+  <p>近30日重大产业事件</p>
+
+  <ul class="catalyst-list">
+    <li>
+      <span class="catalyst-date">5月26日</span>
+      <div class="catalyst-text">
+        <strong>光互连"光进铜退"加速</strong> — GPU-HBM封装迎来光纤互连新方案，AVGO +5%，MRVL +6%，GLW +1%。<span class="tag tag-green">产业趋势</span>
+      </div>
+    </li>
+    <li>
+      <span class="catalyst-date">5月20日</span>
+      <div class="catalyst-text">
+        <strong>HSBC升级Marvell</strong> — Hold → Buy，目标$85→$300（街最高），称AI网络与光互连价值被低估。<span class="tag tag-blue">评级上调</span>
+      </div>
+    </li>
+    <li>
+      <span class="catalyst-date">5月14日</span>
+      <div class="catalyst-text">
+        <strong>Coherent历史新高$404</strong> — 获CPO超大订单，6英寸InP量产突破，CEO随川普中国行。<span class="tag tag-green">订单驱动</span>
+      </div>
+    </li>
+    <li>
+      <span class="catalyst-date">5月12日</span>
+      <div class="catalyst-text">
+        <strong>Bernstein近百页报告</strong> — "连接已成为新的瓶颈与战场"，点名LITE、天孚、泰瑞达为赢家。<span class="tag tag-purple">研报催化</span>
+      </div>
+    </li>
+    <li>
+      <span class="catalyst-date">5月6日</span>
+      <div class="catalyst-text">
+        <strong>英伟达×康宁历史性合作</strong> — NVDA有权投资最多$32亿，GLW在美新建三厂，光纤产量+50%。<span class="tag tag-green">战略合作</span>
+      </div>
+    </li>
+    <li>
+      <span class="catalyst-date">5月5-6日</span>
+      <div class="catalyst-text">
+        <strong>Lumentum Q3业绩超预期</strong> — 营收$808M(+90% YoY)，EPS $2.37；Q4指引$960M-$1.01B。<span class="tag tag-blue">财报超预期</span>
+      </div>
+    </li>
+    <li>
+      <span class="catalyst-date">5月初</span>
+      <div class="catalyst-text">
+        <strong>Coherent FY2026Q2</strong> — 订单出货比>4倍，能见度延伸至2027年；1.6T光模块步入爆发期。<span class="tag tag-blue">财报超预期</span>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<!-- RISK FACTORS -->
+<section class="anc-section--gc anc-section--flame" data-anc="risks" data-handles="refine,expand" data-deps="">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+    <h2 style="margin-bottom:0;">风险因素</h2>
+    <span class="anc-pill anc-pill--warn">注意</span>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <h3>📉 估值风险</h3>
+      <ul style="font-size:14px;line-height:1.8;padding-left:18px;">
+        <li>COHR/LITE 动态PE >150x，已提前反映多年盈利预期</li>
+        <li>AXTI GF估值$2.60 vs 市价$100+，差异极端</li>
+        <li>AAOI GF估值$20 vs 市价$167，显著高估</li>
+        <li>多家机构对COHR维持"中立"评等</li>
+      </ul>
+    </div>
+    <div>
+      <h3>⚡ 产业风险</h3>
+      <ul style="font-size:14px;line-height:1.8;padding-left:18px;">
+        <li>CPO量产时间表可能不及预期（良率、封装）</li>
+        <li>硅光方案竞争（传统VCSEL vs 硅光 vs InP）</li>
+        <li>产能爬坡瓶颈：InP衬底、高端EML激光器</li>
+        <li>中美出口管制风险（AXTI中国关联）</li>
+      </ul>
+    </div>
+    <div>
+      <h3>📊 技术风险</h3>
+      <ul style="font-size:14px;line-height:1.8;padding-left:18px;">
+        <li>1.6T → 3.2T演进路径尚不明确</li>
+        <li>CPO vs LPO（线性可插拔）路线之争</li>
+        <li>英伟达下一代架构R100/Vera可能改变互连方案</li>
+      </ul>
+    </div>
+    <div>
+      <h3>💹 市场风险</h3>
+      <ul style="font-size:14px;line-height:1.8;padding-left:18px;">
+        <li>5月AI芯片股全面冲高后获利回吐</li>
+        <li>AAOI/AXTI/SIVE单日回撤10-20%已出现多次</li>
+        <li>MRVL 5/27财报可能引发波动</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- INVESTMENT THREADS -->
+<section class="anc-section--gc" data-anc="threads" data-handles="refine,expand,lock" data-deps="">
+  <h2>投资主线总结</h2>
+
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--aurora">
+      <div class="kpi-top">
+        <div class="kpi-label-top">确定性龙头</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:28px;">LITE · COHR · AVGO</div>
+        <div class="kpi-unit">英伟达深度绑定，全产业链布局<br>适合中长期配置，关注回调机会</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--flame">
+      <div class="kpi-top">
+        <div class="kpi-label-top">高弹性标的</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:28px;">AAOI · AXTI · SIVE</div>
+        <div class="kpi-unit">景气度弹性极大，单日振幅10-30%<br>适合短线交易，需严格风控</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--cool">
+      <div class="kpi-top">
+        <div class="kpi-label-top">技术哨兵</div>
+        <div class="kpi-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg></div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:28px;">GLW · TER · MRVL</div>
+        <div class="kpi-unit">基础设施先行，设备先行<br>确定性最强，波动相对较小</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<hr class="anc-divider" data-anc="footer" data-handles="lock" data-deps="">
+<p style="text-align:center;font-size:12px;color:#94a3b8;">数据来源：公开市场数据 · 2026年5月27日 · 本报告不构成投资建议</p>
+
+</body>
+</html>

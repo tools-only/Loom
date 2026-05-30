@@ -81,6 +81,15 @@ class CoreHTTPHandler(BaseHTTPRequestHandler):
                 cr_path.write_text(json.dumps(existing, indent=2))
             return self._send_json(200, {"ok": True, "resource_id": resource_id})
 
+        # --- Timing stages (computed by Python, replaces JS timing-waterfall) ---
+        if method == "POST" and path == "/timing/stages":
+            try:
+                from loom.timing_stats import compute_stages
+                result = compute_stages(body.get("timing", {}))
+                return self._send_json(200, {"ok": True, **result})
+            except Exception as e:
+                return self._send_json(500, {"error": str(e)})
+
         # --- Feedback routes ---
         if method == "GET" and path == "/feedback":
             if self.feedback_store is None:

@@ -1,0 +1,251 @@
+/* Mobile Loom — independent mobile viewport styles.
+   Loaded only by mobile.html. Does not touch styles.css / index.html. */
+
+/* ── Reset & base ──────────────────────────────────── */
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; padding: 0;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--paper, #f8f9fc);
+  color: var(--ink, #1a1a1a);
+  overflow-x: hidden;
+}
+
+/* ── Mobile toolbar ────────────────────────────────── */
+.mob-toolbar {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  min-height: 48px;
+}
+.mob-brand {
+  font-size: 16px; font-weight: 700;
+  font-family: 'Bricolage Grotesque', sans-serif;
+  letter-spacing: -0.02em;
+  color: var(--accent-iris, #7A5AF8);
+  margin-right: 4px;
+}
+.mob-status {
+  font-size: 10px; color: var(--ink-3, #999);
+  flex: 1; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mob-domain-tabs {
+  display: flex; gap: 2px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.mob-domain-tabs::-webkit-scrollbar { display: none; }
+.mob-domain-tab {
+  flex-shrink: 0;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 600;
+  background: transparent; border: 1px solid rgba(0,0,0,0.08);
+  color: var(--ink-2, #666);
+  cursor: pointer;
+}
+.mob-domain-tab.active {
+  background: var(--accent-iris, #7A5AF8);
+  color: #fff; border-color: transparent;
+}
+.mob-domain-tab i { font-size: 14px; vertical-align: middle; margin-right: 3px; }
+
+/* ── Processing indicator ──────────────────────────── */
+.mob-processing {
+  display: none;
+  padding: 6px 12px; font-size: 11px; color: var(--ink-3, #999);
+  background: rgba(122,90,248,0.06);
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.mob-processing.show { display: flex; align-items: center; gap: 6px; }
+.mob-processing .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent-iris, #7A5AF8);
+  animation: mob-pulse 1.2s ease-in-out infinite;
+}
+@keyframes mob-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── Content area ──────────────────────────────────── */
+#anchor-content {
+  padding: 12px;
+}
+#anchor-content:empty::after {
+  content: "⬤ 等待内容…";
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px 0; font-size: 13px; color: var(--ink-3, #999);
+  letter-spacing: 0.02em;
+}
+
+/* ── Section cards ─────────────────────────────────── */
+#anchor-content .anc-section {
+  padding: 14px; margin-bottom: 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.7);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+#anchor-content .anc-section h1 { font-size: 20px; margin: 0 0 6px; }
+#anchor-content .anc-section h2 { font-size: 16px; margin: 0 0 8px; }
+#anchor-content .anc-section h3 { font-size: 14px; margin: 12px 0 4px; }
+#anchor-content .anc-section p,
+#anchor-content .anc-section li { font-size: 13px; line-height: 1.6; }
+#anchor-content .anc-section ul { padding-left: 16px; }
+
+/* ── KPI grid: mobile single-column ────────────────── */
+#anchor-content .anc-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 10px 0;
+}
+#anchor-content .anc-kpi {
+  padding: 14px;
+  border-radius: 12px;
+  min-height: 80px;
+}
+#anchor-content .anc-kpi .kpi-value { font-size: 28px; }
+#anchor-content .anc-kpi .kpi-label-top { font-size: 13px; }
+#anchor-content .anc-kpi .kpi-unit { font-size: 11px; }
+#anchor-content .anc-kpi--center .kpi-value { font-size: 32px; }
+
+/* ── KPI 6-card special case: 2 then 1 ─────────────── */
+@media (min-width: 420px) {
+  #anchor-content .anc-kpi-grid:has(> .anc-kpi:nth-child(2)) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ── Pills ─────────────────────────────────────────── */
+.anc-pill-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.anc-pill {
+  padding: 2px 10px; border-radius: 999px;
+  font-size: 10px; font-weight: 600;
+}
+
+/* ── Pill colors (compact) ─────────────────────────── */
+.anc-pill--active { background: #dcfce7; color: #166534; }
+.anc-pill--gen { background: #ede9fe; color: #5b21b6; }
+.anc-pill--warn { background: #fef3c7; color: #92400e; }
+.anc-pill--review { background: #dbeafe; color: #1e40af; }
+.anc-pill--done { background: #f0e7ff; color: #5b21b6; }
+.anc-pill--draft { background: #fce7f3; color: #9d174d; }
+.anc-pill--lock { background: #f3f4f6; color: #6b7280; }
+.anc-pill--edit { background: #fef9c3; color: #854d0e; }
+
+/* ── Divider ───────────────────────────────────────── */
+.anc-divider { border: none; border-top: 1px solid rgba(0,0,0,0.06); margin: 14px 0; }
+
+/* ── Handle bars (touch-friendly) ──────────────────── */
+.anc-handle-bar {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 8px;
+}
+.anc-handle-bar .anc-handle-btn {
+  padding: 4px 10px; font-size: 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.8);
+  color: var(--ink-2, #555);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.anc-handle-bar .anc-handle-btn:active {
+  background: var(--accent-iris, #7A5AF8);
+  color: #fff;
+}
+
+/* ── Op bars (streaming output) ────────────────────── */
+.anc-opbar-container { margin: 8px 0; }
+.anc-opbar {
+  padding: 8px 12px; margin-bottom: 6px;
+  border-radius: 10px;
+  background: rgba(122,90,248,0.04);
+  border: 1px solid rgba(0,0,0,0.04);
+  font-size: 12px;
+}
+
+/* ── Toast ─────────────────────────────────────────── */
+.anc-toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.8); color: #fff;
+  padding: 8px 20px; border-radius: 999px;
+  font-size: 13px;
+  z-index: 99999;
+  opacity: 0; transition: opacity 0.3s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.anc-toast.show { opacity: 1; }
+
+/* ── Home screen (initial state) ───────────────────── */
+.mob-home {
+  padding: 32px 16px;
+  text-align: center;
+}
+.mob-home h1 {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  font-size: 24px;
+  margin: 0 0 4px;
+  color: var(--ink, #1a1a1a);
+}
+.mob-home p {
+  font-size: 13px; color: var(--ink-3, #999);
+  margin: 0 0 20px;
+}
+.mob-prompt {
+  display: flex; gap: 6px;
+  max-width: 100%;
+}
+.mob-prompt input {
+  flex: 1;
+  padding: 10px 14px; border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: white;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+.mob-prompt input:focus {
+  border-color: var(--accent-iris, #7A5AF8);
+}
+.mob-prompt button {
+  padding: 10px 16px; border-radius: 999px;
+  background: var(--accent-iris, #7A5AF8);
+  color: #fff; border: none;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.mob-suggestions {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 20px;
+}
+.mob-suggestions button {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  background: white;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 12px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  color: var(--ink, #1a1a1a);
+  -webkit-tap-highlight-color: transparent;
+}
+.mob-suggestions button:active {
+  background: var(--accent-iris, #7A5AF8);
+  color: #fff;
+}
+.mob-suggestions button i { font-size: 16px; }
+
+/* ── Timing overlay (light mode, compact) ──────────── */
+#anc-timing-panel {
+  font-size: 10px !important;
+  min-width: 240px !important;
+  max-width: calc(100vw - 32px) !important;
+  left: 16px !important;
+  bottom: 16px !important;
+}

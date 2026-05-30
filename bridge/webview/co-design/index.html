@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Co-Design — Slide Workspace</title>
+<link rel="stylesheet" href="../resource/colors_and_type.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="codesign-body">
+
+<!-- Ambient background -->
+<div class="refraction-bg">
+  <div class="blob blob1"></div>
+  <div class="blob blob2"></div>
+  <div class="blob blob3"></div>
+  <div class="light light1"></div>
+  <div class="light light2"></div>
+  <div class="grain"></div>
+</div>
+
+<!-- Toolbar -->
+<header id="codesign-toolbar">
+  <a href="/" class="toolbar-home" title="Back to Loom">&larr; Loom</a>
+  <span class="toolbar-brand">Co-Design</span>
+  <span class="toolbar-divider">|</span>
+  <span class="toolbar-status" id="status">connecting...</span>
+  <span class="toolbar-spacer"></span>
+  <button id="btn-new-deck" class="btn btn--ghost btn--sm" type="button">
+    <i class="ph-bold ph-plus"></i> New
+  </button>
+  <button id="btn-export" class="btn btn--brand btn--sm" type="button" disabled>
+    <i class="ph-bold ph-download"></i> Export PPTX
+  </button>
+</header>
+
+<!-- Start state: brainstorming prompt -->
+<section id="codesign-start" class="codesign-start">
+  <div class="codesign-hero">
+    <h1>Design your deck</h1>
+    <p>Describe your topic. The AI brainstorms an outline with you, then generates each slide. Refine any element in-place.</p>
+    <div class="codesign-prompt-row">
+      <input id="codesign-prompt" class="codesign-prompt-input" type="text"
+             placeholder="e.g. A technical deck on migrating from monolith to microservices...">
+      <button id="codesign-submit" class="btn btn--brand" type="button">
+        <i class="ph-bold ph-arrow-right"></i><span>Generate</span>
+      </button>
+    </div>
+    <div class="codesign-templates">
+      <span class="codesign-templates-label">Or start from a template:</span>
+      <button class="btn btn--ghost btn--sm" data-template="tech-arch">System Architecture Review</button>
+      <button class="btn btn--ghost btn--sm" data-template="quarterly">Engineering Quarterly Update</button>
+      <button class="btn btn--ghost btn--sm" data-template="proposal">Technical Proposal</button>
+    </div>
+  </div>
+</section>
+
+<!-- Main workspace (hidden until generation) -->
+<div id="codesign-workspace" class="codesign-workspace" style="display:none">
+  <!-- Outline sidebar -->
+  <aside id="codesign-outline" class="codesign-outline">
+    <div class="outline-header">
+      <h3><i class="ph-bold ph-tree-structure"></i> Outline</h3>
+      <button id="btn-toggle-outline" class="btn btn--ghost btn--icon btn--sm" type="button" title="Collapse">
+        <i class="ph-bold ph-sidebar-simple"></i>
+      </button>
+    </div>
+    <nav id="outline-nav" class="outline-nav" aria-label="Slide outline"></nav>
+  </aside>
+
+  <!-- Slide canvas -->
+  <main id="codesign-canvas" class="codesign-canvas">
+    <div id="codesign-content" class="codesign-content"></div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

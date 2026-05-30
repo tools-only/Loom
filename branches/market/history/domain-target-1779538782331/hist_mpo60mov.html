@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>美股市场总览 — 2026-05-27</title>
+<style>
+  body { background: var(--paper, #F5F1EB); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 24px; }
+  .anc-section { background: #fff; border-radius: 20px; padding: 24px 28px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .anc-section--gc { }
+  h1, h2, h3 { font-family: 'Bricolage Grotesque', sans-serif; margin: 0 0 16px; }
+  h1 { font-size: 26px; font-weight: 700; }
+  h2 { font-size: 20px; font-weight: 600; }
+  .anc-kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-bottom: 8px; }
+  .anc-kpi { border-radius: 20px; padding: 20px; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+  .anc-kpi:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.12); }
+  .kpi-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .kpi-label-top { font-size: 14px; font-weight: 600; color: rgba(0,0,0,0.7); line-height: 1.3; }
+  .kpi-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .kpi-bottom { }
+  .kpi-value { font-family: 'Bricolage Grotesque', sans-serif; font-size: 32px; font-weight: 700; line-height: 1.1; margin-bottom: 4px; }
+  .kpi-unit { font-size: 13px; color: rgba(0,0,0,0.55); }
+  .kpi-change { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .kpi-change.positive { color: #16a34a; }
+  .kpi-change.negative { color: #dc2626; }
+  .kpi-change.neutral { color: #6b7280; }
+  .anc-kpi--center { text-align: center; }
+  .anc-kpi--center .kpi-value { font-size: 36px; }
+  /* Gradient themes */
+  .anc-kpi--warm { background: linear-gradient(135deg, #fce4ec 0%, #f3e5f5 50%, #fff 100%); }
+  .anc-kpi--cool { background: linear-gradient(135deg, #e0f2f1 0%, #e3f2fd 50%, #fff 100%); }
+  .anc-kpi--aurora { background: linear-gradient(135deg, #e8eaf6 0%, #e0f2f1 50%, #fff 100%); }
+  .anc-kpi--ocean { background: linear-gradient(135deg, #e3f2fd 0%, #fce4ec 50%, #fff 100%); }
+  .anc-kpi--berry { background: linear-gradient(135deg, #ede7f6 0%, #f3e5f5 50%, #fff 100%); }
+  .anc-kpi--arctic { background: linear-gradient(135deg, #e0f7fa 0%, #e8f5e9 50%, #fff 100%); }
+  .anc-kpi--flame { background: linear-gradient(135deg, #fff3e0 0%, #fce4ec 50%, #fff 100%); }
+  .anc-kpi--sunset { background: linear-gradient(135deg, #fce4ec 0%, #fff8e1 50%, #fff 100%); }
+  .anc-kpi--forest { background: linear-gradient(135deg, #e8f5e9 0%, #efebe9 50%, #fff 100%); }
+  .anc-kpi--dusk { background: linear-gradient(135deg, #eceff1 0%, #fce4ec 50%, #fff 100%); }
+  .anc-pill-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .anc-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .anc-pill--active { background: #dcfce7; color: #166534; }
+  .anc-pill--gen { background: #ede9fe; color: #5b21b6; }
+  .anc-pill--warn { background: #fef3c7; color: #92400e; }
+  .anc-pill--done { background: #e0e7ff; color: #3730a3; }
+  .anc-pill--draft { background: #fce7f3; color: #9d174d; }
+  .anc-pill--review { background: #e0f2fe; color: #075985; }
+  .anc-pill--lock { background: #f3f4f6; color: #4b5563; }
+  .pulse-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .anc-divider { border: none; border-top: 1px solid #e5e7eb; margin: 20px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f3f4f6; }
+  th { font-weight: 600; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .event-today { background: #fefce8; border-left: 3px solid #eab308; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .tag-earnings { background: #dbeafe; color: #1e40af; }
+  .tag-data { background: #dcfce7; color: #166534; }
+  .tag-geo { background: #fef3c7; color: #92400e; }
+  .tag-fed { background: #f3e8ff; color: #6b21a8; }
+  ul { padding-left: 20px; margin: 8px 0; }
+  li { margin-bottom: 6px; line-height: 1.5; color: #374151; }
+  strong { color: #111827; }
+  .market-sentiment { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-radius: 16px; margin-bottom: 20px; }
+  .market-sentiment--bullish { background: linear-gradient(135deg, #dcfce7, #f0fdf4); }
+  .market-sentiment--cautious { background: linear-gradient(135deg, #fef9c3, #fffbeb); }
+  .sentiment-label { font-size: 14px; font-weight: 600; color: #374151; }
+  .sentiment-value { font-size: 22px; font-weight: 700; font-family: 'Bricolage Grotesque', sans-serif; }
+  .theme-card { padding: 18px 20px; border-radius: 16px; margin-bottom: 14px; border: 1px solid #f3f4f6; }
+  .theme-card h3 { font-size: 16px; margin-bottom: 8px; }
+  .theme-card p { font-size: 14px; line-height: 1.6; color: #4b5563; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- HERO: Title + Date + Sentiment -->
+<section class="anc-section anc-section--gc" data-anc="hero" data-handles="refine" data-deps="">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+    <div>
+      <div class="anc-pill-row">
+        <span class="anc-pill anc-pill--active"><span class="pulse-dot"></span> 盘中</span>
+        <span class="anc-pill anc-pill--gen">AI Generated</span>
+        <span class="anc-pill anc-pill--review">2026-05-27 周三</span>
+      </div>
+      <h1>美股市场总览</h1>
+      <p style="color:#6b7280; margin:4px 0 0; font-size:14px;">节后首个完整交易日 · 纳指与标普500再创收盘新高 · AI行情延续</p>
+    </div>
+    <div class="market-sentiment market-sentiment--bullish" style="min-width:180px;">
+      <div>
+        <div class="sentiment-label">市场情绪</div>
+        <div class="sentiment-value">谨慎看多</div>
+      </div>
+      <div style="font-size:28px;">🐂</div>
+    </div>
+  </div>
+</section>
+
+<!-- KEY INDICES -->
+<section class="anc-section anc-section--gc" data-anc="indices" data-handles="refine,expand" data-deps="hero">
+  <h2>📊 主要指数</h2>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--aurora" data-anc="indices.spx" data-handles="refine">
+      <div class="kpi-top">
+        <div class="kpi-label-top">标普500<br>S&P 500</div>
+        <div class="kpi-icon">📈</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">7,519</div>
+        <div class="kpi-unit">+45.65 (+0.61%)</div>
+        <div class="kpi-change positive">▲ 历史收盘新高</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--warm" data-anc="indices.nasdaq" data-handles="refine">
+      <div class="kpi-top">
+        <div class="kpi-label-top">纳斯达克<br>Nasdaq</div>
+        <div class="kpi-icon">🚀</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">26,656</div>
+        <div class="kpi-unit">+312.21 (+1.19%)</div>
+        <div class="kpi-change positive">▲ 历史收盘新高</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--ocean" data-anc="indices.dow" data-handles="refine">
+      <div class="kpi-top">
+        <div class="kpi-label-top">道琼斯<br>Dow Jones</div>
+        <div class="kpi-icon">⚖️</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">50,462</div>
+        <div class="kpi-unit">-118.02 (-0.23%)</div>
+        <div class="kpi-change negative">▼ 小幅回调</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--flame" data-anc="indices.phlx" data-handles="refine">
+      <div class="kpi-top">
+        <div class="kpi-label-top">费城半导体<br>SOX Index</div>
+        <div class="kpi-icon">🔲</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">新高</div>
+        <div class="kpi-unit">同步创历史纪录</div>
+        <div class="kpi-change positive">▲ MU +19% 领涨</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MACRO DASHBOARD -->
+<section class="anc-section anc-section--gc" data-anc="macro" data-handles="refine,expand" data-deps="indices">
+  <h2>🌐 宏观仪表盘</h2>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--arctic" data-anc="macro.treasury" data-handles="refine">
+      <div class="kpi-top">
+        <div class="kpi-label-top">10Y 美债收益率</div>
+        <div class="kpi-icon">🏛️</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">4.47%</div>
+        <div class="kpi-unit">-2.2bp · 5月14日以来最低</div>
+        <div class="kpi-change positive">▼ 停火预期推降</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--dusk" data-anc="macro.dxy" data-handles="refine">
+      <div class="kpi-top">
+        <div class="kpi-label-top">美元指数 DXY</div>
+        <div class="kpi-icon">💵</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">98.97</div>
+        <div class="kpi-unit">-0.25% · 偏弱运行</div>
+        <div class="kpi-change negative">▼ 风险偏好回升</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--cool" data-anc="macro.fed" data-handles="refine">
+      <div class="kpi-top">
+        <div class="kpi-label-top">联邦基金利率</div>
+        <div class="kpi-icon">📋</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">4.50%</div>
+        <div class="kpi-unit">三次连续按兵不动</div>
+        <div class="kpi-change neutral">→ 9月首降概率 95%</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--flame" data-anc="macro.oil" data-handles="refine">
+      <div class="kpi-top">
+        <div class="kpi-label-top">WTI 原油</div>
+        <div class="kpi-icon">🛢️</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value">$88.5</div>
+        <div class="kpi-unit">-5.7% · 两周低位</div>
+        <div class="kpi-change positive">▼ 伊和谈预期</div>
+      </div>
+    </div>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px,1fr)); gap:12px; margin-top:12px;">
+    <div class="anc-kpi anc-kpi--forest" style="padding:14px 18px;">
+      <div class="kpi-value" style="font-size:20px;">3.9%</div>
+      <div class="kpi-unit">核心PCE (YoY) · 预期周四公布</div>
+    </div>
+    <div class="anc-kpi anc-kpi--berry" style="padding:14px 18px;">
+      <div class="kpi-value" style="font-size:20px;">4.2%</div>
+      <div class="kpi-unit">失业率 · 稳定</div>
+    </div>
+    <div class="anc-kpi anc-kpi--dusk" style="padding:14px 18px;">
+      <div class="kpi-value" style="font-size:20px;">2.6%</div>
+      <div class="kpi-unit">Q1 GDP (修正值) · 预期 +2.0%</div>
+    </div>
+  </div>
+</section>
+
+<!-- CORE THEMES -->
+<section class="anc-section anc-section--gc" data-anc="themes" data-handles="refine,restructure" data-deps="macro,indices">
+  <h2>🔥 今日核心主题</h2>
+
+  <div class="theme-card" style="border-left:4px solid #7c3aed;">
+    <h3>🤖 AI 芯片狂潮 — Micron 突破万亿市值</h3>
+    <p>Micron (MU) 周二暴涨 19%，市值首破 <strong>$1万亿</strong>，成为继 Walmart 之后今年第二家加入万亿俱乐部的美股。UBS 将目标价三倍上调至 <strong>$1,625</strong>（隐含 $1.8万亿市值），称 AI 已从根本上改变存储芯片行业的结构性需求。HBM (高带宽存储) 全年产能已售罄。AMD 同步创历史新高 (~$8200亿市值)，Marvell、Seagate、Western Digital 等全线跟涨。</p>
+    <div style="margin-top:8px;"><span class="tag tag-earnings">AI</span> <span class="tag tag-earnings">半导体</span> <span class="tag tag-earnings">MU</span></div>
+  </div>
+
+  <div class="theme-card" style="border-left:4px solid #eab308;">
+    <h3>🕊️ 美伊和谈进程 — 原油暴跌 5.7%</h3>
+    <p>美国与伊朗就霍尔木兹海峡问题接近达成框架协议。草案提议伊朗在一个月内恢复商业航运，换取美军分阶段撤出。两艘 LNG 油轮和一艘原油超大型油轮已自冲突以来首次通过海峡。WTI 原油单日暴跌 5.7% 至 <strong>$88.5</strong>，为两周最低。分析师警告即使达成协议，恢复正常油运仍需数月排雷和设施修复。</p>
+    <div style="margin-top:8px;"><span class="tag tag-geo">地缘</span> <span class="tag tag-data">原油</span> <span class="tag tag-data">霍尔木兹</span></div>
+  </div>
+
+  <div class="theme-card" style="border-left:4px solid #2563eb;">
+    <h3>🏛️ 美联储路径 — 降息预期升温</h3>
+    <p>联邦基金利率维持在 <strong>4.25%-4.50%</strong> 不变，连续三次按兵不动。市场定价 9 月首次降息概率约 95%，全年预计累计降息 75bp。5月会议纪要显示联储工作人员认为衰退概率"几乎与基线预测一样高"。周四将公布 4 月核心 PCE（预期 +3.3% YoY），是降息节奏的关键验证点。</p>
+    <div style="margin-top:8px;"><span class="tag tag-fed">联储</span> <span class="tag tag-data">PCE</span> <span class="tag tag-data">降息</span></div>
+  </div>
+
+  <div class="theme-card" style="border-left:4px solid #059669;">
+    <h3>📊 板块分化 — 科技 vs 能源的冰火两重天</h3>
+    <p>当日 11 大板块中有 6 个上涨。科技 +1.69% 领涨，能源 -2.8% 垫底。但 YTD 来看能源累涨 <strong>+24%</strong> 是标普500的约3倍，为今年最强板块。防御性板块（房地产 +3.72%、公用事业 +2.91%）资金流入明显，市场在周四 PCE 公布前进行防御性轮动。广度问题值得警惕：仅 52% 标普成分股在 50 日均线上方。</p>
+    <div style="margin-top:8px;"><span class="tag tag-earnings">板块轮动</span> <span class="tag tag-data">防御</span> <span class="tag tag-data">广度</span></div>
+  </div>
+</section>
+
+<!-- SECTOR PERFORMANCE -->
+<section class="anc-section anc-section--gc" data-anc="sectors" data-handles="refine,expand" data-deps="themes">
+  <h2>📋 板块表现 (5/26)</h2>
+  <table>
+    <thead>
+      <tr><th>板块</th><th>当日涨跌</th><th>YTD</th><th>备注</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>科技</strong></td><td style="color:#16a34a;">+1.69%</td><td style="color:#16a34a;">~+13%</td><td>AI 巨头领涨，广度狭窄</td></tr>
+      <tr><td><strong>房地产</strong></td><td style="color:#16a34a;">+3.72%</td><td>—</td><td>周四PCE前防御轮动</td></tr>
+      <tr><td><strong>公用事业</strong></td><td style="color:#16a34a;">+2.91%</td><td>—</td><td>资金流入防御板块</td></tr>
+      <tr><td><strong>必需消费</strong></td><td style="color:#16a34a;">+2.37%</td><td>—</td><td>防御性配置</td></tr>
+      <tr><td><strong>金融</strong></td><td style="color:#6b7280;">微涨</td><td>—</td><td>跟随大盘</td></tr>
+      <tr><td><strong>医疗</strong></td><td style="color:#6b7280;">微涨</td><td>—</td><td>平稳</td></tr>
+      <tr><td><strong>能源</strong></td><td style="color:#dc2626;">-2.80%</td><td style="color:#16a34a; font-weight:600;">+24%</td><td>伊和谈致原油暴跌；YTD 最强</td></tr>
+      <tr><td><strong>材料</strong></td><td style="color:#dc2626;">下跌</td><td>—</td><td>商品价格承压</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:13px; color:#6b7280; margin-top:12px;">标普500 整体 YTD +8%。科技 P/E 38.89x，能源 P/E 19.83x。</p>
+</section>
+
+<!-- RISK CALENDAR -->
+<section class="anc-section anc-section--gc" data-anc="calendar" data-handles="refine,expand" data-deps="macro">
+  <h2>📅 本周风险日历 (5/27 – 5/29)</h2>
+  <table>
+    <thead>
+      <tr><th style="width:80px;">日期</th><th>事件</th><th style="width:100px;">类型</th><th style="width:80px;">预期</th></tr>
+    </thead>
+    <tbody>
+      <tr class="event-today">
+        <td><strong>周三</strong><br>5/27</td>
+        <td>Salesforce (CRM) 盘后财报<br>Marvell (MRVL) 盘后财报 ← AI 焦点<br>Snowflake (SNOW) 盘后财报<br>MBA 抵押贷款申请<br>里士满联储制造业指数</td>
+        <td><span class="tag tag-earnings">财报</span><br><span class="tag tag-earnings">财报</span><br><span class="tag tag-earnings">财报</span><br><span class="tag tag-data">数据</span></td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><strong>周四</strong><br>5/28</td>
+        <td><strong>核心PCE (4月) YoY</strong> ← 降息关键<br><strong>个人收入/支出 (4月)</strong><br><strong>耐用品订单 (4月)</strong><br><strong>GDP修正值 (Q1)</strong><br>Costco (COST) 盘后财报<br>Dell (DELL) 盘后财报<br>Autodesk (ADSK) / MongoDB (MDB) 财报</td>
+        <td><span class="tag tag-fed">通胀</span><br><span class="tag tag-data">消费</span><br><span class="tag tag-data">工业</span><br><span class="tag tag-data">增长</span><br><span class="tag tag-earnings">财报</span></td>
+        <td>+3.3%<br>+0.5% / +0.5%<br>+2.5%<br>+2.0%</td>
+      </tr>
+      <tr>
+        <td><strong>周五</strong><br>5/29</td>
+        <td>MNI 芝加哥 PMI (5月)<br>批发库存 (4月 初值)</td>
+        <td><span class="tag tag-data">PMI</span></td>
+        <td>51.2</td>
+      </tr>
+    </tbody>
+  </table>
+  <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+    <span class="tag tag-earnings">财报</span><span style="font-size:13px;color:#6b7280;">· 本周焦点：CRM、MRVL、COST、DELL</span>
+    <span class="tag tag-fed" style="margin-left:12px;">PCE</span><span style="font-size:13px;color:#6b7280;">· 周四核心PCE决定性</span>
+    <span class="tag tag-geo">地缘</span><span style="font-size:13px;color:#6b7280;">· 美伊谈判进展</span>
+  </div>
+</section>
+
+<!-- TRACKABLE TICKERS -->
+<section class="anc-section anc-section--gc" data-anc="tickers" data-handles="refine,expand,restructure" data-deps="themes,calendar">
+  <h2>🎯 可追踪标的</h2>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--aurora" data-anc="tickers.mu">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Micron<br>MU</div>
+        <div class="kpi-icon">💾</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:24px;">$960</div>
+        <div class="kpi-unit">万亿市值里程碑 · 6/24 财报</div>
+        <div class="kpi-change positive">UBS目标 $1,625</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--warm" data-anc="tickers.amd">
+      <div class="kpi-top">
+        <div class="kpi-label-top">AMD</div>
+        <div class="kpi-icon">🔲</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:24px;">新高</div>
+        <div class="kpi-unit">~$8200亿市值 · AI GPU需求</div>
+        <div class="kpi-change positive">历史新高</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--ocean" data-anc="tickers.mrvl">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Marvell<br>MRVL</div>
+        <div class="kpi-icon">📡</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:24px;">盘后</div>
+        <div class="kpi-unit">今日财报 · AI网络芯片</div>
+        <div class="kpi-change positive">AI 焦点股</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--cool" data-anc="tickers.crm">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Salesforce<br>CRM</div>
+        <div class="kpi-icon">☁️</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:24px;">盘后</div>
+        <div class="kpi-unit">今日财报 · 企业AI落地</div>
+        <div class="kpi-change positive">Agentforce 战略</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--flame" data-anc="tickers.cost">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Costco<br>COST</div>
+        <div class="kpi-icon">🛒</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:24px;">周四</div>
+        <div class="kpi-unit">消费健康关键指标</div>
+        <div class="kpi-change neutral">零售晴雨表</div>
+      </div>
+    </div>
+    <div class="anc-kpi anc-kpi--berry" data-anc="tickers.de">
+      <div class="kpi-top">
+        <div class="kpi-label-top">Dell<br>DELL</div>
+        <div class="kpi-icon">🖥️</div>
+      </div>
+      <div class="kpi-bottom">
+        <div class="kpi-value" style="font-size:24px;">周四</div>
+        <div class="kpi-unit">AI服务器需求验证</div>
+        <div class="kpi-change positive">企业IT支出风向</div>
+      </div>
+    </div>
+  </div>
+  <hr class="anc-divider">
+  <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+    <div style="font-size:14px; font-weight:600; color:#374151;">📌 关注逻辑：</div>
+    <span class="tag tag-earnings">MU</span><span style="font-size:13px;color:#6b7280;">AI存储龙头，万亿里程碑后的持续性</span>
+    <span class="tag tag-earnings">MRVL</span><span style="font-size:13px;color:#6b7280;">今日盘后财报，AI网络芯片需求信号</span>
+    <span class="tag tag-earnings">COST</span><span style="font-size:13px;color:#6b7280;">消费韧性验证，抗通胀能力</span>
+    <span class="tag tag-fed">PCE</span><span style="font-size:13px;color:#6b7280;">周四通胀数据定降息节奏</span>
+    <span class="tag tag-geo">原油</span><span style="font-size:13px;color:#6b7280;">美伊谈判决定能源板块方向</span>
+  </div>
+</section>
+
+<!-- DISCLAIMER -->
+<section class="anc-section anc-section--gc" data-anc="footer" data-handles="" data-deps="">
+  <p style="font-size:12px; color:#9ca3af; text-align:center; margin:0;">
+    数据来源：MarketWatch, CNBC, Yahoo Finance, Reuters · 数据截至 2026-05-27 美东时间早盘<br>
+    本页面由 AI 生成，仅供参考，不构成投资建议。
+  </p>
+</section>
+
+</body>
+</html>

@@ -33,7 +33,12 @@ Tier E/F sources provide context only — never override Tier A/B data.
 Write ONLY this JSON line to stdout (no other text):
 
 ```json
-{"type": "run.artifact", "artifact": {"metadata": {"confidence": 0.7, "gaps": [], "key_claims": []}, "narrative": "2-3 paragraph Chinese sentiment assessment"}}
+{"type": "run.artifact", "artifact": {"metadata": {"resources_used": ["fear-greed", "aaii", "cftc-cot"], "key_claims": ["sentiment judgment 1", "positioning observation"], "gaps": ["data gap if any"]}, "narrative": "2-3 paragraph Chinese sentiment assessment"}}
 ```
+
+- `resources_used`: list every resource ID fetched this session. Loom uses this for source authority — Tier E/F (social/survey) sources are labeled accordingly in the UI.
+- `key_claims`: concrete positioning judgments backed by fetched data.
+- `gaps`: data unavailable or stale this session.
+- Do not include a `confidence` field.
 
 The outer `{"type":"run.artifact","artifact":{...}}` wrapper is required. Do not emit any other text on stdout.

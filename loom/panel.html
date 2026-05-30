@@ -104,7 +104,7 @@
 
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-btn-analyze" onclick="switchTab('analyze')">📊 分析</button>
-    <button class="tab-btn" id="tab-btn-config" onclick="switchTab('config')">⚙ 模型配置</button>
+    <button class="tab-btn" id="tab-btn-config" onclick="switchTab('config')">⚙ 配置</button>
   </div>
 
   <div class="layout">
@@ -193,11 +193,16 @@
         </div>
         <div class="divider"></div>
         <div class="cfg-note">
-          <strong>说明</strong><br>
+          <strong>SDK 配置说明</strong><br>
           • API Key 为空 → 读取环境变量<br>
           • Base URL 为空 → 使用供应商默认端点<br>
           • Hand 字段为空 → 继承全局默认<br>
-          • 保存后立即生效，无需重启 Brain
+          • 保存后立即生效，无需重启 Brain<br><br>
+          <strong>外部 Agent 说明</strong><br>
+          • 填写 Endpoint 后点「应用挂载」<br>
+          • 已挂载的 Hand 优先走外部 Agent<br>
+          • 留空则回退到 SDK 配置<br>
+          • 支持任何 OpenAI Chat API 兼容服务
         </div>
       </div>
 
@@ -302,8 +307,47 @@
           </div>
         </div>
 
+        <!-- Per-hand agent mount -->
+        <div class="config-card">
+          <h3>外部 Agent 挂载 <span>（已挂载的 Hand 优先走外部 Agent；留空则走 SDK 配置）</span></h3>
+          <div style="display:grid;grid-template-columns:128px 1fr 180px 80px;gap:8px;align-items:center;padding-bottom:8px;border-bottom:1px solid #f3f4f6;margin-bottom:8px">
+            <div class="col-header">Hand</div>
+            <div class="col-header">Endpoint URL（OpenAI 兼容）</div>
+            <div class="col-header">功能描述（可选）</div>
+            <div class="col-header">状态</div>
+          </div>
+          <div style="display:grid;grid-template-columns:128px 1fr 180px 80px;gap:8px;align-items:center;margin-bottom:8px">
+            <div class="hand-label">📊 市场研判</div>
+            <input id="ma-ep-market" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace;font-size:12px">
+            <input id="ma-desc-market" type="text" placeholder="可选描述">
+            <span id="ma-st-market" style="font-size:12px;color:#9ca3af">—</span>
+          </div>
+          <div style="display:grid;grid-template-columns:128px 1fr 180px 80px;gap:8px;align-items:center;margin-bottom:8px">
+            <div class="hand-label">🌡️ 情绪追踪</div>
+            <input id="ma-ep-sentiment" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace;font-size:12px">
+            <input id="ma-desc-sentiment" type="text" placeholder="可选描述">
+            <span id="ma-st-sentiment" style="font-size:12px;color:#9ca3af">—</span>
+          </div>
+          <div style="display:grid;grid-template-columns:128px 1fr 180px 80px;gap:8px;align-items:center;margin-bottom:8px">
+            <div class="hand-label">🎯 标的 Thesis</div>
+            <input id="ma-ep-target" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace;font-size:12px">
+            <input id="ma-desc-target" type="text" placeholder="可选描述">
+            <span id="ma-st-target" style="font-size:12px;color:#9ca3af">—</span>
+          </div>
+          <div style="display:grid;grid-template-columns:128px 1fr 180px 80px;gap:8px;align-items:center;margin-bottom:8px">
+            <div class="hand-label">💼 持仓管理</div>
+            <input id="ma-ep-position" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace;font-size:12px">
+            <input id="ma-desc-position" type="text" placeholder="可选描述">
+            <span id="ma-st-position" style="font-size:12px;color:#9ca3af">—</span>
+          </div>
+          <div class="btn-row" style="margin-top:12px">
+            <button class="btn-primary" onclick="applyMounts()">🔌 应用挂载配置</button>
+            <span id="mount-msg" class="save-msg" style="display:none"></span>
+          </div>
+        </div>
+
         <div class="btn-row">
-          <button class="btn-primary" onclick="saveConfig()">💾 保存配置</button>
+          <button class="btn-primary" onclick="saveConfig()">💾 保存 SDK 配置</button>
           <button class="btn-ghost" onclick="loadConfig()">↺ 重新加载</button>
           <span id="save-msg" class="save-msg" style="display:none"></span>
         </div>
@@ -331,6 +375,75 @@
         document.getElementById('main-' + t).style.display    = t === tab ? '' : 'none';
       });
       if (tab === 'config') loadConfig();
+    }
+
+    // ── Agent Mount (integrated into config tab) ────────────────────
+    async function loadMountStates() {
+      for (const h of HANDS) {
+        try {
+          const r = await fetch(`http://localhost:3001/hand/${h}/mount`, { signal: AbortSignal.timeout(2000) });
+          if (!r.ok) continue;
+          const d = await r.json();
+          const st = document.getElementById('ma-st-' + h);
+          if (!st) continue;
+          if (d.mounted) {
+            document.getElementById('ma-ep-' + h).value = d.endpoint || '';
+            st.textContent = '✓ 已挂载';
+            st.style.color = '#10b981';
+            st.style.fontWeight = '700';
+          } else {
+            st.textContent = '—';
+            st.style.color = '#9ca3af';
+            st.style.fontWeight = '';
+          }
+        } catch (_) {}
+      }
+    }
+
+    async function applyMounts() {
+      const msgEl = document.getElementById('mount-msg');
+      msgEl.style.display = '';
+      msgEl.className = 'save-msg';
+      msgEl.textContent = '应用中…';
+      let ok = 0, fail = 0;
+      for (const h of HANDS) {
+        const endpoint = (document.getElementById('ma-ep-' + h)?.value || '').trim();
+        const description = (document.getElementById('ma-desc-' + h)?.value || '').trim();
+        const st = document.getElementById('ma-st-' + h);
+        try {
+          const cur = await fetch(`http://localhost:3001/hand/${h}/mount`, { signal: AbortSignal.timeout(2000) });
+          const curData = cur.ok ? await cur.json() : { mounted: false };
+
+          if (endpoint && !curData.mounted) {
+            const r = await fetch(`http://localhost:3001/hand/${h}/mount`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ endpoint, description }),
+            });
+            const d = await r.json();
+            if (d.ok) { ok++; st.textContent = '✓ 已挂载'; st.style.color = '#10b981'; st.style.fontWeight = '700'; }
+            else { fail++; st.textContent = '❌ 失败'; st.style.color = '#dc2626'; }
+          } else if (endpoint && curData.mounted && curData.endpoint !== endpoint) {
+            // endpoint changed — remount
+            await fetch(`http://localhost:3001/hand/${h}/mount`, { method: 'DELETE' });
+            const r = await fetch(`http://localhost:3001/hand/${h}/mount`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ endpoint, description }),
+            });
+            const d = await r.json();
+            if (d.ok) { ok++; st.textContent = '✓ 已挂载'; st.style.color = '#10b981'; st.style.fontWeight = '700'; }
+            else { fail++; st.textContent = '❌ 失败'; st.style.color = '#dc2626'; }
+          } else if (!endpoint && curData.mounted) {
+            await fetch(`http://localhost:3001/hand/${h}/mount`, { method: 'DELETE' });
+            ok++;
+            st.textContent = '—'; st.style.color = '#9ca3af'; st.style.fontWeight = '';
+          } else if (endpoint && curData.mounted) {
+            ok++; // no change needed
+          }
+        } catch (e) { fail++; if (st) { st.textContent = '❌'; st.style.color = '#dc2626'; } }
+      }
+      msgEl.className = fail ? 'save-msg err' : 'save-msg ok';
+      msgEl.textContent = fail ? `❌ ${fail} 个失败` : '✓ 已应用';
+      setTimeout(() => msgEl.style.display = 'none', 3000);
     }
 
     // ── Status ──────────────────────────────────────────────────────
@@ -404,9 +517,6 @@
       }
       const art  = data.artifact || {};
       const meta = art.metadata  || {};
-      const conf = meta.confidence || 0;
-      const confPct = Math.round(conf * 100);
-      const confCls = conf > 0.7 ? 'badge-green' : conf > 0.4 ? 'badge-yellow' : 'badge-red';
       const shown = meta.resources_shown || [];
       const used  = meta.resources_used  || [];
       const gaps  = meta.gaps || [];
@@ -417,7 +527,6 @@
           <div class="result-header">
             <h2>${HAND_NAMES[handId]} 分析结果</h2>
             <span class="badge badge-purple">✓ 完成</span>
-            <span class="badge ${confCls}">置信度 ${confPct}%</span>
             <span class="badge badge-gray">用了 ${used.length}/${shown.length} 个资源</span>
           </div>
           <h4 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin-bottom:8px">分析叙述</h4>
@@ -472,6 +581,7 @@
       } catch (e) {
         console.warn('loadConfig:', e.message);
       }
+      loadMountStates();
     }
 
     async function saveConfig() {
