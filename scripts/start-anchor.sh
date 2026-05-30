@@ -24,7 +24,7 @@ if curl -sf http://localhost:3002/health >/dev/null 2>&1; then
 else
   echo "[brain]  Starting Loom Brain on http://localhost:3002 ..."
   mkdir -p logs
-  nohup bash -c "cd '$ROOT/loom' && python main.py" >> "$ROOT/logs/brain.log" 2>&1 &
+  nohup bash -c "cd '$ROOT/loom' && python3 main.py" >> "$ROOT/logs/brain.log" 2>&1 &
   echo "[brain]  PID $!"
 fi
 
