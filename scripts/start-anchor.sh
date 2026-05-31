@@ -17,6 +17,10 @@ if [ ! -d "$VENV" ]; then
   exit 1
 fi
 
+# ── Ensure log files exist ────────────────────────────────────────────────────
+mkdir -p logs
+touch logs/anchor.log logs/brain.log
+
 # ── ① Anchor Service (:3000) ──────────────────────────────────────────────────
 if curl -sf http://localhost:3000/health >/dev/null 2>&1; then
   echo "[anchor] Already running on http://localhost:3000"
