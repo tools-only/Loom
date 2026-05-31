@@ -67,9 +67,9 @@ window.MobileRoutes = (function () {
     var hand = (config && config.defaultHand) ? config.defaultHand : '(default)';
     el.innerHTML =
       '<h2>AI Hand</h2>' +
-      '<div class="mob-settings-row"><span>Active hand</span><span style="color:var(--smoke);font-size:14px">' + _esc(hand) + '</span></div>' +
+      '<div class="mob-settings-row"><span>Active hand</span><span class="mob-settings-val">' + _esc(hand) + '</span></div>' +
       '<h2>Session</h2>' +
-      '<div class="mob-settings-row"><span>Status</span><span style="color:#2BB673;font-size:14px;font-weight:700">Connected</span></div>';
+      '<div class="mob-settings-row"><span>Status</span><span class="mob-settings-val mob-settings-val--live">Connected</span></div>';
   }
 
   function _esc(str) {

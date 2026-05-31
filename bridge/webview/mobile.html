@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Loom</title>
 <link rel="stylesheet" href="resource/colors_and_type.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
@@ -20,34 +20,41 @@
 <!-- Home -->
 <section data-route="home">
   <div id="mob-home-empty">
-    <h1>Think it. Live it.</h1>
-    <p class="mob-subtitle">AI-native mobile</p>
+    <div class="mob-home-eyebrow">AI-Native Mobile</div>
+    <h1>Think it.<br>Live it.</h1>
     <div class="mob-prompt">
       <input id="mob-prompt-input" type="text" placeholder="今日市场简报…" autocomplete="off" autocorrect="off">
       <button id="mob-prompt-submit"><i class="ph-bold ph-arrow-right"></i></button>
     </div>
     <div class="mob-suggestions">
       <button data-prompt="\market 今日市场简报：宏观信号、板块轮动、风险事件">
-        <span>今日市场简报</span><i class="ph-bold ph-arrow-right"></i>
+        <span>今日市场简报</span>
+        <i class="ph-bold ph-chart-bar"></i>
       </button>
       <button data-prompt="\sentiment 合成市场情绪摘要">
-        <span>情绪追踪</span><i class="ph-bold ph-arrow-right"></i>
+        <span>情绪追踪</span>
+        <i class="ph-bold ph-activity"></i>
       </button>
       <button data-prompt="\target 跟踪 NVDA、AAPL、TSLA">
-        <span>标的跟踪</span><i class="ph-bold ph-arrow-right"></i>
+        <span>标的跟踪</span>
+        <i class="ph-bold ph-crosshair-simple"></i>
       </button>
       <button data-prompt="\position 交易复盘">
-        <span>交易复盘</span><i class="ph-bold ph-arrow-right"></i>
+        <span>交易复盘</span>
+        <i class="ph-bold ph-arrows-clockwise"></i>
       </button>
     </div>
   </div>
 
-  <!-- AI-rendered anchor content (hidden until first render arrives) -->
+  <!-- AI-rendered anchor content -->
   <div id="anchor-content" hidden></div>
 </section>
 
 <!-- Activity -->
 <section data-route="activity" hidden>
+  <header class="mob-route-header">
+    <h1>Activity</h1>
+  </header>
   <div id="mob-activity-list">
     <p class="mob-empty">No activity yet</p>
   </div>
@@ -55,6 +62,9 @@
 
 <!-- Inbox -->
 <section data-route="inbox" hidden>
+  <header class="mob-route-header">
+    <h1>Inbox</h1>
+  </header>
   <div id="mob-inbox-list">
     <p class="mob-empty">No messages yet</p>
   </div>
@@ -62,11 +72,14 @@
 
 <!-- Settings -->
 <section data-route="settings" hidden>
+  <header class="mob-route-header">
+    <h1>Settings</h1>
+  </header>
   <div id="mob-settings">
     <h2>AI Hand</h2>
-    <div class="mob-settings-row"><span>Active hand</span><span style="color:var(--smoke);font-size:14px">(default)</span></div>
+    <div class="mob-settings-row"><span>Active hand</span><span class="mob-settings-val">(default)</span></div>
     <h2>Session</h2>
-    <div class="mob-settings-row"><span>Status</span><span style="color:var(--mist);font-size:14px">Connecting…</span></div>
+    <div class="mob-settings-row"><span>Status</span><span class="mob-settings-val">Connecting…</span></div>
   </div>
 </section>
 
@@ -106,7 +119,7 @@
 <!-- ── Toast ──────────────────────────────────────────────── -->
 <div class="anc-toast" id="toast"></div>
 
-<!-- ══ Scripts (load order matters) ════════════════════════ -->
+<!-- ══ Scripts ════════════════════════════════════════════ -->
 <script src="timing-waterfall.js"></script>
 <script src="mobile-lib/anchor-envelope.js"></script>
 <script src="mobile-lib/anchor-ws.js"></script>
