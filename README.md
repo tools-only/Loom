@@ -23,21 +23,46 @@ Browser ──op/envelope──► Anchor Service (daemon, port 3000)
 
 ## Quick Start
 
-```bash
-# Install dependencies
-npm install
-cd bridge && npm install && cd ..
+### Windows
 
-# Run in browser (dev mode)
+```bat
+REM Start services (first run installs deps automatically)
 scripts\start-anchor.bat
-# → open http://localhost:3000
+REM → opens http://localhost:3000 in your browser
 
-# Run as desktop app
+REM Run as desktop app (Electron)
 npm start
 
-# Build Windows installer
+REM Build installer
 npm run build
 ```
+
+### Linux (headless server)
+
+**Prerequisites:** Node.js, Python 3, curl
+
+```bash
+# Start services — idempotent, safe to run repeatedly.
+# First run: creates loom/.venv, installs Node + Python deps automatically.
+bash scripts/start-anchor.sh
+# → open http://localhost:3000 in your browser
+
+# Stop services
+bash scripts/stop-anchor.sh
+```
+
+**What the start script does on first run:**
+
+| Step | Action | Skipped if |
+|------|--------|-----------|
+| ① Prereq check | Verify `node`, `python3`, `curl` in PATH | — |
+| ② Node deps | `npm install` inside `mcp/` | `mcp/node_modules` exists |
+| ③ Python venv | `python3 -m venv loom/.venv` | `loom/.venv` exists |
+| ④ Python deps | `pip install -r loom/requirements.txt` | `loom/requirements.txt` unchanged since last install |
+| ⑤ Anchor | Start `mcp/server.cjs` on :3000 | Already running |
+| ⑥ Brain | Start `loom/main.py` (FastAPI) on :3002 | Already running |
+
+Logs are written to `logs/anchor.log` and `logs/brain.log`.
 
 ## Anchor HTML Protocol
 
