@@ -4,10 +4,11 @@
 // This file exists to document the expected webhook payload format.
 'use strict';
 
-class TradingviewWebhookConnector {
+const { BaseConnector } = require('./_base.cjs');
+
+class TradingviewWebhookConnector extends BaseConnector {
   constructor() {
-    this._id   = 'tradingview';
-    this._name = 'TradingView Alerts';
+    super('tradingview', 'TradingView Alerts');
   }
 
   // Called by server.cjs webhook route — not via scheduler

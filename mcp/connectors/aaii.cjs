@@ -2,14 +2,13 @@
 // Polls AAII Investor Sentiment Survey — weekly Thursday results.
 'use strict';
 
-const { loadModule } = require('./_base.cjs');
+const { BaseConnector } = require('./_base.cjs');
 
 // AAII publishes results every Thursday at 4pm ET;
 // we pull Friday morning to ensure data is available.
-class AaiiConnector {
+class AaiiConnector extends BaseConnector {
   constructor() {
-    this._id   = 'aaii';
-    this._name = 'AAII Sentiment';
+    super('aaii', 'AAII Sentiment');
     this._cron = '0 9 * * 5'; // 9am ET every Friday
   }
 
