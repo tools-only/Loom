@@ -42,11 +42,10 @@ npm run build
 **Prerequisites:** Node.js, Python 3, curl — installed and in PATH.
 
 ```bash
-# Install Python dependencies (Brain service)
-pip install -r loom/requirements.txt
+# One-time setup: creates loom/.venv and installs all dependencies
+bash scripts/setup-linux.sh
 
-# Start services — idempotent, safe to run repeatedly.
-# First run automatically creates loom/.venv and installs deps.
+# Start services (run each time)
 bash scripts/start-anchor.sh
 # → open http://localhost:3000 in your browser
 
@@ -54,18 +53,23 @@ bash scripts/start-anchor.sh
 bash scripts/stop-anchor.sh
 ```
 
-**What the start script does on first run:**
+**`setup-linux.sh`** — run once, all steps idempotent:
 
 | Step | Action | Skipped if |
 |------|--------|-----------|
 | ① Prereq check | Verify `node`, `python3`, `curl` in PATH | — |
 | ② Node deps | `npm install` inside `mcp/` | `mcp/node_modules` exists |
 | ③ Python venv | `python3 -m venv loom/.venv` | `loom/.venv` exists |
-| ④ Python deps | `pip install -r loom/requirements.txt` | `loom/requirements.txt` unchanged since last install |
-| ⑤ Anchor | Start `mcp/server.cjs` on :3000 | Already running |
-| ⑥ Brain | Start `loom/main.py` (FastAPI) on :3002 | Already running |
+| ④ Python deps | `pip install -r loom/requirements.txt` | `requirements.txt` unchanged since last install |
 
-Logs are written to `logs/anchor.log` and `logs/brain.log`.
+**`start-anchor.sh`** — run each time:
+
+| Step | Action | Skipped if |
+|------|--------|-----------|
+| ① Anchor | Start `mcp/server.cjs` on :3000 | Already running |
+| ② Brain | Start `loom/main.py` (FastAPI) on :3002 | Already running |
+
+Logs: `logs/anchor.log` · `logs/brain.log`
 
 ## Anchor HTML Protocol
 
