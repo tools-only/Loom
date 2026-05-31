@@ -101,6 +101,8 @@ All UI uses CSS variables from `resource/colors_and_type.css`. Never hard-code c
 
 ## Loom Fin — Hand Agents
 
+> **使用手册：** [`docs/loom-fin.md`](docs/loom-fin.md)
+
 Loom Fin connects **hand agents** — independent AI processes that handle specific trading analysis domains (market, sentiment, target, position). Each hand runs as its own agent process with a persistent wiki-style memory.
 
 ```
