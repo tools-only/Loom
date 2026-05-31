@@ -5,9 +5,10 @@
 const { BaseConnector } = require('./_base.cjs');
 const { fetchFeed }     = require('../lib/rss-fetch.cjs');
 
+// reuters.com free RSS was shut down in 2020; replaced with AP Business News
 const FEEDS = [
-  'https://feeds.reuters.com/reuters/businessNews',
-  'https://feeds.reuters.com/reuters/topNews',
+  'https://apnews.com/hub/business.rss',
+  'https://apnews.com/hub/financial-markets.rss',
 ];
 
 class ReutersRssConnector extends BaseConnector {

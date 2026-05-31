@@ -10,8 +10,7 @@ const Parser  = require(path.join(BRIDGE_NM, 'rss-parser'));
 async function fetchFeed(url, opts = {}) {
   const parser = new Parser({
     headers: {
-      'User-Agent': opts.userAgent ||
-        'Loom/1.0 (personal research workspace; contact: user@localhost)'
+      'User-Agent': opts.userAgent || 'Loom/1.0 isq.zhou@gmail.com'
     },
     timeout: opts.timeout || 15000,
     customFields: { item: ['summary', 'description'] }
@@ -29,7 +28,7 @@ async function fetchFeed(url, opts = {}) {
       }))
     };
   } catch (e) {
-    console.error('[rss-fetch] error', url + ':', e.message);
+    console.error('[rss-fetch] error', url + ':', e.message || e.code || String(e));
     return { title: '', items: [] };
   }
 }

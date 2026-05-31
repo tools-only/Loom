@@ -27,7 +27,7 @@ if curl -sf http://localhost:3000/health >/dev/null 2>&1; then
 else
   echo "[anchor] Starting Anchor service on http://localhost:3000 ..."
   mkdir -p logs
-  ANCHOR_USE_AUTOEXEC=1 ANCHOR_DISABLE_ENRICHMENT=1 \
+  ANCHOR_USE_AUTOEXEC=1 ANCHOR_DISABLE_ENRICHMENT=1 ANCHOR_NO_AUTO_BROWSER=1 \
     nohup node mcp/server.cjs >> logs/anchor.log 2>&1 &
   echo "[anchor] PID $!"
 fi

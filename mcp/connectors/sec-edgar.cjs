@@ -55,7 +55,8 @@ class SecEdgarConnector extends BaseConnector {
   async _pollForm(formType) {
     const url = EDGAR_FEED(formType);
     const { items } = await fetchFeed(url, {
-      userAgent: 'Loom/1.0 (personal research workspace; contact: user@localhost)'
+      // SEC EDGAR requires a real email in User-Agent per https://www.sec.gov/privacy.htm#security
+      userAgent: 'Loom/1.0 isq.zhou@gmail.com'
     });
 
     for (const item of items) {
