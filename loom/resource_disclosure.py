@@ -4,6 +4,8 @@ LEGACY: disclosure strategy (rank-by-usage) belongs to each hand agent, not Core
 This module is retained only to support the sdk_legacy adapter path.
 New runtimes (cc, codex) should not use this — hands self-manage via their wiki.
 """
+from __future__ import annotations
+
 import json
 from collections import Counter
 from pathlib import Path

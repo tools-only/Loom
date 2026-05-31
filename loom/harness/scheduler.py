@@ -1,4 +1,6 @@
 """APScheduler — daily harness review at 07:00 ET, weekdays."""
+from __future__ import annotations
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .review import run_daily_review
 

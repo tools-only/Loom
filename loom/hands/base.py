@@ -6,6 +6,8 @@ Flow per run():
   3. On stop_reason=end_turn: parse the structured artifact
   4. Return { metadata, narrative } with resource tracking metadata merged in
 """
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from bridge import get_connector_data

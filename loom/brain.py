@@ -9,6 +9,8 @@ Routes:
   GET  /hand/:id/config                              →  hand config
   PUT  /hand/:id/config                              →  write hand config
 """
+from __future__ import annotations
+
 import asyncio
 import datetime
 import json

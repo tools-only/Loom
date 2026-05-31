@@ -1,4 +1,6 @@
 """HTTP client — connects Python Loom harness to the JS server at port 3000."""
+from __future__ import annotations
+
 import json
 import time
 from pathlib import Path

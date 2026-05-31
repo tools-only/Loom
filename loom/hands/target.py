@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .base import BaseHand
 from bridge import get_thesis, append_thesis
 

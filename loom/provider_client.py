@@ -9,6 +9,8 @@ Supported providers:
 
 Config is read from loom-config.json. Call write_config() to hot-reload without restart.
 """
+from __future__ import annotations
+
 import json
 import os
 from pathlib import Path
