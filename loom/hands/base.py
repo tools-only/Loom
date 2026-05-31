@@ -42,13 +42,36 @@ FETCH_RESOURCE_TOOL = {
 class BaseHand:
     def __init__(self, hand_id: str):
         self.hand_id = hand_id
-        self._prompt_cache: str | None = None
 
-    def _load_prompt(self) -> str:
-        if self._prompt_cache is None:
-            p = ROOT / "hands" / "prompts" / f"{self.hand_id}.md"
-            self._prompt_cache = p.read_text(encoding="utf-8")
-        return self._prompt_cache
+    def _assemble_prompt(self, context: dict) -> str:
+        import time
+        parts: list[str] = []
+
+        hand_prompt = ROOT / "loom" / "hands" / "prompts" / f"{self.hand_id}.md"
+        if hand_prompt.exists():
+            parts.append(hand_prompt.read_text("utf-8"))
+
+        skill_md = ROOT / "skills" / "investment-research-framework" / "SKILL.md"
+        if skill_md.exists():
+            parts.append("\n\n# Investment Research Framework (skill index)\n\n")
+            parts.append(skill_md.read_text("utf-8"))
+
+        personal_dir = ROOT / "hands" / self.hand_id / "personal"
+        for fname in ["profile.md", "themes.md", "watchlist.md", "sources.md"]:
+            p = personal_dir / fname
+            if p.exists() and p.stat().st_size > 0:
+                parts.append(f"\n\n## (personal) {fname}\n\n{p.read_text('utf-8')}")
+
+        notes = personal_dir / "learned-notes.md"
+        if notes.exists() and notes.stat().st_size > 0:
+            txt = notes.read_text("utf-8")
+            parts.append(f"\n\n## (personal) learned-notes (tail)\n\n{txt[-4000:]}")
+
+        snap = ROOT / "hands" / self.hand_id / "context" / "regime-snapshot.md"
+        if snap.exists() and (time.time() - snap.stat().st_mtime) < 86400:
+            parts.append(f"\n\n## (context) regime-snapshot\n\n{snap.read_text('utf-8')}")
+
+        return "".join(parts)
 
     @staticmethod
     def _format_menu(resource_menu: list[dict]) -> str:
@@ -61,7 +84,7 @@ class BaseHand:
 
     async def run(self, task: str, context: dict, resource_menu: list[dict]) -> dict:
         client, model = get_client_for_hand(self.hand_id)
-        system = self._load_prompt()
+        system = self._assemble_prompt(context)
         shown = [r["resource_id"] for r in resource_menu]
         used: list[str] = []
 
@@ -73,7 +96,7 @@ class BaseHand:
         messages: list[dict] = [{"role": "user", "content": "\n".join(user_parts)}]
         final_text = ""
 
-        for _ in range(10):
+        for _ in range(12):
             resp = await client.messages.create(
                 model=model,
                 max_tokens=4096,

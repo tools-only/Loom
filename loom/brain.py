@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import json
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -170,12 +171,46 @@ def _register_mount_adapter(hand_id: str, endpoint: str, description: str,
     return adapter_id
 
 
+def _read_personal_context(hand_id: str) -> dict[str, str]:
+    """Return {label: content} for SKILL.md + personal/ + fresh context/."""
+    out: dict[str, str] = {}
+    skill_md = _ROOT / "skills" / "investment-research-framework" / "SKILL.md"
+    if skill_md.exists():
+        out["skill_index"] = skill_md.read_text("utf-8")
+    personal_dir = _ROOT / "hands" / hand_id / "personal"
+    for fname in ["profile.md", "themes.md", "watchlist.md", "sources.md"]:
+        p = personal_dir / fname
+        if p.exists() and p.stat().st_size > 0:
+            out[f"personal/{fname}"] = p.read_text("utf-8")
+    notes = personal_dir / "learned-notes.md"
+    if notes.exists() and notes.stat().st_size > 0:
+        txt = notes.read_text("utf-8")
+        out["personal/learned-notes.md"] = txt[-4000:]
+    snap = _ROOT / "hands" / hand_id / "context" / "regime-snapshot.md"
+    if snap.exists() and (time.time() - snap.stat().st_mtime) < 86400:
+        out["context/regime-snapshot.md"] = snap.read_text("utf-8")
+    return out
+
+
+def _format_personal_block(personal: dict[str, str]) -> str:
+    """Format personal context dict as markdown sections for prompt injection."""
+    if not personal:
+        return ""
+    parts = ["\n\n---\n\n# Research Framework & User Context\n"]
+    if "skill_index" in personal:
+        parts.append(f"\n## Skill Index\n\n{personal['skill_index']}")
+    for k, v in personal.items():
+        if k != "skill_index":
+            parts.append(f"\n\n## ({k})\n\n{v}")
+    return "".join(parts)
+
+
 def _build_hand_system_prompt(hand_id: str, description: str) -> str:
     info = REGISTRY.get(hand_id, {})
     label = info.get("label", hand_id)
     domain = info.get("description", "")
     user_note = f"\n\n## 用户说明\n{description.strip()}" if description.strip() else ""
-    return (
+    base = (
         f"你是 Loom Fin 的【{label}】hand agent。{user_note}\n\n"
         f"## 分析职责\n{domain}\n\n"
         "## 输出协议（严格遵守）\n"
@@ -187,6 +222,7 @@ def _build_hand_system_prompt(hand_id: str, description: str) -> str:
         "- narrative: 2-4 段中文分析\n\n"
         "不要输出其他任何内容。"
     )
+    return base + _format_personal_block(_read_personal_context(hand_id))
 
 
 # Restore mounts on startup
@@ -234,14 +270,20 @@ async def run(req: RunRequest):
             return {"ok": False, "error": f"unknown runtime adapter: {runtime}"}
         wiki_dir = info.get("wiki_dir", "")
         hand_dir = str(Path(wiki_dir).parent) if wiki_dir else ""
+        personal = _read_personal_context(req.hand_id)
+        # Inject into context so http×loom _build_snapshot forwards it to cloud agents.
+        context_with_personal = {**req.context}
+        if personal:
+            context_with_personal["__personal__"] = personal
         envelope = {
             "task": req.task,
-            "context": req.context,
+            "context": context_with_personal,
             "hand_id": req.hand_id,
             "hand_dir": hand_dir,
             "wiki_dir": wiki_dir,
             "resource_api": "http://127.0.0.1:3001/resources",
             "feedback_log": str(_ROOT / "logs" / "feedback.jsonl"),
+            "personal": personal,  # top-level for process×loom agents (stdin JSON)
         }
         artifact = None
         try:

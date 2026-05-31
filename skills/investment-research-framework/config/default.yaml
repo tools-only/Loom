@@ -1,0 +1,54 @@
+version: 1
+scope_defaults:
+  market: "US equities unless the user specifies another market"
+  horizon: "days-to-weeks"
+  output_depth: "standard"
+  advice_boundary: "research framework, not personalized financial advice"
+
+driver_weights:
+  market_regime:
+    macro: 0.16
+    rates: 0.14
+    liquidity: 0.14
+    credit_volatility: 0.12
+    large_flows: 0.18
+    breadth: 0.10
+    earnings_valuation: 0.16
+  sector_heat:
+    relative_strength: 0.18
+    flows: 0.18
+    breadth: 0.12
+    earnings_revisions: 0.18
+    valuation: 0.10
+    industry_conditions: 0.14
+    policy_tailwind: 0.10
+  policy_layer:
+    monetary_policy: 0.20
+    fiscal_policy: 0.14
+    regulation: 0.14
+    geopolitics: 0.18
+    elections: 0.12
+    international_macro: 0.12
+    implementation_timing: 0.10
+
+source_tier_weights:
+  A_official_original: 1.00
+  B_market_data_vendor: 0.90
+  C_primary_financial_news: 0.75
+  D_industry_source: 0.70
+  E_company_or_filing: 0.95
+  F_social_sentiment: 0.35
+  G_secondary_commentary: 0.45
+
+freshness_rules:
+  intraday_market_data: "same session"
+  macro_release: "until next official release"
+  policy_news: "verify current status and implementation stage"
+  earnings: "until next report or guidance update"
+  industry_data: "prefer latest monthly or quarterly release"
+
+evolution:
+  feedback_decay: "recent user corrections outweigh older preferences unless explicitly marked durable"
+  durable_change_threshold: "repeat signal, high-confidence correction, or explicit user request"
+  strategy_ingestion_mode: "extract principle and test condition before changing weights"
+
