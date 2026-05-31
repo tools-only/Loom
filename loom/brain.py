@@ -428,6 +428,7 @@ def get_config():
 
 
 @app.put("/config")
+@app.post("/config")
 async def put_config(request: Request):
     try:
         cfg = await request.json()

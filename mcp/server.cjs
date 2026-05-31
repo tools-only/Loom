@@ -576,6 +576,12 @@ function _makeProxy(port) {
 const _proxyToBrain = _makeProxy(BRAIN_PORT);
 const _proxyToCore  = _makeProxy(CORE_PORT);
 
+// /config, /run, /feedback, /hand/* → Brain FastAPI at port 3002 (direct paths)
+app.all('/config',           (req, res) => _proxyToBrain(req, res, '/config'));
+app.all('/run',              (req, res) => _proxyToBrain(req, res, '/run'));
+app.all('/feedback',         (req, res) => _proxyToBrain(req, res, '/feedback'));
+app.all(/^\/hand(\/.*)?$/,   (req, res) => _proxyToBrain(req, res, '/hand' + (req.params[0] || '')));
+
 // /loom/* → Brain FastAPI at port 3002 (strips /loom prefix)
 app.all(/^\/loom(\/.*)?$/, (req, res) => {
   const brainPath = (req.params[0] || '/') || '/';
