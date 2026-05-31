@@ -78,15 +78,19 @@ window.AnchorEnvelope = (function () {
       transient_override: !!overrideBundle
     }, overrideBundle || {});
 
+    var intent = { op: op, target_kind: target_kind };
+    if (target_ref != null) intent.target_ref = target_ref;
+    if (instruction != null) intent.instruction = instruction;
+
     return {
       schema_version: '1.0',
-      intent: { op: op, target_kind: target_kind, target_ref: target_ref, instruction: instruction },
+      intent: intent,
       selection: selection,
       context_bundle: bundle,
       render_state: renderState,
       domain: null, // TODO: trading domain inference not yet ported to mobile
       provenance: {
-        session_id: sessionId,
+        session_id: sessionId || '',
         event_id: eventId,
         parent_event_id: null,
         timestamp: new Date().toISOString(),
