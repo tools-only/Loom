@@ -39,47 +39,14 @@ npm run build
 
 ### Linux (headless server)
 
-**Prerequisites:** Node.js 18+, Python 3.10+, curl
-
-<details>
-<summary>Install prerequisites</summary>
-
-**Ubuntu / Debian**
-```bash
-# Node.js 20 (via NodeSource)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Python 3 + venv support + curl
-sudo apt-get install -y python3 python3-venv curl
-```
-
-**RHEL / CentOS / Fedora**
-```bash
-# Node.js 20 (via NodeSource)
-curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-sudo dnf install -y nodejs
-
-# Python 3 + curl
-sudo dnf install -y python3 curl
-```
-
-**Arch Linux**
-```bash
-sudo pacman -S nodejs npm python curl
-```
-
-Verify:
-```bash
-node --version   # v20.x.x
-python3 --version  # 3.10+
-curl --version
-```
-</details>
+**Prerequisites:** Node.js, Python 3, curl — installed and in PATH.
 
 ```bash
+# Install Python dependencies (Brain service)
+pip install -r loom/requirements.txt
+
 # Start services — idempotent, safe to run repeatedly.
-# First run: creates loom/.venv, installs Node + Python deps automatically.
+# First run automatically creates loom/.venv and installs deps.
 bash scripts/start-anchor.sh
 # → open http://localhost:3000 in your browser
 
