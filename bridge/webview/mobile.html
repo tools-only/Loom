@@ -3,256 +3,118 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Loom Mobile</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Loom</title>
 <link rel="stylesheet" href="resource/colors_and_type.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="mobile.css">
 </head>
 <body>
 
-<!-- ═══ Toolbar ═══ -->
-<header class="mob-toolbar" id="mob-toolbar">
-  <span class="mob-brand">Loom</span>
-  <nav class="mob-domain-tabs" id="mob-domain-tabs">
-    <button class="mob-domain-tab" data-domain="market"><i class="ph-bold ph-newspaper"></i>Market</button>
-    <button class="mob-domain-tab" data-domain="target"><i class="ph-bold ph-crosshair"></i>Targets</button>
-    <button class="mob-domain-tab" data-domain="sentiment"><i class="ph-bold ph-pulse"></i>Sentiment</button>
-    <button class="mob-domain-tab" data-domain="position"><i class="ph-bold ph-briefcase"></i>Portfolio</button>
-  </nav>
-  <span class="mob-status" id="status">connecting…</span>
-</header>
+<!-- ── Status pill ────────────────────────────── -->
+<span class="mob-status" id="mob-status">connecting…</span>
 
-<!-- ═══ Processing indicator ═══ -->
-<div class="mob-processing" id="processing">
-  <span class="dot"></span>
-  <span class="processing-label" id="processing-label">Processing</span>
-</div>
+<!-- ══ Routes ══════════════════════════════════════════════ -->
 
-<!-- ═══ Home screen (shown when no content) ═══ -->
-<section class="mob-home" id="mob-home">
-  <h1>Think it. Live it.</h1>
-  <p>AI-native chrome · mobile view</p>
-  <div class="mob-prompt">
-    <input id="prompt-input" type="text" placeholder="\market 今日简报…" autocomplete="off">
-    <button id="prompt-submit"><i class="ph-bold ph-arrow-right"></i></button>
+<!-- Home -->
+<section data-route="home">
+  <div id="mob-home-empty">
+    <h1>Think it. Live it.</h1>
+    <p class="mob-subtitle">AI-native mobile</p>
+    <div class="mob-prompt">
+      <input id="mob-prompt-input" type="text" placeholder="今日市场简报…" autocomplete="off" autocorrect="off">
+      <button id="mob-prompt-submit"><i class="ph-bold ph-arrow-right"></i></button>
+    </div>
+    <div class="mob-suggestions">
+      <button data-prompt="\market 今日市场简报：宏观信号、板块轮动、风险事件">
+        <span>今日市场简报</span><i class="ph-bold ph-arrow-right"></i>
+      </button>
+      <button data-prompt="\sentiment 合成市场情绪摘要">
+        <span>情绪追踪</span><i class="ph-bold ph-arrow-right"></i>
+      </button>
+      <button data-prompt="\target 跟踪 NVDA、AAPL、TSLA">
+        <span>标的跟踪</span><i class="ph-bold ph-arrow-right"></i>
+      </button>
+      <button data-prompt="\position 交易复盘">
+        <span>交易复盘</span><i class="ph-bold ph-arrow-right"></i>
+      </button>
+    </div>
   </div>
-  <div class="mob-suggestions">
-    <button data-prompt="\market 今日市场简报：宏观信号、板块轮动、风险事件"><span>今日市场简报</span><i class="ph-bold ph-arrow-right"></i></button>
-    <button data-prompt="\sentiment 合成市场情绪摘要"><span>情绪追踪</span><i class="ph-bold ph-arrow-right"></i></button>
-    <button data-prompt="\target 跟踪 NVDA、AAPL、TSLA"><span>标的跟踪</span><i class="ph-bold ph-arrow-right"></i></button>
-    <button data-prompt="\position 交易复盘"><span>交易复盘</span><i class="ph-bold ph-arrow-right"></i></button>
+
+  <!-- AI-rendered anchor content (hidden until first render arrives) -->
+  <div id="anchor-content" hidden></div>
+</section>
+
+<!-- Activity -->
+<section data-route="activity" hidden>
+  <div id="mob-activity-list">
+    <p class="mob-empty">No activity yet</p>
   </div>
 </section>
 
-<!-- ═══ Anchor content (rendered by AI) ═══ -->
-<div id="anchor-content"></div>
+<!-- Inbox -->
+<section data-route="inbox" hidden>
+  <div id="mob-inbox-list">
+    <p class="mob-empty">No messages yet</p>
+  </div>
+</section>
 
-<!-- ═══ Toast ═══ -->
+<!-- Settings -->
+<section data-route="settings" hidden>
+  <div id="mob-settings">
+    <h2>AI Hand</h2>
+    <div class="mob-settings-row"><span>Active hand</span><span style="color:var(--smoke);font-size:14px">(default)</span></div>
+    <h2>Session</h2>
+    <div class="mob-settings-row"><span>Status</span><span style="color:var(--mist);font-size:14px">Connecting…</span></div>
+  </div>
+</section>
+
+<!-- ── Sticky prompt bar (shown after first render) ──────── -->
+<div class="mob-prompt-bar" id="mob-prompt-bar" hidden>
+  <input id="mob-bar-input" type="text" placeholder="New prompt…" autocomplete="off" autocorrect="off">
+  <button id="mob-bar-submit"><i class="ph-bold ph-arrow-right"></i></button>
+</div>
+
+<!-- ── Bottom navigation ──────────────────────────────────── -->
+<nav class="mob-bottom-nav">
+  <button class="mob-nav-btn is-active" data-route="home">
+    <i class="ph-bold ph-house"></i>
+    <span>Home</span>
+  </button>
+  <button class="mob-nav-btn" data-route="activity">
+    <i class="ph-bold ph-pulse"></i>
+    <span>Activity</span>
+  </button>
+  <button class="mob-nav-btn" data-route="inbox">
+    <i class="ph-bold ph-tray"></i>
+    <span>Inbox</span>
+  </button>
+  <button class="mob-nav-btn" data-route="settings">
+    <i class="ph-bold ph-gear"></i>
+    <span>Settings</span>
+  </button>
+</nav>
+
+<!-- ── Selection action bar ───────────────────────────────── -->
+<div class="mob-sel-bar" id="mob-sel-bar" hidden>
+  <button class="mob-sel-btn" data-op="ask">Ask</button>
+  <button class="mob-sel-btn" data-op="refine">Refine</button>
+  <button class="mob-sel-btn" data-op="annotate">Annotate</button>
+</div>
+
+<!-- ── Toast ──────────────────────────────────────────────── -->
 <div class="anc-toast" id="toast"></div>
 
-<!-- ═══ Scripts ═══ -->
+<!-- ══ Scripts (load order matters) ════════════════════════ -->
 <script src="timing-waterfall.js"></script>
-<script>
-(function() {
-  'use strict';
+<script src="mobile-lib/anchor-envelope.js"></script>
+<script src="mobile-lib/anchor-ws.js"></script>
+<script src="mobile-lib/anchor-patch.js"></script>
+<script src="mobile/mobile-routes.js"></script>
+<script src="mobile/mobile-anchor.js"></script>
+<script src="mobile/mobile-selection.js"></script>
+<script src="mobile/mobile-app.js"></script>
 
-  // ── DOM refs ────────────────────────────────────
-  const statusEl = document.getElementById('status');
-  const processingEl = document.getElementById('processing');
-  const processingLabel = document.getElementById('processing-label');
-  const homeEl = document.getElementById('mob-home');
-  const contentEl = document.getElementById('anchor-content');
-  const toastEl = document.getElementById('toast');
-  const promptInput = document.getElementById('prompt-input');
-  const promptSubmit = document.getElementById('prompt-submit');
-
-  // ── WS connection ───────────────────────────────
-  var ws = null;
-  var currentTiming = null;
-
-  function connect() {
-    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(proto + '//' + location.host);
-    ws.onopen = function() {
-      statusEl.textContent = 'connected';
-      homeEl.style.display = '';
-      contentEl.style.display = 'none';
-    };
-    ws.onclose = function() {
-      statusEl.textContent = 'offline';
-      if (!contentEl.children.length) homeEl.style.display = '';
-      setTimeout(connect, 2000);
-    };
-    ws.onmessage = function(e) {
-      var msg;
-      try { msg = JSON.parse(e.data); } catch(_) { return; }
-      handleMsg(msg);
-    };
-  }
-
-  // ── Message handling ────────────────────────────
-  var _timing = null;
-
-  function handleMsg(msg) {
-    switch (msg.type) {
-      case 'html':
-        contentEl.innerHTML = msg.content || '';
-        homeEl.style.display = 'none';
-        contentEl.style.display = 'block';
-        break;
-      case 'patch':
-        if (msg.patches) applyPatches(msg.patches);
-        if (_timing && !_timing.t5_patch) _timing.t5_patch = performance.now();
-        break;
-      case 'ack':
-        if (_timing && !_timing.t3_ack) _timing.t3_ack = performance.now();
-        break;
-      case 'agent_event':
-        handleAgentEvent(msg.event);
-        break;
-      case 'error':
-        toast(msg.message || 'Error');
-        break;
-    }
-  }
-
-  function handleAgentEvent(evt) {
-    if (!evt) return;
-    var kind = evt.kind || '';
-    var payload = evt.payload || {};
-    if (kind === 'agent.timing' && _timing) {
-      _timing.server = payload;
-      if (_timing.t6_dom) showTimings();
-      return;
-    }
-    if (kind === 'agent.thinking') {
-      processingEl.classList.add('show');
-      processingLabel.textContent = payload.summary || 'Thinking…';
-    }
-    if (kind === 'agent.complete' || kind === 'agent.error') {
-      processingEl.classList.remove('show');
-    }
-  }
-
-  // ── Patch apply ─────────────────────────────────
-  function applyPatches(patches) {
-    if (!patches) return;
-    var tp0 = performance.now();
-    patches.forEach(function(p) {
-      if (!p.anchor_id || !p.html_fragment) return;
-      var sel = '[data-anc="' + p.anchor_id.replace(/"/g, '\\"') + '"]';
-      var target = contentEl.querySelector(sel);
-      if (!target) return;
-      var wrapper = document.createElement('div');
-      wrapper.innerHTML = p.html_fragment;
-      var newNode = wrapper.firstElementChild;
-      if (newNode) target.replaceWith(newNode);
-    });
-    if (_timing && !_timing.t6_dom) {
-      _timing.t6_dom = performance.now();
-      var tp1 = performance.now();
-      _timing._patch_detail = { outerhtml_ms: Math.round(tp1 - tp0) };
-      setTimeout(function() { showTimings(); }, 0);
-    }
-  }
-
-  // ── Send prompt / envelope ──────────────────────
-  function sendPrompt(text) {
-    var trimmed = text.trim();
-    if (!trimmed) return;
-    _timing = {
-      op: 'prompt',
-      target: 'mobile',
-      t0_click: performance.now(),
-    };
-    homeEl.style.display = 'none';
-    contentEl.style.display = 'block';
-    contentEl.innerHTML = '<div style="padding:24px;text-align:center;color:#999;font-size:13px">⏳ 生成中…</div>';
-
-    var handMatch = trimmed.match(/^\\(market|position|target|sentiment)\s+(.*)/s);
-    var envelope = {
-      schema_version: '1.0',
-      intent: { op: 'initial_render', target_kind: 'global', target_ref: null, instruction: trimmed },
-      context_bundle: { memory_ids: [], skill_ids: [], subagent_ids: [], resource_ids: [] },
-      render_state: { anchor_tree: [], anchor_index: {} },
-      provenance: { session_id: null, event_id: 'mob-' + Date.now(), parent_event_id: null,
-                    timestamp: new Date().toISOString(), client_version: '0.1.0' }
-    };
-    if (handMatch) {
-      envelope.context_bundle.loom_hand = handMatch[1];
-      envelope.intent.instruction = handMatch[2];
-    }
-
-    ws.send(JSON.stringify({ type: 'envelope', envelope: envelope }));
-    if (_timing) _timing.t2_sent = performance.now();
-    toast('Sent');
-    promptInput.value = '';
-    promptInput.blur();
-  }
-
-  // ── Timing waterfall (mobile compact) ────────────
-  function showTimings() {
-    if (!_timing || !_timing.t6_dom || !_timing.t0_click) return;
-    var t = _timing;
-    var total = Math.round(t.t6_dom - t.t0_click);
-    var srv = t.server || {};
-    var html = '<div style="font-size:10px;color:#888;margin-bottom:6px">';
-    if (t.op) html += 'op: ' + t.op + ' · ';
-    html += 'total: <b>' + fmt(total) + '</b></div>';
-
-    if (srv.ms_hand_agent != null) {
-      html += '<div style="font-size:10px;color:#999">';
-      html += 'Hand Agent: <b style="color:#FFD700">' + fmt(srv.ms_hand_agent) + '</b>';
-      if (srv.ms_loom_agent != null) {
-        html += ' · Loom: <b style="color:#F6AD55">' + fmt(srv.ms_loom_agent) + '</b>';
-      }
-      html += '</div>';
-    }
-    toast('⏱ ' + total + 'ms');
-  }
-
-  function fmt(v) {
-    if (v == null || isNaN(v)) return '—';
-    return v >= 1000 ? (v / 1000).toFixed(1) + 's' : Math.round(v) + 'ms';
-  }
-
-  // ── Toast ────────────────────────────────────────
-  var toastTimer = null;
-  function toast(msg) {
-    toastEl.textContent = msg;
-    toastEl.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function() { toastEl.classList.remove('show'); }, 2000);
-  }
-
-  // ── Domain tabs ──────────────────────────────────
-  document.getElementById('mob-domain-tabs').addEventListener('click', function(e) {
-    var btn = e.target.closest('.mob-domain-tab');
-    if (!btn) return;
-    var domain = btn.getAttribute('data-domain');
-    var promptMap = { market: '\\market ', target: '\\target ', sentiment: '\\sentiment ', position: '\\position ' };
-    promptInput.value = promptMap[domain] || '';
-    promptInput.focus();
-    document.querySelectorAll('.mob-domain-tab').forEach(function(t) { t.classList.remove('active'); });
-    btn.classList.add('active');
-  });
-
-  // ── Prompt submit ────────────────────────────────
-  promptSubmit.addEventListener('click', function() { sendPrompt(promptInput.value); });
-  promptInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') sendPrompt(promptInput.value);
-  });
-
-  // ── Suggestion buttons ──────────────────────────
-  document.querySelectorAll('.mob-suggestions button').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      sendPrompt(btn.getAttribute('data-prompt'));
-    });
-  });
-
-  // ── Boot ─────────────────────────────────────────
-  connect();
-})();
-</script>
 </body>
 </html>
