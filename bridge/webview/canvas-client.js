@@ -48,6 +48,12 @@ function initViewport() {
       document.body.classList.add('canvas-panning');
       e.preventDefault();
     }
+    if ((e.key === 'Delete' || e.key === 'Backspace') &&
+        state.selected.size > 0 &&
+        document.activeElement !== promptInput) {
+      e.preventDefault();
+      deleteSelected();
+    }
   });
 
   document.addEventListener('keyup', function (e) {
@@ -65,9 +71,12 @@ function initViewport() {
       e.preventDefault();
       return;
     }
-    // Click on empty canvas → clear selection
+    // Click on empty canvas → clear selection + start pan
     if (e.target === viewport || e.target === stage) {
       clearSelection();
+      isPanning = true;
+      panStart = { x: e.clientX - state.viewport.x, y: e.clientY - state.viewport.y };
+      e.preventDefault();
     }
   });
 
@@ -137,6 +146,7 @@ function renderFromHtml(html) {
     var x     = hasPos ? parseFloat(cardEl.getAttribute('data-anc-x'))     : autoX + autoCol * 360;
     var y     = hasPos ? parseFloat(cardEl.getAttribute('data-anc-y'))     : autoY;
     var w     = parseFloat(cardEl.getAttribute('data-anc-w')     || '320');
+    var h     = parseFloat(cardEl.getAttribute('data-anc-h')     || '0');
     var rot   = parseFloat(cardEl.getAttribute('data-anc-rot')   || '0');
     var scale = parseFloat(cardEl.getAttribute('data-anc-scale') || '1');
     var z     = parseInt(  cardEl.getAttribute('data-anc-z')     || '1', 10);
@@ -150,12 +160,12 @@ function renderFromHtml(html) {
       var existing = state.cards.get(id);
       existing.contentEl.innerHTML = cardEl.innerHTML;
       if (!existing.localMoved) {
-        existing.x = x; existing.y = y; existing.w = w;
+        existing.x = x; existing.y = y; existing.w = w; existing.h = h;
         existing.rot = rot; existing.scale = scale; existing.z = z;
         updateCardTransform(existing);
       }
     } else {
-      addCard(id, cardEl.outerHTML, x, y, w, rot, scale, z);
+      addCard(id, cardEl.outerHTML, x, y, w, h, rot, scale, z);
     }
   });
 
@@ -169,17 +179,13 @@ function renderFromHtml(html) {
   updateEmptyState();
 }
 
-function addCard(id, outerHtml, x, y, w, rot, scale, z) {
+function addCard(id, outerHtml, x, y, w, h, rot, scale, z) {
   var host = document.createElement('div');
   host.className = 'canvas-card-host';
   host.dataset.cardId = id;
-  host.style.cssText =
-    'position:absolute;' +
-    'left:' + x + 'px;' +
-    'top:'  + y + 'px;' +
-    'width:'+ w + 'px;' +
-    'z-index:' + z + ';' +
-    'transform:rotate(' + rot + 'deg) scale(' + scale + ');';
+  var css = 'position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;z-index:' + z + ';transform:rotate(' + rot + 'deg) scale(' + scale + ');';
+  if (h > 0) css += 'height:' + h + 'px;overflow:hidden;';
+  host.style.cssText = css;
 
   var inner = document.createElement('div');
   inner.innerHTML = outerHtml;
@@ -193,7 +199,7 @@ function addCard(id, outerHtml, x, y, w, rot, scale, z) {
 
   var entry = {
     el: host, contentEl: contentEl,
-    x: x, y: y, w: w, rot: rot, scale: scale, z: z,
+    x: x, y: y, w: w, h: h || 0, rot: rot, scale: scale, z: z,
     localMoved: false
   };
   state.cards.set(id, entry);
@@ -258,6 +264,9 @@ function bindCardEvents(id, host, entry) {
 }
 
 function beginDrag(e, id, entry, type, dir) {
+  // Snapshot actual rendered height for resize (h=0 means auto so far)
+  if (type === 'resize' && !entry.h) entry.h = entry.el.offsetHeight;
+
   var rect = entry.el.getBoundingClientRect();
   _drag = {
     type:     type,
@@ -268,6 +277,7 @@ function beginDrag(e, id, entry, type, dir) {
     x0:  entry.x,
     y0:  entry.y,
     w0:  entry.w,
+    h0:  entry.h || entry.el.offsetHeight,
     rot0: entry.rot,
     // Pre-compute card center for rotation
     cx: rect.left + rect.width  / 2,
@@ -303,12 +313,21 @@ document.addEventListener('mousemove', function (e) {
 
   } else if (_drag.type === 'resize') {
     var dir = _drag.dir;
+    // Horizontal
     if (dir === 'e' || dir === 'se' || dir === 'ne') {
       entry.w = Math.max(160, _drag.w0 + dx);
     } else if (dir === 'w' || dir === 'sw' || dir === 'nw') {
       var nw = Math.max(160, _drag.w0 - dx);
       entry.x = _drag.x0 + (_drag.w0 - nw);
       entry.w = nw;
+    }
+    // Vertical
+    if (dir === 's' || dir === 'se' || dir === 'sw') {
+      entry.h = Math.max(80, _drag.h0 + dy);
+    } else if (dir === 'n' || dir === 'ne' || dir === 'nw') {
+      var nh = Math.max(80, _drag.h0 - dy);
+      entry.y = _drag.y0 + (_drag.h0 - nh);
+      entry.h = nh;
     }
     entry.localMoved = true;
   }
@@ -330,6 +349,13 @@ function updateCardTransform(entry) {
   entry.el.style.width     = entry.w   + 'px';
   entry.el.style.zIndex    = entry.z;
   entry.el.style.transform = 'rotate(' + entry.rot + 'deg) scale(' + entry.scale + ')';
+  if (entry.h > 0) {
+    entry.el.style.height   = entry.h + 'px';
+    entry.el.style.overflow = 'hidden';
+  } else {
+    entry.el.style.height   = '';
+    entry.el.style.overflow = '';
+  }
 
   // Keep data-anc-* on content element in sync (so serialization is correct)
   var c = entry.contentEl;
@@ -340,6 +366,8 @@ function updateCardTransform(entry) {
     c.setAttribute('data-anc-rot',   entry.rot);
     c.setAttribute('data-anc-scale', entry.scale);
     c.setAttribute('data-anc-z',     entry.z);
+    if (entry.h > 0) c.setAttribute('data-anc-h', entry.h);
+    else c.removeAttribute('data-anc-h');
   }
 }
 
@@ -360,6 +388,16 @@ function clearSelection() {
   state.selected.clear();
 }
 
+function deleteSelected() {
+  state.selected.forEach(function (id) {
+    var entry = state.cards.get(id);
+    if (entry) { entry.el.remove(); state.cards.delete(id); }
+  });
+  state.selected.clear();
+  updateEmptyState();
+  scheduleSync();
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Patch apply (incoming from agent via WS)
 // ─────────────────────────────────────────────────────────────────────
@@ -376,10 +414,11 @@ function applyPatches(patches) {
       var x     = parseFloat(el.getAttribute('data-anc-x')     || '0');
       var y     = parseFloat(el.getAttribute('data-anc-y')     || '0');
       var w     = parseFloat(el.getAttribute('data-anc-w')     || '320');
+      var h     = parseFloat(el.getAttribute('data-anc-h')     || '0');
       var rot   = parseFloat(el.getAttribute('data-anc-rot')   || '0');
       var scale = parseFloat(el.getAttribute('data-anc-scale') || '1');
       var z     = parseInt(  el.getAttribute('data-anc-z')     || '1', 10);
-      addCard(p.anchor_id, p.html_fragment, x, y, w, rot, scale, z);
+      addCard(p.anchor_id, p.html_fragment, x, y, w, h, rot, scale, z);
       return;
     }
 
@@ -395,6 +434,7 @@ function applyPatches(patches) {
     if (!entry.localMoved && newCard.getAttribute('data-anc-x')) {
       entry.x     = parseFloat(newCard.getAttribute('data-anc-x'));
       entry.y     = parseFloat(newCard.getAttribute('data-anc-y'));
+      entry.h     = parseFloat(newCard.getAttribute('data-anc-h')     || '0');
       entry.rot   = parseFloat(newCard.getAttribute('data-anc-rot')   || '0');
       entry.scale = parseFloat(newCard.getAttribute('data-anc-scale') || '1');
       updateCardTransform(entry);
@@ -548,6 +588,8 @@ function serializeCanvasHtml() {
       entry.contentEl.setAttribute('data-anc-rot',   entry.rot);
       entry.contentEl.setAttribute('data-anc-scale', entry.scale);
       entry.contentEl.setAttribute('data-anc-z',     entry.z);
+      if (entry.h > 0) entry.contentEl.setAttribute('data-anc-h', entry.h);
+      else entry.contentEl.removeAttribute('data-anc-h');
       html += entry.contentEl.outerHTML;
     }
   });
