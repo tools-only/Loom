@@ -2613,7 +2613,7 @@ const SCHEMA_STUB = {
       properties: {
         op: { enum: ['refine','expand','shorten','longer','edit','lock','annotate','branch','restructure','ask','custom','initial_render','debate','debate_abort'] },
         instruction: { type: 'string', maxLength: 4000 },
-        target_kind: { enum: ['anchor','selection','global'] },
+        target_kind: { enum: ['anchor','selection','global','group'] },
         target_ref: { type: 'string' }
       }
     },

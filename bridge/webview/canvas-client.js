@@ -750,6 +750,9 @@ function initWS() {
 
     } else if (msg.type === 'event') {
       handleAgentEvent(msg);
+
+    } else if (msg.type === 'error') {
+      setStatus('Error: ' + (msg.message || msg.code || ''), null);
     }
   };
 
@@ -803,7 +806,6 @@ function sendEnvelope(instruction, op) {
     intent: {
       op: op || 'initial_render',
       target_kind: isGroup ? 'group' : 'global',
-      target_ref: null,
       target_refs: isGroup ? selectedIds : undefined,
       instruction: instruction
     },
