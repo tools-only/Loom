@@ -17,7 +17,13 @@
   <span class="canvas-status" id="canvas-status">Connecting…</span>
   <span class="canvas-sel-badge" id="canvas-sel-badge"></span>
   <span style="flex:1"></span>
-  <a href="/" style="font-size:13px;color:var(--ink);opacity:0.5;text-decoration:none;padding:6px;">
+  <button class="canvas-tool-btn active" id="canvas-snap-btn" title="Snap to grid (toggle)">
+    <i class="ph-bold ph-dots-nine"></i>
+  </button>
+  <button class="canvas-tool-btn" id="canvas-connect-btn" title="Connect cards (C)">
+    <i class="ph-bold ph-arrow-up-right"></i>
+  </button>
+  <a href="/" style="font-size:13px;color:var(--ink);opacity:0.5;text-decoration:none;padding:6px;margin-left:4px;">
     <i class="ph-bold ph-x"></i>
   </a>
 </div>
@@ -25,6 +31,14 @@
 <!-- Canvas area -->
 <div id="canvas-viewport">
   <div id="canvas-stage">
+    <!-- SVG connector layer (below cards via z-index) -->
+    <svg id="canvas-connectors" style="position:absolute;top:0;left:0;width:3000px;height:2000px;pointer-events:none;overflow:visible;z-index:0;">
+      <defs>
+        <marker id="canvas-arrow" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#7A5AF8" fill-opacity="0.6"/>
+        </marker>
+      </defs>
+    </svg>
     <!-- Cards inserted here by canvas-client.js -->
   </div>
   <div id="canvas-empty">

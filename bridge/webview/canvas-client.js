@@ -7,18 +7,34 @@
 // State
 // ─────────────────────────────────────────────────────────────────────
 var state = {
-  cards:    new Map(),    // anchor_id → { el, contentEl, x, y, w, rot, scale, z, localMoved }
-  viewport: { x: 0, y: 0, zoom: 1 },
-  selected: new Set(),    // anchor_ids currently selected
+  cards:       new Map(),    // anchor_id → { el, contentEl, x, y, w, h, rot, scale, z, localMoved }
+  viewport:    { x: 0, y: 0, zoom: 1 },
+  selected:    new Set(),    // anchor_ids currently selected
+  connections: new Map(),    // connId → { id, fromId, toId }
 };
 
 var CANVAS_W = 3000;
 var CANVAS_H = 2000;
+var SNAP_GRID = 40;
+var SNAP_THR  = 8;
 
 var stage, viewport, promptInput, statusEl, emptyEl, marqueeEl, selBadgeEl, ws;
 var suggBarEl, suggLabelEl, suggAcceptBtn, suggRejectBtn;
+var snapBtnEl, connectBtnEl;
 var _activeSuggestion = null;
 var _syncTimer = null;
+
+// ── Undo/redo ────────────────────────────────────────────────────────
+var _undoStack = [];
+var _redoStack = [];
+var _dragStartSnap = null;
+
+// ── Connect mode ────────────────────────────────────────────────────
+var _connectMode = false;
+var _connectFrom = null;   // anchor_id of the "from" card
+
+// ── Snap ────────────────────────────────────────────────────────────
+var _snapEnabled = true;
 
 // ─────────────────────────────────────────────────────────────────────
 // Boot
@@ -37,6 +53,10 @@ document.addEventListener('DOMContentLoaded', function () {
   suggRejectBtn = document.getElementById('canvas-suggestion-reject');
   if (suggAcceptBtn) suggAcceptBtn.addEventListener('click', acceptLayoutSuggestion);
   if (suggRejectBtn) suggRejectBtn.addEventListener('click', rejectLayoutSuggestion);
+  snapBtnEl    = document.getElementById('canvas-snap-btn');
+  connectBtnEl = document.getElementById('canvas-connect-btn');
+  if (snapBtnEl)    snapBtnEl.addEventListener('click', toggleSnap);
+  if (connectBtnEl) connectBtnEl.addEventListener('click', toggleConnectMode);
 
   initViewport();
   initPromptUI();
@@ -54,16 +74,35 @@ function initViewport() {
   var _marquee  = null;
 
   document.addEventListener('keydown', function (e) {
-    if (e.code === 'Space' && document.activeElement !== promptInput) {
+    var inInput = document.activeElement === promptInput;
+
+    if (e.code === 'Space' && !inInput) {
       spaceDown = true;
       document.body.classList.add('canvas-panning');
       e.preventDefault();
+      return;
     }
-    if ((e.key === 'Delete' || e.key === 'Backspace') &&
-        state.selected.size > 0 &&
-        document.activeElement !== promptInput) {
+
+    if (!inInput && (e.key === 'Delete' || e.key === 'Backspace') && state.selected.size > 0) {
       e.preventDefault();
+      pushUndo();
       deleteSelected();
+      return;
+    }
+
+    if (!inInput && (e.ctrlKey || e.metaKey)) {
+      if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+      if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo(); return; }
+      if (e.key === 'd') { e.preventDefault(); duplicateSelected(); return; }
+    }
+
+    if (!inInput && e.key === 'c' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      toggleConnectMode();
+    }
+    if (!inInput && e.key === 'Escape') {
+      if (_connectMode) { toggleConnectMode(); }
+      clearSelection();
     }
   });
 
@@ -284,10 +323,11 @@ function buildHandles(id) {
 var _drag = null;
 
 function bindCardEvents(id, host, entry) {
-  // Card body → select + move
+  // Card body → select + move (or connect in connect mode)
   host.addEventListener('mousedown', function (e) {
     if (e.target.closest('.card-handles')) return;
     e.stopPropagation();
+    if (_connectMode) { handleConnectClick(id); return; }
     if (!e.shiftKey) clearSelection();
     selectCard(id);
     beginDrag(e, id, entry, 'move', null);
@@ -316,6 +356,7 @@ function bindCardEvents(id, host, entry) {
 }
 
 function beginDrag(e, id, entry, type, dir) {
+  _dragStartSnap = snapshotCards();
   // Snapshot actual rendered height for resize (h=0 means auto so far)
   if (type === 'resize' && !entry.h) entry.h = entry.el.offsetHeight;
 
@@ -351,8 +392,10 @@ document.addEventListener('mousemove', function (e) {
   var dy   = (e.clientY - _drag.clientY0) / zoom;
 
   if (_drag.type === 'move') {
-    entry.x = _drag.x0 + dx;
-    entry.y = _drag.y0 + dy;
+    var rawX = _drag.x0 + dx;
+    var rawY = _drag.y0 + dy;
+    entry.x = _snapEnabled ? snap(rawX) : rawX;
+    entry.y = _snapEnabled ? snap(rawY) : rawY;
     entry.localMoved = true;
 
   } else if (_drag.type === 'rotate') {
@@ -385,10 +428,18 @@ document.addEventListener('mousemove', function (e) {
   }
 
   updateCardTransform(entry);
+  if (state.connections.size > 0) renderConnections();
 });
 
 document.addEventListener('mouseup', function () {
   if (_drag) {
+    var movedEntry = state.cards.get(_drag.id);
+    if (movedEntry && movedEntry.localMoved && _dragStartSnap) {
+      _undoStack.push(_dragStartSnap);
+      if (_undoStack.length > 30) _undoStack.shift();
+      _redoStack = [];
+    }
+    _dragStartSnap = null;
     scheduleSync();
     _drag = null;
     document.body.classList.remove('canvas-dragging');
@@ -443,6 +494,14 @@ function clearSelection() {
 }
 
 function deleteSelected() {
+  // Prune connections that reference deleted cards
+  var deadConns = [];
+  state.connections.forEach(function (conn, cid) {
+    if (state.selected.has(conn.fromId) || state.selected.has(conn.toId)) deadConns.push(cid);
+  });
+  deadConns.forEach(function (cid) { state.connections.delete(cid); });
+  if (deadConns.length) renderConnections();
+
   state.selected.forEach(function (id) {
     var entry = state.cards.get(id);
     if (entry) { entry.el.remove(); state.cards.delete(id); }
@@ -713,6 +772,22 @@ function buildSelectedSubtrees() {
 // ─────────────────────────────────────────────────────────────────────
 // Persistence
 // ─────────────────────────────────────────────────────────────────────
+function serializeConnections() {
+  var arr = [];
+  state.connections.forEach(function (c) { arr.push({ id: c.id, fromId: c.fromId, toId: c.toId }); });
+  try { localStorage.setItem('canvas-connections', JSON.stringify(arr)); } catch (e) {}
+}
+
+function restoreConnections() {
+  try {
+    var raw = localStorage.getItem('canvas-connections');
+    if (!raw) return;
+    var arr = JSON.parse(raw);
+    arr.forEach(function (c) { state.connections.set(c.id, c); });
+    if (state.connections.size) renderConnections();
+  } catch (e) {}
+}
+
 function serializeCanvasHtml() {
   var html = '<div id="canvas-stage" data-anc="canvas-root" style="position:relative;width:' + CANVAS_W + 'px;height:' + CANVAS_H + 'px;">';
   state.cards.forEach(function (entry) {
@@ -735,7 +810,7 @@ function serializeCanvasHtml() {
 
 function scheduleSync() {
   clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(saveToServer, 600);
+  _syncTimer = setTimeout(function () { saveToServer(); serializeConnections(); }, 600);
 }
 
 function saveToServer() {
@@ -756,6 +831,7 @@ function loadSavedCanvas() {
     .then(function (r) { return r.ok ? r.text() : ''; })
     .then(function (html) {
       if (html && html.trim()) renderFromHtml(html);
+      restoreConnections();
     })
     .catch(function () {});
 }
@@ -763,6 +839,179 @@ function loadSavedCanvas() {
 // ─────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────
+// Snap-to-grid
+// ─────────────────────────────────────────────────────────────────────
+function snap(v) {
+  var s = Math.round(v / SNAP_GRID) * SNAP_GRID;
+  return Math.abs(v - s) < SNAP_THR ? s : v;
+}
+
+function toggleSnap() {
+  _snapEnabled = !_snapEnabled;
+  if (snapBtnEl) snapBtnEl.classList.toggle('active', _snapEnabled);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Undo / redo
+// ─────────────────────────────────────────────────────────────────────
+function snapshotCards() {
+  var snap = [];
+  state.cards.forEach(function (entry, id) {
+    snap.push({
+      id: id,
+      html: entry.contentEl ? entry.contentEl.outerHTML : '',
+      x: entry.x, y: entry.y, w: entry.w, h: entry.h,
+      rot: entry.rot, scale: entry.scale, z: entry.z,
+    });
+  });
+  return snap;
+}
+
+function pushUndo() {
+  _undoStack.push(snapshotCards());
+  if (_undoStack.length > 30) _undoStack.shift();
+  _redoStack = [];
+}
+
+function restoreSnapshot(snap) {
+  clearSelection();
+  var snapIds = new Set(snap.map(function (s) { return s.id; }));
+  // Remove cards not in snapshot
+  state.cards.forEach(function (entry, id) {
+    if (!snapIds.has(id)) { entry.el.remove(); state.cards.delete(id); }
+  });
+  snap.forEach(function (s) {
+    if (state.cards.has(s.id)) {
+      var entry = state.cards.get(s.id);
+      // Replace content element
+      var tmp = document.createElement('div');
+      tmp.innerHTML = s.html;
+      var newContent = tmp.firstElementChild || tmp;
+      entry.el.replaceChild(newContent, entry.contentEl);
+      entry.contentEl = newContent;
+      entry.x = s.x; entry.y = s.y; entry.w = s.w; entry.h = s.h;
+      entry.rot = s.rot; entry.scale = s.scale; entry.z = s.z;
+      entry.localMoved = true;
+      updateCardTransform(entry);
+    } else {
+      addCard(s.id, s.html, s.x, s.y, s.w, s.h, s.rot, s.scale, s.z);
+    }
+  });
+  updateEmptyState();
+  if (state.connections.size) renderConnections();
+}
+
+function undo() {
+  if (_undoStack.length === 0) return;
+  _redoStack.push(snapshotCards());
+  restoreSnapshot(_undoStack.pop());
+  scheduleSync();
+  setStatus('Undo');
+}
+
+function redo() {
+  if (_redoStack.length === 0) return;
+  _undoStack.push(snapshotCards());
+  restoreSnapshot(_redoStack.pop());
+  scheduleSync();
+  setStatus('Redo');
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Duplicate (Ctrl+D)
+// ─────────────────────────────────────────────────────────────────────
+function duplicateSelected() {
+  if (state.selected.size === 0) return;
+  pushUndo();
+  var newIds = [];
+  state.selected.forEach(function (id) {
+    var entry = state.cards.get(id);
+    if (!entry || !entry.contentEl) return;
+    var newId = id.replace(/-copy-[a-z0-9]+$/, '') + '-copy-' + Date.now().toString(36);
+    var tmp = document.createElement('div');
+    tmp.innerHTML = entry.contentEl.outerHTML;
+    var el = tmp.firstElementChild;
+    if (el) el.setAttribute('data-anc', newId);
+    addCard(newId, tmp.innerHTML, entry.x + 24, entry.y + 24, entry.w, entry.h, entry.rot, entry.scale, entry.z + 1);
+    newIds.push(newId);
+  });
+  clearSelection();
+  newIds.forEach(function (id) { selectCard(id); });
+  scheduleSync();
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Connector arrows (SVG overlay)
+// ─────────────────────────────────────────────────────────────────────
+function toggleConnectMode() {
+  _connectMode = !_connectMode;
+  _connectFrom = null;
+  document.body.classList.toggle('canvas-connect-mode', _connectMode);
+  if (connectBtnEl) connectBtnEl.classList.toggle('active', _connectMode);
+  // Clear pending-source highlight
+  stage.querySelectorAll('.canvas-connect-src').forEach(function (el) {
+    el.classList.remove('canvas-connect-src');
+  });
+}
+
+function handleConnectClick(id) {
+  if (_connectFrom === null) {
+    _connectFrom = id;
+    var entry = state.cards.get(id);
+    if (entry) entry.el.classList.add('canvas-connect-src');
+  } else if (_connectFrom === id) {
+    // Cancel
+    var e = state.cards.get(id);
+    if (e) e.el.classList.remove('canvas-connect-src');
+    _connectFrom = null;
+  } else {
+    // Complete connection
+    var fromEntry = state.cards.get(_connectFrom);
+    if (fromEntry) fromEntry.el.classList.remove('canvas-connect-src');
+    var connId = 'conn-' + Date.now().toString(36);
+    state.connections.set(connId, { id: connId, fromId: _connectFrom, toId: id });
+    _connectFrom = null;
+    renderConnections();
+    serializeConnections();
+    // Stay in connect mode so user can add more connections
+  }
+}
+
+function _cardCenter(entry) {
+  var h = entry.h > 0 ? entry.h : (entry.el ? entry.el.offsetHeight : 200);
+  return { x: entry.x + entry.w / 2, y: entry.y + h / 2 };
+}
+
+function renderConnections() {
+  var svg = document.getElementById('canvas-connectors');
+  if (!svg) return;
+  // Remove old paths (keep <defs>)
+  Array.from(svg.querySelectorAll('path')).forEach(function (p) { p.remove(); });
+
+  state.connections.forEach(function (conn) {
+    var fe = state.cards.get(conn.fromId);
+    var te = state.cards.get(conn.toId);
+    if (!fe || !te) return;
+    var f = _cardCenter(fe);
+    var t = _cardCenter(te);
+    var dx = t.x - f.x;
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    var d = 'M ' + f.x + ' ' + f.y +
+            ' C ' + (f.x + dx * 0.4) + ' ' + f.y +
+            ' '  + (t.x - dx * 0.4) + ' ' + t.y +
+            ' '  + t.x + ' ' + t.y;
+    path.setAttribute('d', d);
+    path.setAttribute('stroke', '#7A5AF8');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-opacity', '0.55');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('marker-end', 'url(#canvas-arrow)');
+    path.setAttribute('data-conn', conn.id);
+    svg.appendChild(path);
+  });
+}
+
 function updateEmptyState() {
   if (!emptyEl) return;
   if (state.cards.size > 0) {
