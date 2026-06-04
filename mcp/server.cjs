@@ -26,6 +26,7 @@ const WORKSPACE_DIR = path.join(LOGS_DIR, 'workspace');
 const SESSIONS_DIR = path.join(LOGS_DIR, 'sessions');
 const SCHEMAS_DIR  = path.join(__dirname, 'schemas');
 const CURRENT_HTML   = path.join(OUTPUT_DIR, 'current.html');
+const CANVAS_HTML    = path.join(OUTPUT_DIR, 'canvas.html');
 const PENDING_PROMPT = path.join(PROMPTS_DIR, 'pending.md');
 const PENDING_OP_JSON = path.join(PROMPTS_DIR, 'pending-op.json');
 const OPS_LOG      = path.join(LOGS_DIR, 'ops.jsonl');
@@ -661,6 +662,31 @@ app.post('/patch', (req, res) => {
   res.json({ ok: true, cascade_warnings: missed.length });
 });
 
+// ── Connector data query (used by bridge.py get_connector_data) ──────
+// Returns inbox items for a specific connector source, newest-first.
+// Supports ?ticker=NVDA for per-ticker filtering (e.g. finnhub).
+app.get('/data/:connectorId', (req, res) => {
+  const { connectorId } = req.params;
+  const { ticker, limit: limitStr } = req.query;
+  const limit = Math.min(parseInt(limitStr, 10) || 50, 200);
+  let items = inbox.list({}).filter(item => {
+    const src = item.source || '';
+    return src === connectorId ||
+           src === 'feed:' + connectorId ||
+           src === 'webhook:' + connectorId ||
+           src.startsWith(connectorId + ':');
+  });
+  if (ticker) {
+    const t = ticker.toUpperCase();
+    items = items.filter(item => {
+      const p = item.payload || {};
+      return (p.ticker || '').toUpperCase() === t || (item.title || '').toUpperCase().includes(t);
+    });
+  }
+  items = items.slice(0, limit);
+  res.json({ ok: true, connector_id: connectorId, count: items.length, items });
+});
+
 // ── Inbox routes ─────────────────────────────────────────────────────
 
 app.get('/inbox', (req, res) => {
@@ -972,6 +998,32 @@ app.post('/loop/enable', (req, res) => {
 
 app.get('/current-html', (req, res) => {
   res.type('text/plain').send(currentHtml || '');
+});
+
+app.get('/canvas', (req, res) => {
+  res.sendFile(path.join(WEBVIEW_DIR, 'canvas.html'));
+});
+
+app.get('/current-canvas', (req, res) => {
+  try {
+    if (fs.existsSync(CANVAS_HTML)) {
+      res.type('text/html').send(fs.readFileSync(CANVAS_HTML, 'utf8'));
+    } else {
+      res.type('text/html').send('');
+    }
+  } catch { res.type('text/html').send(''); }
+});
+
+app.post('/canvas-state', (req, res) => {
+  const html = req.body && req.body.html ? req.body.html : '';
+  if (!html) return res.json({ ok: false, error: 'html required' });
+  try {
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+    fs.writeFileSync(CANVAS_HTML, html, 'utf8');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 app.get('/workspace', (req, res) => {
@@ -2103,6 +2155,29 @@ function buildProcessorPrompt(ops) {
         '---',
       ];
     }),
+    // 容灾: hand agent unavailable, fall back to skill invocation
+    // This runs when loom_hand is set but loom_artifact is missing (timeout/error)
+    ...ops.flatMap(op => {
+      const handId   = op.context_bundle?.loom_hand;
+      const artifact = op.context_bundle?.loom_artifact;
+      if (!handId || artifact) return [];
+      const SKILL_PATHS = {
+        market:    'D:\\nano\\nanobot\\nanobot\\skills\\hand-market\\SKILL.md',
+        sentiment: 'D:\\nano\\nanobot\\nanobot\\skills\\hand-sentiment\\SKILL.md',
+        target:    'D:\\nano\\nanobot\\nanobot\\skills\\hand-target\\SKILL.md',
+        position:  'D:\\nano\\nanobot\\nanobot\\skills\\hand-position\\SKILL.md',
+      };
+      const skillPath = SKILL_PATHS[handId];
+      if (!skillPath) return [];
+      return [
+        `--- HAND AGENT UNAVAILABLE (hand=${handId}) — FALLBACK TO SKILL ---`,
+        `The remote hand agent for "${handId}" failed. You MUST:`,
+        `1. Read the hand skill file using Read tool: Read(file_path="${skillPath}")`,
+        `2. Follow the skill instructions to generate the analysis (use web_fetch/search for current data as needed).`,
+        `3. Render an Anchor HTML page with gradient KPI cards for key metrics and detailed analysis sections beneath.`,
+        '---',
+      ];
+    }),
     '',
     '--- UI REFINEMENT PASS ---',
     'After the initial render, do a second pass to polish the UI:',
@@ -2566,6 +2641,56 @@ function formatEnvelopeAsPrompt(envelope) {
   const bundle = envelope.context_bundle || {};
   const rs = envelope.render_state || {};
   const MAX_HTML = 15000;
+
+  // ── Canvas co-design mode ──────────────────────────────────────
+  if (bundle.context_mode === 'canvas') {
+    const cardContext = (() => {
+      const subtree = rs.relevant_subtree;
+      if (!subtree || !subtree.target_html || subtree.target_html.length < 50) return '';
+      return '\n### Current Canvas State\n```html\n' + subtree.target_html.substring(0, 8000) + '\n```\n';
+    })();
+    const selectedCtx = (() => {
+      const subs = rs.selected_subtrees || {};
+      const ids = Object.keys(subs);
+      if (ids.length === 0) return '';
+      return '\n### Selected Cards\n' + ids.map(id =>
+        '**`' + id + '`**:\n```html\n' + ((subs[id].target_html || '').substring(0, 2000)) + '\n```'
+      ).join('\n') + '\n';
+    })();
+    return [
+      '## Canvas Co-design Request',
+      '',
+      '**Op**: ' + (intent.op || 'initial_render'),
+      '**Instruction**: ' + (intent.instruction || '(none)'),
+      cardContext,
+      selectedCtx,
+      '## Canvas HTML Format',
+      '',
+      'All cards must be children of `<div id="canvas-stage" data-anc="canvas-root" style="position:relative;width:3000px;height:2000px;">`.',
+      '',
+      'Each card:',
+      '```html',
+      '<div class="anc-card anc-section anc-section--gc"',
+      '     data-anc="card-[unique-slug]"',
+      '     data-handles="refine,expand,shorten"',
+      '     data-anc-x="80"',
+      '     data-anc-y="80"',
+      '     data-anc-w="320"',
+      '     data-anc-rot="0"',
+      '     data-anc-scale="1"',
+      '     data-anc-z="1"',
+      '     style="position:absolute;left:80px;top:80px;width:320px;transform:rotate(0deg) scale(1);">',
+      '  <!-- Bloom CSS card content (h2, p, anc-kpi-grid, etc.) -->',
+      '</div>',
+      '```',
+      '',
+      '**Placement**: 4-column grid, step (360px, 280px) starting at (80,80). No overlap.',
+      '**For initial_render / global ops**: Generate all cards, wrap in a full HTML document, and call `anchor_render(html)`.',
+      '**For refine/patch ops on existing cards**: Call `anchor_patch({patches:[...]})` — preserve user-set data-anc-x/y/rot/scale unless instruction explicitly asks to move.',
+      '',
+      anchorLayoutContract(),
+    ].join('\n');
+  }
 
   if (intent.op === 'initial_render') {
     let prompt = `## Anchor Initial Render Request\n\n**Instruction**: ${intent.instruction || '(none)'}\n\n`;
