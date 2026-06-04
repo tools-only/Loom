@@ -1,0 +1,235 @@
+/* canvas-styles.css — loom-human-ag canvas workspace
+   Uses Bloom Design System tokens from resource/colors_and_type.css
+   NEVER touch styles.css                                            */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  height: 100%; overflow: hidden;
+  background: var(--paper, #f8f7f4);
+  font-family: var(--font-body, 'Plus Jakarta Sans', sans-serif);
+  color: var(--ink, #1a1a2e);
+  user-select: none;
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────── */
+#canvas-toolbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 52px; z-index: 1000;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 16px;
+  background: rgba(248, 247, 244, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+#canvas-toolbar h1 {
+  font-family: var(--font-display, 'Bricolage Grotesque', sans-serif);
+  font-size: 16px; font-weight: 800;
+  margin: 0; letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.canvas-status {
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px;
+  background: rgba(0,0,0,0.06);
+  color: var(--ink);
+  border: 1px solid rgba(0,0,0,0.08);
+  pointer-events: none;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.canvas-status--live {
+  background: rgba(74, 222, 128, 0.15);
+  color: #16a34a;
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.canvas-status--thinking {
+  background: rgba(122, 90, 248, 0.1);
+  color: var(--accent-brand, #7A5AF8);
+  border-color: rgba(122, 90, 248, 0.2);
+}
+
+/* ── Prompt bar ───────────────────────────────────────────────── */
+#canvas-prompt-bar {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 1000;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 8px 8px 16px;
+  min-width: 480px; max-width: 700px; width: 60vw;
+  background: var(--paper, #f8f7f4);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 999px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.06);
+}
+
+#canvas-prompt-input {
+  flex: 1; border: none; outline: none;
+  background: transparent;
+  font-family: var(--font-body, 'Plus Jakarta Sans', sans-serif);
+  font-size: 14px; color: var(--ink, #1a1a2e);
+}
+
+#canvas-prompt-input::placeholder { color: rgba(0,0,0,0.35); }
+
+#canvas-prompt-send {
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  border-radius: 50%; border: none; cursor: pointer;
+  background: var(--accent-brand, #7A5AF8);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+#canvas-prompt-send:hover { transform: scale(1.05); box-shadow: 0 2px 8px rgba(122,90,248,0.4); }
+#canvas-prompt-send:active { transform: scale(0.95); }
+
+/* ── Canvas viewport ──────────────────────────────────────────── */
+#canvas-viewport {
+  position: fixed;
+  top: 52px; left: 0; right: 0; bottom: 0;
+  overflow: hidden;
+  cursor: default;
+}
+
+body.canvas-panning #canvas-viewport { cursor: grab; }
+body.canvas-panning.canvas-dragging #canvas-viewport { cursor: grabbing; }
+
+#canvas-stage {
+  position: absolute;
+  width: 3000px; height: 2000px;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* ── Canvas cards ─────────────────────────────────────────────── */
+.canvas-card-host {
+  position: absolute;
+  transform-origin: center center;
+  cursor: grab;
+  transition: box-shadow 0.15s;
+}
+
+.canvas-card-host:hover { z-index: 10 !important; }
+.canvas-card-host:active { cursor: grabbing; }
+
+.canvas-card-host .anc-section {
+  margin: 0 !important;
+  width: 100%;
+  pointer-events: none;
+}
+
+/* ── Selection state ──────────────────────────────────────────── */
+.canvas-card-host.canvas-selected {
+  outline: 2px solid var(--accent-brand, #7A5AF8);
+  outline-offset: 2px;
+  border-radius: 16px;
+  z-index: 100 !important;
+}
+
+/* ── Card handles (shown when selected) ──────────────────────── */
+.card-handles {
+  display: none;
+  position: absolute;
+  inset: -10px;
+  pointer-events: none;
+}
+
+.canvas-card-host.canvas-selected .card-handles {
+  display: block;
+}
+
+.resize-handle {
+  position: absolute;
+  width: 10px; height: 10px;
+  background: #fff;
+  border: 2px solid var(--accent-brand, #7A5AF8);
+  border-radius: 2px;
+  pointer-events: all;
+  z-index: 200;
+}
+
+/* Position the 8 resize handles */
+.resize-handle.resize-nw { top: 0;    left: 0;    cursor: nw-resize; transform: translate(-50%, -50%); }
+.resize-handle.resize-n  { top: 0;    left: 50%;  cursor: n-resize;  transform: translate(-50%, -50%); }
+.resize-handle.resize-ne { top: 0;    left: 100%; cursor: ne-resize; transform: translate(-50%, -50%); }
+.resize-handle.resize-e  { top: 50%;  left: 100%; cursor: e-resize;  transform: translate(-50%, -50%); }
+.resize-handle.resize-se { top: 100%; left: 100%; cursor: se-resize; transform: translate(-50%, -50%); }
+.resize-handle.resize-s  { top: 100%; left: 50%;  cursor: s-resize;  transform: translate(-50%, -50%); }
+.resize-handle.resize-sw { top: 100%; left: 0;    cursor: sw-resize; transform: translate(-50%, -50%); }
+.resize-handle.resize-w  { top: 50%;  left: 0;    cursor: w-resize;  transform: translate(-50%, -50%); }
+
+.rotate-handle {
+  position: absolute;
+  width: 18px; height: 18px;
+  background: var(--accent-brand, #7A5AF8);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  top: -30px; left: 50%;
+  transform: translateX(-50%);
+  cursor: crosshair;
+  pointer-events: all;
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.rotate-handle::after {
+  content: '↻';
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.rotate-handle::before {
+  content: '';
+  position: absolute;
+  top: 100%; left: 50%;
+  width: 1px; height: 14px;
+  background: var(--accent-brand, #7A5AF8);
+  opacity: 0.5;
+  transform: translateX(-50%);
+}
+
+/* ── Canvas grid background ───────────────────────────────────── */
+#canvas-viewport::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* ── Empty state ──────────────────────────────────────────────── */
+#canvas-empty {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: rgba(0,0,0,0.3);
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+#canvas-empty.hidden { opacity: 0; pointer-events: none; }
+
+#canvas-empty p {
+  font-size: 14px; line-height: 1.6;
+  margin: 8px 0 0;
+}
+
+#canvas-empty .canvas-empty-icon {
+  font-size: 40px;
+  opacity: 0.5;
+}
+
+/* ── Dragging ─────────────────────────────────────────────────── */
+body.canvas-dragging * { cursor: grabbing !important; }
+body.canvas-dragging .canvas-card-host { transition: none !important; }
