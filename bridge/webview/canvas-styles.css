@@ -257,3 +257,38 @@ body.canvas-panning.canvas-dragging #canvas-viewport { cursor: grabbing; }
 /* ── Dragging ─────────────────────────────────────────────────── */
 body.canvas-dragging * { cursor: grabbing !important; }
 body.canvas-dragging .canvas-card-host { transition: none !important; }
+
+/* ── Layout suggestion ghosts ─────────────────────────────────── */
+.canvas-ghost {
+  opacity: 0.35;
+  pointer-events: none !important;
+  outline: 2px dashed var(--accent-brand, #7A5AF8) !important;
+  outline-offset: 3px;
+  border-radius: 16px;
+  filter: blur(0.4px);
+}
+
+/* ── Suggestion bar ───────────────────────────────────────────── */
+.canvas-suggestion-bar {
+  position: fixed;
+  top: 60px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px 8px 12px;
+  background: rgba(248,247,244,0.96);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid var(--accent-brand, #7A5AF8);
+  border-radius: 999px;
+  box-shadow: 0 4px 24px rgba(122,90,248,0.18);
+  z-index: 2000;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  animation: suggestionSlideIn 0.2s ease;
+}
+.canvas-suggestion-bar.hidden { display: none; }
+.canvas-suggestion-bar i { color: var(--accent-brand, #7A5AF8); font-size: 16px; }
+
+@keyframes suggestionSlideIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

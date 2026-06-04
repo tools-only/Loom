@@ -16,6 +16,8 @@ var CANVAS_W = 3000;
 var CANVAS_H = 2000;
 
 var stage, viewport, promptInput, statusEl, emptyEl, marqueeEl, selBadgeEl, ws;
+var suggBarEl, suggLabelEl, suggAcceptBtn, suggRejectBtn;
+var _activeSuggestion = null;
 var _syncTimer = null;
 
 // ─────────────────────────────────────────────────────────────────────
@@ -29,6 +31,12 @@ document.addEventListener('DOMContentLoaded', function () {
   emptyEl     = document.getElementById('canvas-empty');
   marqueeEl   = document.getElementById('canvas-marquee');
   selBadgeEl  = document.getElementById('canvas-sel-badge');
+  suggBarEl   = document.getElementById('canvas-suggestion-bar');
+  suggLabelEl = document.getElementById('canvas-suggestion-label');
+  suggAcceptBtn = document.getElementById('canvas-suggestion-accept');
+  suggRejectBtn = document.getElementById('canvas-suggestion-reject');
+  if (suggAcceptBtn) suggAcceptBtn.addEventListener('click', acceptLayoutSuggestion);
+  if (suggRejectBtn) suggRejectBtn.addEventListener('click', rejectLayoutSuggestion);
 
   initViewport();
   initPromptUI();
@@ -446,6 +454,68 @@ function deleteSelected() {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// Layout suggestion — ghost preview + Accept / Reject
+// ─────────────────────────────────────────────────────────────────────
+function showLayoutSuggestion(payload) {
+  if (_activeSuggestion) dismissLayoutSuggestion();
+  _activeSuggestion = payload;
+
+  payload.moves.forEach(function (mv) {
+    var entry = state.cards.get(mv.anchor_id);
+    if (!entry) return;
+    var ghost = entry.el.cloneNode(true);
+    ghost.classList.add('canvas-ghost');
+    ghost.classList.remove('canvas-selected');
+    ghost.dataset.ghostFor = mv.anchor_id;
+    ghost.style.left      = (mv.x !== undefined ? mv.x : entry.x) + 'px';
+    ghost.style.top       = (mv.y !== undefined ? mv.y : entry.y) + 'px';
+    ghost.style.transform = 'rotate(' + (mv.rot !== undefined ? mv.rot : entry.rot) + 'deg) scale(' + (mv.scale !== undefined ? mv.scale : entry.scale) + ')';
+    ghost.style.zIndex    = 50;
+    stage.appendChild(ghost);
+  });
+
+  if (suggBarEl) {
+    if (suggLabelEl) suggLabelEl.textContent = 'AI 建议重排 ' + payload.moves.length + ' 张卡片';
+    suggBarEl.classList.remove('hidden');
+  }
+}
+
+function dismissLayoutSuggestion() {
+  stage.querySelectorAll('.canvas-ghost').forEach(function (el) { el.remove(); });
+  if (suggBarEl) suggBarEl.classList.add('hidden');
+  _activeSuggestion = null;
+}
+
+function acceptLayoutSuggestion() {
+  if (!_activeSuggestion) return;
+  _activeSuggestion.moves.forEach(function (mv) {
+    var entry = state.cards.get(mv.anchor_id);
+    if (!entry) return;
+    entry.el.style.transition = 'left 0.4s ease, top 0.4s ease';
+    if (mv.x !== undefined) entry.x = mv.x;
+    if (mv.y !== undefined) entry.y = mv.y;
+    if (mv.rot   !== undefined) entry.rot   = mv.rot;
+    if (mv.scale !== undefined) entry.scale = mv.scale;
+    entry.localMoved = true;
+    updateCardTransform(entry);
+    setTimeout(function () { entry.el.style.transition = ''; }, 450);
+  });
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'suggestion_accept', suggestion_id: _activeSuggestion.suggestion_id }));
+  }
+  dismissLayoutSuggestion();
+  scheduleSync();
+}
+
+function rejectLayoutSuggestion() {
+  if (!_activeSuggestion) return;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'suggestion_reject', suggestion_id: _activeSuggestion.suggestion_id }));
+  }
+  dismissLayoutSuggestion();
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Patch apply (incoming from agent via WS)
 // ─────────────────────────────────────────────────────────────────────
 function applyPatches(patches) {
@@ -522,6 +592,21 @@ function initWS() {
 
     } else if (msg.type === 'patch' && Array.isArray(msg.patches)) {
       applyPatches(msg.patches);
+
+    } else if (msg.type === 'layout_suggest') {
+      showLayoutSuggestion(msg);
+      setStatus('建议重排…', 'thinking');
+
+    } else if (msg.type === 'suggestion_accepted') {
+      // Already applied locally; this echo from server is a no-op
+    } else if (msg.type === 'suggestion_rejected') {
+      // May arrive if another client rejected
+      if (_activeSuggestion && _activeSuggestion.suggestion_id === msg.suggestion_id) {
+        dismissLayoutSuggestion();
+      }
+
+    } else if (msg.type === 'agent_event') {
+      handleAgentEvent((msg.event && msg.event.payload) || msg.event || msg);
 
     } else if (msg.type === 'event') {
       handleAgentEvent(msg);
@@ -658,7 +743,11 @@ function saveToServer() {
   fetch('/canvas-state', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ html: html })
+    body: JSON.stringify({
+      html: html,
+      viewport: { x: state.viewport.x, y: state.viewport.y, zoom: state.viewport.zoom },
+      selection: Array.from(state.selected),
+    })
   }).catch(function () {});
 }
 

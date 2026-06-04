@@ -60,6 +60,7 @@ try {
 const inbox              = require('./inbox.cjs');
 const { PushBroker }     = require('./push-broker.cjs');
 const { buildAgentTimingPayload } = require('./lib/agent-timing.cjs');
+const canvasState        = require('./lib/canvas-state.cjs');
 
 const ANTHROPIC_SDK_PATH = path.join(BRIDGE_NM, '..', 'node_modules', '@anthropic-ai', 'sdk');
 let inprocAgent = null;
@@ -1020,6 +1021,11 @@ app.post('/canvas-state', (req, res) => {
   try {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
     fs.writeFileSync(CANVAS_HTML, html, 'utf8');
+    canvasState.update({
+      html,
+      viewport:  req.body.viewport  || undefined,
+      selection: req.body.selection || undefined,
+    });
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
@@ -1541,6 +1547,18 @@ wssBrowser.on('connection', (ws) => {
           recordEvent('agent.html_synced', { html_size: currentHtml.length, sig: msg.sig || '' });
         }
 
+      } else if (msg.type === 'suggestion_accept') {
+        const sug = canvasState.acceptSuggestion(msg.suggestion_id);
+        if (sug) {
+          broadcastBrowserMessage({ type: 'suggestion_accepted', suggestion_id: msg.suggestion_id, moves: sug.moves });
+        }
+        ws.send(JSON.stringify({ type: 'ack' }));
+
+      } else if (msg.type === 'suggestion_reject') {
+        canvasState.rejectSuggestion(msg.suggestion_id);
+        broadcastBrowserMessage({ type: 'suggestion_rejected', suggestion_id: msg.suggestion_id });
+        ws.send(JSON.stringify({ type: 'ack' }));
+
       } else if (msg.type === 'ping') {
         ws.send(JSON.stringify({ type: 'pong' }));
       }
@@ -2004,6 +2022,12 @@ function initInprocAgent() {
     anchor_get_html: async () => currentHtml,
     anchor_emit_event: async (input, ctx) => {
       const { type, payload } = input;
+      if (type === 'layout_suggest' && payload) {
+        const sug = { id: payload.suggestion_id || ('sug-' + Date.now()), moves: payload.moves || [] };
+        canvasState.addSuggestion(sug);
+        broadcastBrowserMessage({ type: 'layout_suggest', suggestion_id: sug.id, moves: sug.moves });
+        return 'layout_suggest queued: ' + sug.id;
+      }
       broadcastAgentEvent({ type, target_anchor: ctx.target, ...(payload || {}) });
       if (type === 'complete') ctx.completed = true;
       return 'ok';
@@ -2644,10 +2668,20 @@ function formatEnvelopeAsPrompt(envelope) {
 
   // ── Canvas co-design mode ──────────────────────────────────────
   if (bundle.context_mode === 'canvas') {
+    const snap = canvasState.getSnapshot();
+    const stateCtx = snap.cards.length > 0
+      ? '\n### Canvas State (' + snap.cards.length + ' cards)\n' +
+        '```json\n' + JSON.stringify(snap.cards.map(c => ({
+          id: c.anchor_id, x: c.x, y: c.y, w: c.w,
+          ...(c.h > 0 ? {h: c.h} : {}),
+          ...(c.rot !== 0 ? {rot: c.rot} : {}),
+          ...(c.scale !== 1 ? {scale: c.scale} : {}),
+        })), null, 2).substring(0, 3000) + '\n```\n'
+      : '';
     const cardContext = (() => {
       const subtree = rs.relevant_subtree;
       if (!subtree || !subtree.target_html || subtree.target_html.length < 50) return '';
-      return '\n### Current Canvas State\n```html\n' + subtree.target_html.substring(0, 8000) + '\n```\n';
+      return '\n### Current Canvas HTML\n```html\n' + subtree.target_html.substring(0, 6000) + '\n```\n';
     })();
     const isGroup = intent.target_kind === 'group';
     const targetRefs = intent.target_refs || [];
@@ -2669,6 +2703,7 @@ function formatEnvelopeAsPrompt(envelope) {
       '**Op**: ' + (intent.op || 'initial_render'),
       '**Instruction**: ' + (intent.instruction || '(none)'),
       groupInstruction,
+      stateCtx,
       cardContext,
       selectedCtx,
       '## Canvas HTML Format',
@@ -2694,6 +2729,8 @@ function formatEnvelopeAsPrompt(envelope) {
       '**Placement**: 4-column grid, step (360px, 280px) starting at (80,80). No overlap.',
       '**For initial_render / global ops**: Generate all cards, wrap in a full HTML document, and call `anchor_render(html)`.',
       '**For refine/patch ops on existing cards**: Call `anchor_patch({patches:[...]})` — preserve user-set data-anc-x/y/rot/scale unless instruction explicitly asks to move.',
+      '**To create a new card**: call `anchor_patch` with a new unique anchor_id not already in Canvas State.',
+      '**To propose a layout rearrangement**: call `anchor_emit_event("layout_suggest", {suggestion_id, moves:[{anchor_id,x,y},...]})`; do NOT directly patch positions.',
       '',
       anchorLayoutContract(),
     ].join('\n');
