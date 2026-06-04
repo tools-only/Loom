@@ -29,6 +29,10 @@ var _undoStack = [];
 var _redoStack = [];
 var _dragStartSnap = null;
 
+// ── Direct edit mode ────────────────────────────────────────────────
+var _editingId   = null;
+var EDITABLE_SEL = 'h1,h2,h3,h4,h5,h6,p,li,td,th,.kpi-value,.kpi-label,.kpi-label-top,.kpi-unit';
+
 // ── Connect mode ────────────────────────────────────────────────────
 var _connectMode = false;
 var _connectFrom = null;   // anchor_id of the "from" card
@@ -64,6 +68,13 @@ document.addEventListener('DOMContentLoaded', function () {
   initPromptUI();
   initWS();
   loadSavedCanvas();
+
+  // Exit edit mode when clicking outside the edited card
+  document.addEventListener('mousedown', function (e) {
+    if (_editingId && !e.target.closest('.canvas-card-host[data-card-id="' + _editingId + '"]')) {
+      exitEditMode();
+    }
+  }, true);
 });
 
 // ─────────────────────────────────────────────────────────────────────
@@ -77,6 +88,12 @@ function initViewport() {
 
   document.addEventListener('keydown', function (e) {
     var inInput = document.activeElement === promptInput;
+
+    // Edit mode — only Escape passes through; everything else is for the text editor
+    if (_editingId) {
+      if (e.key === 'Escape') { e.preventDefault(); exitEditMode(); }
+      return;
+    }
 
     if (e.code === 'Space' && !inInput) {
       spaceDown = true;
@@ -377,11 +394,19 @@ function buildHandles(id) {
 var _drag = null;
 
 function bindCardEvents(id, host, entry) {
+  // Double-click → enter direct edit mode
+  host.addEventListener('dblclick', function (e) {
+    if (e.target.closest('.card-handles')) return;
+    e.stopPropagation();
+    enterEditMode(id);
+  });
+
   // Card body → select + move (or connect in connect mode)
   host.addEventListener('mousedown', function (e) {
     if (e.target.closest('.card-handles')) return;
     e.stopPropagation();
     if (_connectMode) { handleConnectClick(id); return; }
+    if (_editingId === id) return; // let text cursor clicks through
     if (!e.shiftKey) clearSelection();
     selectCard(id);
     beginDrag(e, id, entry, 'move', null);
@@ -895,6 +920,59 @@ function loadSavedCanvas() {
 // ─────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────
+// Direct card editing (double-click)
+// ─────────────────────────────────────────────────────────────────────
+function enterEditMode(id) {
+  if (_editingId === id) return;
+  if (_editingId) exitEditMode();
+
+  var entry = state.cards.get(id);
+  if (!entry || !entry.contentEl) return;
+
+  pushUndo();
+  _editingId = id;
+  entry.el.classList.add('canvas-editing');
+  entry.el.classList.remove('canvas-selected');
+  clearSelection();
+
+  var els = entry.contentEl.querySelectorAll(EDITABLE_SEL);
+  els.forEach(function (el) {
+    el.setAttribute('contenteditable', 'true');
+    el.setAttribute('spellcheck', 'false');
+  });
+
+  // Focus + move cursor to end of first editable element
+  var first = els[0];
+  if (first) {
+    first.focus();
+    try {
+      var range = document.createRange();
+      range.selectNodeContents(first);
+      range.collapse(false);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch (e) {}
+  }
+}
+
+function exitEditMode() {
+  if (!_editingId) return;
+  var entry = state.cards.get(_editingId);
+  _editingId = null;
+  if (!entry) return;
+
+  entry.el.classList.remove('canvas-editing');
+  entry.contentEl.querySelectorAll('[contenteditable]').forEach(function (el) {
+    el.removeAttribute('contenteditable');
+    el.removeAttribute('spellcheck');
+  });
+  // Sync data-anc-* attrs and save
+  updateCardTransform(entry);
+  scheduleSync();
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Snap-to-grid
 // ─────────────────────────────────────────────────────────────────────
