@@ -1,0 +1,32 @@
+{
+  "id": "loom-human-ag",
+  "name": "Loom Human-Agent Canvas",
+  "runtime": "local-desktop-single-user",
+  "version": "0.1.0",
+  "description": "Free-form whiteboard for co-design: AI generates positioned cards, user drags/rotates/scales, group select + AI improvement loop.",
+  "interface": "loom-agent-adapter",
+  "routes": ["canvas"],
+  "capabilities": ["canvas.create", "canvas.codesign"],
+  "agentTasks": [
+    {
+      "id": "canvas.codesign",
+      "label": "Canvas co-design",
+      "agent": "canvas-agent",
+      "adapter": "cc",
+      "artifactContract": "canvas_html"
+    }
+  ],
+  "compatibility": {
+    "preserveExistingExperience": true,
+    "preserveCssTemplates": true,
+    "preserveUiDesign": true,
+    "preserveColorSystem": true,
+    "preserveConcreteFunctions": true
+  },
+  "paths": {
+    "agentTasks": "./agent-tasks",
+    "resources": "./resources",
+    "policies": "./policies",
+    "ui": "./ui"
+  }
+}
