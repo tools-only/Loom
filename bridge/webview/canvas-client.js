@@ -15,7 +15,7 @@ var state = {
 var CANVAS_W = 3000;
 var CANVAS_H = 2000;
 
-var stage, viewport, promptInput, statusEl, emptyEl, ws;
+var stage, viewport, promptInput, statusEl, emptyEl, marqueeEl, selBadgeEl, ws;
 var _syncTimer = null;
 
 // ─────────────────────────────────────────────────────────────────────
@@ -27,6 +27,8 @@ document.addEventListener('DOMContentLoaded', function () {
   promptInput = document.getElementById('canvas-prompt-input');
   statusEl    = document.getElementById('canvas-status');
   emptyEl     = document.getElementById('canvas-empty');
+  marqueeEl   = document.getElementById('canvas-marquee');
+  selBadgeEl  = document.getElementById('canvas-sel-badge');
 
   initViewport();
   initPromptUI();
@@ -41,6 +43,7 @@ function initViewport() {
   var isPanning = false;
   var panStart  = null;
   var spaceDown = false;
+  var _marquee  = null;
 
   document.addEventListener('keydown', function (e) {
     if (e.code === 'Space' && document.activeElement !== promptInput) {
@@ -71,16 +74,25 @@ function initViewport() {
       e.preventDefault();
       return;
     }
-    // Click on empty canvas → clear selection + start pan
+    // Click on empty canvas → clear selection + start marquee
     if (e.target === viewport || e.target === stage) {
       clearSelection();
-      isPanning = true;
-      panStart = { x: e.clientX - state.viewport.x, y: e.clientY - state.viewport.y };
+      var vr = viewport.getBoundingClientRect();
+      _marquee = {
+        startX: e.clientX - vr.left, startY: e.clientY - vr.top,
+        endX:   e.clientX - vr.left, endY:   e.clientY - vr.top,
+      };
       e.preventDefault();
     }
   });
 
   document.addEventListener('mousemove', function (e) {
+    if (_marquee) {
+      var vr = viewport.getBoundingClientRect();
+      _marquee.endX = e.clientX - vr.left;
+      _marquee.endY = e.clientY - vr.top;
+      updateMarqueeEl(_marquee);
+    }
     if (!isPanning || !panStart) return;
     state.viewport.x = e.clientX - panStart.x;
     state.viewport.y = e.clientY - panStart.y;
@@ -88,6 +100,11 @@ function initViewport() {
   });
 
   document.addEventListener('mouseup', function () {
+    if (_marquee) {
+      finishMarquee(_marquee);
+      _marquee = null;
+      if (marqueeEl) marqueeEl.style.display = 'none';
+    }
     isPanning = false;
   });
 
@@ -112,6 +129,33 @@ function initViewport() {
 function applyViewportTransform() {
   stage.style.transform = 'translate(' + state.viewport.x + 'px,' + state.viewport.y + 'px) scale(' + state.viewport.zoom + ')';
   stage.style.transformOrigin = '0 0';
+}
+
+function updateMarqueeEl(m) {
+  if (!marqueeEl) return;
+  var x = Math.min(m.startX, m.endX);
+  var y = Math.min(m.startY, m.endY);
+  var w = Math.abs(m.endX - m.startX);
+  var h = Math.abs(m.endY - m.startY);
+  if (w < 2 && h < 2) { marqueeEl.style.display = 'none'; return; }
+  marqueeEl.style.cssText = 'display:block;left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px;';
+}
+
+function finishMarquee(m) {
+  var w = Math.abs(m.endX - m.startX);
+  var h = Math.abs(m.endY - m.startY);
+  if (w < 5 && h < 5) return; // was a click, not a drag — selection cleared in mousedown
+  var vr = viewport.getBoundingClientRect();
+  var mx1 = Math.min(m.startX, m.endX) + vr.left;
+  var my1 = Math.min(m.startY, m.endY) + vr.top;
+  var mx2 = Math.max(m.startX, m.endX) + vr.left;
+  var my2 = Math.max(m.startY, m.endY) + vr.top;
+  state.cards.forEach(function (entry, id) {
+    var cr = entry.el.getBoundingClientRect();
+    if (cr.right > mx1 && cr.left < mx2 && cr.bottom > my1 && cr.top < my2) {
+      selectCard(id);
+    }
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -378,6 +422,7 @@ function selectCard(id) {
   state.selected.add(id);
   var e = state.cards.get(id);
   if (e) e.el.classList.add('canvas-selected');
+  updateSelectionUI();
 }
 
 function clearSelection() {
@@ -386,6 +431,7 @@ function clearSelection() {
     if (e) e.el.classList.remove('canvas-selected');
   });
   state.selected.clear();
+  updateSelectionUI();
 }
 
 function deleteSelected() {
@@ -395,6 +441,7 @@ function deleteSelected() {
   });
   state.selected.clear();
   updateEmptyState();
+  updateSelectionUI();
   scheduleSync();
 }
 
@@ -523,12 +570,16 @@ function sendEnvelope(instruction, op) {
     localStorage.setItem('canvas-session-id', sessionId);
   }
 
+  var selectedIds = Array.from(state.selected);
+  var isGroup = selectedIds.length > 0;
+
   var envelope = {
     schema_version: '1.0',
     intent: {
       op: op || 'initial_render',
-      target_kind: 'global',
+      target_kind: isGroup ? 'group' : 'global',
       target_ref: null,
+      target_refs: isGroup ? selectedIds : undefined,
       instruction: instruction
     },
     selection: null,
@@ -538,7 +589,7 @@ function sendEnvelope(instruction, op) {
       subagent_id: null,
       context_mode: 'canvas',
       file_id: null,
-      card_anchor_ids: Array.from(state.selected)
+      card_anchor_ids: selectedIds
     },
     render_state: {
       anchor_tree: [], anchor_index: {}, dom_signature: '',
@@ -629,6 +680,23 @@ function updateEmptyState() {
     emptyEl.classList.add('hidden');
   } else {
     emptyEl.classList.remove('hidden');
+  }
+}
+
+function updateSelectionUI() {
+  var n = state.selected.size;
+  if (selBadgeEl) {
+    if (n > 0) {
+      selBadgeEl.textContent = n + ' 卡片已选中';
+      selBadgeEl.classList.add('visible');
+    } else {
+      selBadgeEl.classList.remove('visible');
+    }
+  }
+  if (promptInput) {
+    promptInput.placeholder = n > 0
+      ? '对选中的 ' + n + ' 张卡片发出指令…'
+      : '描述你想在画布上生成的内容…';
   }
 }
 

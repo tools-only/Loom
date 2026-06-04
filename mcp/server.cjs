@@ -2649,6 +2649,8 @@ function formatEnvelopeAsPrompt(envelope) {
       if (!subtree || !subtree.target_html || subtree.target_html.length < 50) return '';
       return '\n### Current Canvas State\n```html\n' + subtree.target_html.substring(0, 8000) + '\n```\n';
     })();
+    const isGroup = intent.target_kind === 'group';
+    const targetRefs = intent.target_refs || [];
     const selectedCtx = (() => {
       const subs = rs.selected_subtrees || {};
       const ids = Object.keys(subs);
@@ -2657,11 +2659,16 @@ function formatEnvelopeAsPrompt(envelope) {
         '**`' + id + '`**:\n```html\n' + ((subs[id].target_html || '').substring(0, 2000)) + '\n```'
       ).join('\n') + '\n';
     })();
+    const groupInstruction = isGroup && targetRefs.length > 0
+      ? '\n**Mode: GROUP** — patch these ' + targetRefs.length + ' card(s): `' + targetRefs.join('`, `') + '`\n' +
+        'Call `anchor_patch({patches:[...]})` with one entry per selected card. Preserve their `data-anc-x/y/rot/scale` unless the instruction explicitly requests movement.\n'
+      : '';
     return [
       '## Canvas Co-design Request',
       '',
       '**Op**: ' + (intent.op || 'initial_render'),
       '**Instruction**: ' + (intent.instruction || '(none)'),
+      groupInstruction,
       cardContext,
       selectedCtx,
       '## Canvas HTML Format',
