@@ -939,13 +939,21 @@ function enterEditMode(id) {
   clearSelection();
 
   var els = entry.contentEl.querySelectorAll(EDITABLE_SEL);
-  els.forEach(function (el) {
-    el.setAttribute('contenteditable', 'true');
-    el.setAttribute('spellcheck', 'false');
-  });
+  var first;
+  if (els.length > 0) {
+    els.forEach(function (el) {
+      el.setAttribute('contenteditable', 'true');
+      el.setAttribute('spellcheck', 'false');
+    });
+    first = els[0];
+  } else {
+    // Fallback: make the card container itself editable
+    entry.contentEl.setAttribute('contenteditable', 'true');
+    entry.contentEl.setAttribute('spellcheck', 'false');
+    first = entry.contentEl;
+  }
 
   // Focus + move cursor to end of first editable element
-  var first = els[0];
   if (first) {
     first.focus();
     try {
@@ -970,6 +978,11 @@ function exitEditMode() {
     el.removeAttribute('contenteditable');
     el.removeAttribute('spellcheck');
   });
+  // Also clean up container-level fallback editable
+  if (entry.contentEl.hasAttribute('contenteditable')) {
+    entry.contentEl.removeAttribute('contenteditable');
+    entry.contentEl.removeAttribute('spellcheck');
+  }
   // Sync data-anc-* attrs and save
   updateCardTransform(entry);
   scheduleSync();

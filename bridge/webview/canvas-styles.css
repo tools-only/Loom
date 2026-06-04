@@ -294,6 +294,12 @@ body.canvas-dragging .canvas-card-host { transition: none !important; }
   z-index: 200 !important;
 }
 
+/* Lift pointer-events block so clicks reach editable content */
+.canvas-card-host.canvas-editing .anc-section,
+.canvas-card-host.canvas-editing * {
+  pointer-events: auto;
+}
+
 .canvas-card-host.canvas-editing [contenteditable] {
   outline: none;
   cursor: text;

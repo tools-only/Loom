@@ -95,8 +95,35 @@ Preserve each card's `data-anc-x/y/rot/scale` exactly (copy from render_state).
 
 ## Style Rules (Bloom CSS)
 
-- Outer card element: `class="anc-card anc-section anc-section--gc"`
-- KPI grids: `anc-kpi-grid` with `anc-kpi anc-kpi--aurora` (or any gradient theme)
-- Headings: standard `<h2>`, `<h3>` — no inline styles
-- Never hard-code colors; use `var(--accent-brand)`, `var(--ink)`, `var(--paper)` etc.
-- Phosphor icons available: `<i class="ph-bold ph-..."></i>`
+**Every card must be visually designed — never plain text.** Use one of these patterns:
+
+**Concept/Topic card** — colored section + pill + h2 + p + ul:
+```html
+<div class="anc-card anc-section anc-section--gc anc-section--aurora" data-anc="card-X" ...>
+  <div class="anc-pill-row"><span class="anc-pill anc-pill--gen">洞察</span></div>
+  <h2>标题</h2><p>正文</p><ul><li><strong>要点</strong> — 说明</li></ul>
+</div>
+```
+
+**KPI/Data card** — neutral section + anc-kpi-grid with gradient KPIs:
+```html
+<div class="anc-card anc-section anc-section--gc" data-anc="card-X" ...>
+  <h3>指标</h3>
+  <div class="anc-kpi-grid">
+    <div class="anc-kpi anc-kpi--aurora anc-kpi--center"><div class="kpi-value">42%</div><div class="kpi-label">指标名</div></div>
+    <div class="anc-kpi anc-kpi--warm anc-kpi--center"><div class="kpi-value">$1.2T</div><div class="kpi-label">规模</div></div>
+  </div>
+</div>
+```
+
+**Highlight card** — flame/berry/arctic section + pill + blockquote:
+```html
+<div class="anc-card anc-section anc-section--gc anc-section--flame" data-anc="card-X" ...>
+  <div class="anc-pill-row"><span class="anc-pill anc-pill--warn">⚠ 风险</span></div>
+  <h2>警示</h2><blockquote>核心内容</blockquote>
+</div>
+```
+
+Color themes (use variety across cards): `--aurora` `--warm` `--cool` `--berry` `--flame` `--arctic`
+Icons: `<i class="ph-bold ph-brain"></i>` `ph-lightning` `ph-trend-up` `ph-warning` `ph-check-circle`
+- Never hard-code colors; use Bloom CSS tokens only
