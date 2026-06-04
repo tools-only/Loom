@@ -617,6 +617,7 @@ function acceptLayoutSuggestion() {
     ws.send(JSON.stringify({ type: 'suggestion_accept', suggestion_id: _activeSuggestion.suggestion_id }));
   }
   dismissLayoutSuggestion();
+  if (state.connections.size) renderConnections();
   scheduleSync();
 }
 
@@ -671,6 +672,7 @@ function applyPatches(patches) {
     }
   });
   updateEmptyState();
+  if (state.connections.size) renderConnections();
 }
 
 // ─────────────────────────────────────────────────────────────────────
