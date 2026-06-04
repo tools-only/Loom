@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
 <link rel="stylesheet" href="canvas-styles.css">
 </head>
+<!-- html2canvas for PNG export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 <body>
 
 <!-- Toolbar -->
@@ -23,6 +25,9 @@
   <button class="canvas-tool-btn" id="canvas-connect-btn" title="Connect cards (C)">
     <i class="ph-bold ph-arrow-up-right"></i>
   </button>
+  <button class="canvas-tool-btn" id="canvas-export-btn" title="Export PNG">
+    <i class="ph-bold ph-download-simple"></i>
+  </button>
   <a href="/" style="font-size:13px;color:var(--ink);opacity:0.5;text-decoration:none;padding:6px;margin-left:4px;">
     <i class="ph-bold ph-x"></i>
   </a>
@@ -32,7 +37,7 @@
 <div id="canvas-viewport">
   <div id="canvas-stage">
     <!-- SVG connector layer (below cards via z-index) -->
-    <svg id="canvas-connectors" style="position:absolute;top:0;left:0;width:3000px;height:2000px;pointer-events:none;overflow:visible;z-index:0;">
+    <svg id="canvas-connectors" style="position:absolute;top:0;left:0;width:3000px;height:2000px;overflow:visible;z-index:0;pointer-events:none;">
       <defs>
         <marker id="canvas-arrow" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
           <polygon points="0 0, 9 3.5, 0 7" fill="#7A5AF8" fill-opacity="0.6"/>

@@ -20,7 +20,7 @@ var SNAP_THR  = 8;
 
 var stage, viewport, promptInput, statusEl, emptyEl, marqueeEl, selBadgeEl, ws;
 var suggBarEl, suggLabelEl, suggAcceptBtn, suggRejectBtn;
-var snapBtnEl, connectBtnEl;
+var snapBtnEl, connectBtnEl, exportBtnEl;
 var _activeSuggestion = null;
 var _syncTimer = null;
 
@@ -57,6 +57,8 @@ document.addEventListener('DOMContentLoaded', function () {
   connectBtnEl = document.getElementById('canvas-connect-btn');
   if (snapBtnEl)    snapBtnEl.addEventListener('click', toggleSnap);
   if (connectBtnEl) connectBtnEl.addEventListener('click', toggleConnectMode);
+  exportBtnEl = document.getElementById('canvas-export-btn');
+  if (exportBtnEl)  exportBtnEl.addEventListener('click', exportPNG);
 
   initViewport();
   initPromptUI();
@@ -154,6 +156,58 @@ function initViewport() {
     }
     isPanning = false;
   });
+
+  // ── Touch: 1-finger pan, 2-finger pinch-zoom ───────────────────
+  var _lastPinchDist = null;
+
+  viewport.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      var t = e.touches[0];
+      isPanning = true;
+      panStart = { x: t.clientX - state.viewport.x, y: t.clientY - state.viewport.y };
+      _lastPinchDist = null;
+    } else if (e.touches.length === 2) {
+      isPanning = false;
+      _lastPinchDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+    }
+  }, { passive: false });
+
+  viewport.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+    if (e.touches.length === 1 && isPanning && panStart) {
+      var t = e.touches[0];
+      state.viewport.x = t.clientX - panStart.x;
+      state.viewport.y = t.clientY - panStart.y;
+      applyViewportTransform();
+    } else if (e.touches.length === 2) {
+      var d = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      if (_lastPinchDist) {
+        var factor  = d / _lastPinchDist;
+        var newZoom = Math.max(0.15, Math.min(5, state.viewport.zoom * factor));
+        var cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        var cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        var vr = viewport.getBoundingClientRect();
+        var ratio = newZoom / state.viewport.zoom;
+        state.viewport.x = (cx - vr.left) + (state.viewport.x - (cx - vr.left)) * ratio;
+        state.viewport.y = (cy - vr.top)  + (state.viewport.y - (cy - vr.top))  * ratio;
+        state.viewport.zoom = newZoom;
+        applyViewportTransform();
+      }
+      _lastPinchDist = d;
+    }
+  }, { passive: false });
+
+  viewport.addEventListener('touchend', function (e) {
+    e.preventDefault();
+    if (e.touches.length === 0) { isPanning = false; _lastPinchDist = null; }
+  }, { passive: false });
 
   viewport.addEventListener('wheel', function (e) {
     e.preventDefault();
@@ -986,8 +1040,8 @@ function _cardCenter(entry) {
 function renderConnections() {
   var svg = document.getElementById('canvas-connectors');
   if (!svg) return;
-  // Remove old paths (keep <defs>)
-  Array.from(svg.querySelectorAll('path')).forEach(function (p) { p.remove(); });
+  // Remove old groups (keep <defs>)
+  Array.from(svg.querySelectorAll('g')).forEach(function (g) { g.remove(); });
 
   state.connections.forEach(function (conn) {
     var fe = state.cards.get(conn.fromId);
@@ -996,20 +1050,105 @@ function renderConnections() {
     var f = _cardCenter(fe);
     var t = _cardCenter(te);
     var dx = t.x - f.x;
-    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     var d = 'M ' + f.x + ' ' + f.y +
             ' C ' + (f.x + dx * 0.4) + ' ' + f.y +
             ' '  + (t.x - dx * 0.4) + ' ' + t.y +
             ' '  + t.x + ' ' + t.y;
-    path.setAttribute('d', d);
-    path.setAttribute('stroke', '#7A5AF8');
-    path.setAttribute('stroke-width', '2');
-    path.setAttribute('stroke-opacity', '0.55');
-    path.setAttribute('fill', 'none');
-    path.setAttribute('marker-end', 'url(#canvas-arrow)');
-    path.setAttribute('data-conn', conn.id);
-    svg.appendChild(path);
+
+    var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('data-conn', conn.id);
+    g.style.cursor = 'pointer';
+
+    // Wide invisible hit area
+    var hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    hit.setAttribute('d', d);
+    hit.setAttribute('stroke', 'transparent');
+    hit.setAttribute('stroke-width', '14');
+    hit.setAttribute('fill', 'none');
+    hit.style.pointerEvents = 'stroke';
+
+    // Visible line
+    var vis = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    vis.setAttribute('d', d);
+    vis.setAttribute('stroke', '#7A5AF8');
+    vis.setAttribute('stroke-width', '2');
+    vis.setAttribute('stroke-opacity', '0.55');
+    vis.setAttribute('fill', 'none');
+    vis.setAttribute('marker-end', 'url(#canvas-arrow)');
+    vis.style.pointerEvents = 'none';
+
+    g.appendChild(hit);
+    g.appendChild(vis);
+    // Double-click to delete connection
+    g.addEventListener('dblclick', function (e) {
+      e.stopPropagation();
+      state.connections.delete(conn.id);
+      renderConnections();
+      serializeConnections();
+    });
+    // Hover feedback on visible path
+    g.addEventListener('mouseenter', function () { vis.setAttribute('stroke-opacity', '0.9'); vis.setAttribute('stroke-width', '3'); });
+    g.addEventListener('mouseleave', function () { vis.setAttribute('stroke-opacity', '0.55'); vis.setAttribute('stroke-width', '2'); });
+
+    svg.appendChild(g);
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Export PNG
+// ─────────────────────────────────────────────────────────────────────
+function exportPNG() {
+  if (!window.html2canvas) { setStatus('导出库加载中，请稍后重试'); return; }
+  if (state.cards.size === 0) { setStatus('画布为空'); return; }
+
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  state.cards.forEach(function (entry) {
+    var h = entry.h > 0 ? entry.h : (entry.el ? entry.el.offsetHeight : 300);
+    minX = Math.min(minX, entry.x);
+    minY = Math.min(minY, entry.y);
+    maxX = Math.max(maxX, entry.x + entry.w);
+    maxY = Math.max(maxY, entry.y + h);
+  });
+
+  var pad = 48;
+  var cx = Math.max(0, minX - pad);
+  var cy = Math.max(0, minY - pad);
+  var cw = Math.min(maxX - minX + pad * 2, CANVAS_W);
+  var ch = Math.min(maxY - minY + pad * 2, CANVAS_H);
+
+  // Reset viewport so stage is at (0,0) scale(1) before capture
+  var svx = state.viewport.x, svy = state.viewport.y, svz = state.viewport.zoom;
+  state.viewport.x = 0; state.viewport.y = 0; state.viewport.zoom = 1;
+  applyViewportTransform();
+
+  setStatus('导出中…', 'thinking');
+
+  setTimeout(function () {
+    window.html2canvas(stage, {
+      x: cx, y: cy, width: cw, height: ch,
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#f8f7f4',
+      logging: false,
+      ignoreElements: function (el) {
+        var id = el.id || '';
+        return id === 'canvas-suggestion-bar' || id === 'canvas-toolbar' ||
+               id === 'canvas-prompt-bar'     || id === 'canvas-marquee';
+      },
+    }).then(function (canvas) {
+      state.viewport.x = svx; state.viewport.y = svy; state.viewport.zoom = svz;
+      applyViewportTransform();
+      var a = document.createElement('a');
+      a.download = 'canvas-' + new Date().toISOString().slice(0, 10) + '.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+      setStatus('已导出', 'live');
+    }).catch(function () {
+      state.viewport.x = svx; state.viewport.y = svy; state.viewport.zoom = svz;
+      applyViewportTransform();
+      setStatus('导出失败');
+    });
+  }, 60);
 }
 
 function updateEmptyState() {

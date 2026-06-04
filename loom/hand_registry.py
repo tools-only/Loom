@@ -52,4 +52,13 @@ REGISTRY = {
             "risk_profile": {"type": "str", "label": "风险偏好描述"},
         },
     },
+    "canvas": {
+        "label": "Canvas 协作",
+        "description": "自由白板 co-design：生成、重排、连接内容卡片",
+        "prompt": str(ROOT.parent / "domains" / "loom-human-ag" / "hands" / "canvas" / "CLAUDE.md"),
+        "anchor_id": "canvas-root",
+        "runtime": "canvas",
+        "wiki_dir": str(ROOT.parent / "skills" / "canvas-codesign"),
+        "config_schema": {},
+    },
 }
