@@ -1,22 +1,75 @@
-# Loom
+<p align="center">
+  <img src="resource/assets/logo.svg" alt="Loom" width="150">
+</p>
 
-**An AI-native workspace where the document is the interface, every block is addressable, and agents learn how to coordinate around your intent.**
+<h1 align="center">Loom</h1>
 
-[Live demo](https://tools-only.github.io/Loom/demo.html) | [Hand agent guide](docs/loom-hand-agent-guide.md) | [Rewarded intent harness design](docs/superpowers/specs/2026-06-09-rewarded-intent-harness-architecture.html)
+<p align="center">
+  <strong>An AI-native workspace where the document is the interface.</strong>
+  <br>
+  Every block is addressable. Every agent action is visible. Every useful behavior can become policy.
+</p>
+
+<p align="center">
+  <a href="https://tools-only.github.io/Loom/demo.html"><img alt="Live demo" src="https://img.shields.io/badge/demo-live-7A5AF8?style=for-the-badge"></a>
+  <a href="docs/loom-hand-agent-guide.md"><img alt="Hand agents" src="https://img.shields.io/badge/hand_agents-guide-111827?style=for-the-badge"></a>
+  <a href="docs/superpowers/specs/2026-06-09-rewarded-intent-harness-architecture.html"><img alt="Rewarded harness" src="https://img.shields.io/badge/rewarded_harness-design-10B981?style=for-the-badge"></a>
+  <img alt="Local first" src="https://img.shields.io/badge/local_first-yes-F59E0B?style=for-the-badge">
+</p>
+
+<p align="center">
+  <a href="https://tools-only.github.io/Loom/demo.html">Live demo</a>
+  |
+  <a href="docs/loom-hand-agent-guide.md">Hand agent guide</a>
+  |
+  <a href="docs/superpowers/specs/2026-06-09-rewarded-intent-harness-architecture.html">Rewarded intent harness</a>
+</p>
+
+<p align="center">
+  <img src="resource/screenshots/article-preview.png" alt="Loom generated document preview" width="760">
+</p>
 
 Loom turns generated HTML into a live human-agent workspace. Ask for a report, dashboard, memo, market brief, canvas, or prototype; Loom renders it as structured HTML. Every meaningful block is annotated with stable anchors, so you can click a section and ask an agent to refine, expand, branch, restructure, or annotate only that part.
 
 The long-term goal is not another chat wrapper. Loom is an experiment in **agentic work surfaces**: documents that remember intent, route work to specialist agents, evaluate results, and improve the policies that decide what happens next.
 
-## What Loom Does
+## Product Ideas
 
-- **Renders AI work as interactive HTML** instead of plain chat transcripts.
-- **Makes every section addressable** with `data-anc` anchors and local operation handles.
-- **Routes tasks through a Brain-Hand architecture**: Brain orchestrates; Hands perform domain work.
-- **Captures user intent as structured signals** rather than ephemeral chat context.
-- **Uses a rewarded harness** to select intent policies, evaluate outputs, and update policy weights.
-- **Supports local and cloud agents** through adapter contracts and task envelopes.
-- **Runs locally first** with an Electron/webview shell, HTTP service, WebSocket loop, and Python Brain.
+<table>
+  <tr>
+    <td width="50%">
+      <h3>Interactive AI documents</h3>
+      <p>Generated reports are not dead text. They are HTML workspaces with stable anchors, local operations, provenance, and patchable sections.</p>
+    </td>
+    <td width="50%">
+      <h3>Brain-Hand agents</h3>
+      <p>Brain orchestrates workflows. Hands perform domain work. Artifacts flow back into the document instead of disappearing into chat history.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>Intent-aware workspace</h3>
+      <p>User behavior becomes structured intent: which block was edited, what resource was added, what goal was repeated, and which preference should persist.</p>
+    </td>
+    <td width="50%">
+      <h3>Rewarded harness</h3>
+      <p>Loom tracks selected policies, evaluates output quality, writes reward signals, and updates external agent policy weights without training closed LLM weights.</p>
+    </td>
+  </tr>
+</table>
+
+## What You Can Build With It
+
+<table>
+  <tr>
+    <td><strong>Research brief</strong><br>Generate a market, technical, or strategy report and refine any section in place.</td>
+    <td><strong>Agent dashboard</strong><br>Route one task to multiple specialist agents, then synthesize their artifacts.</td>
+  </tr>
+  <tr>
+    <td><strong>Canvas workspace</strong><br>Turn AI output into cards on a freeform board, then edit selected cards with context.</td>
+    <td><strong>Policy-learning harness</strong><br>Record episodes, reward signals, and credit assignment across Brain, Hands, retrieval, and synthesis.</td>
+  </tr>
+</table>
 
 ## Why This Exists
 
@@ -40,6 +93,27 @@ The public demo is a static interactive preview:
 [https://tools-only.github.io/Loom/demo.html](https://tools-only.github.io/Loom/demo.html)
 
 It shows an AI-generated market research report rendered with Loom's Bloom design system. Hover over sections and KPI cards to see the operations that a connected agent can perform.
+
+## Visual Tour
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="resource/screenshots/article-preview.png" alt="Article-style AI document preview">
+      <br>
+      <strong>Document as interface</strong>
+      <br>
+      Render AI work as polished, structured HTML instead of scrollback.
+    </td>
+    <td width="50%">
+      <img src="resource/screenshots/dashboard-preview.png" alt="Dashboard-style AI workspace preview">
+      <br>
+      <strong>Workspace as state</strong>
+      <br>
+      Dashboards, reports, cards, and canvases become patchable work surfaces.
+    </td>
+  </tr>
+</table>
 
 ## Core Architecture
 
