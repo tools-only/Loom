@@ -15,6 +15,8 @@ const Anchor = {
   _allowIncomingHtml: false,
   _selectedPromptRoute: '',
   _pendingPromptRoute: '',
+  _staticMode: false,  // #sta — static display, no interaction overlays
+  _domainContent: {},   // {domain: html} — cached AI-generated content per domain, survives tab switches
 
   _timing: null,  // per-interaction timing { t0_click, t1_built, t2_sent, t3_ack, t4_thinking, t5_patch, t6_dom }
 
@@ -68,35 +70,78 @@ const Anchor = {
     this._initAnchorSelect();
   },
 
-  _initHashRouting() {
-    window.addEventListener('hashchange', () => this._handleHashChange());
-    const hash = window.location.hash.slice(1);
-    if (!hash) {
+  // Parse hash: "#sta/market" → {static:true, route:"market"}
+  _parseHash(hash) {
+    if (hash.startsWith('sta/')) return { static: true, route: hash.slice(4) };
+    return { static: false, route: hash };
+  },
+
+  _enterStatic() {
+    if (!this._staticMode) {
+      this._staticMode = true;
+      document.body.classList.add('sta-mode');
+    }
+  },
+
+  _exitStaticModeIfNeeded() {
+    if (this._staticMode) {
+      this._staticMode = false;
+      document.body.classList.remove('sta-mode');
+    }
+  },
+
+  _routeHash(hash) {
+    const { static: isStatic, route } = this._parseHash(hash);
+    if (isStatic) this._enterStatic();
+    else this._exitStaticModeIfNeeded();
+
+    if (!route) {
       this.currentHtml = '';
       this.container.innerHTML = '';
       this._syncHomeVisibility();
       this._updateToolbarTabs('');
+    } else if (['market','position','target','sentiment'].includes(route)) {
+      this._loadBlogDomain(route);
+    } else {
+      this.currentHtml = '';
+      this.container.innerHTML = '';
+      this._syncHomeVisibility();
     }
-    else if (['market','position','target','sentiment'].includes(hash)) { this._loadBlogDomain(hash); }
+  },
+
+  _initHashRouting() {
+    window.addEventListener('hashchange', () => this._routeHash(window.location.hash.slice(1)));
+    this._routeHash(window.location.hash.slice(1));
   },
 
   _handleHashChange() {
-    const hash = window.location.hash.slice(1);
-    if (!hash) {
-      this.currentHtml = '';
-      this.container.innerHTML = '';
-      this._syncHomeVisibility();
-      this._updateToolbarTabs('');
-    }
-    else if (['market','position','target','sentiment'].includes(hash)) { this._loadBlogDomain(hash); }
-    else {
-      this.currentHtml = '';
-      this.container.innerHTML = '';
-      this._syncHomeVisibility();
-    }
+    // Kept for external callers; actual logic lives in _routeHash
+    this._routeHash(window.location.hash.slice(1));
   },
 
   async _loadBlogDomain(domain) {
+    // Restore cached AI-generated content if available (survives tab switches)
+    if (this._domainContent[domain]) {
+      this.render(this._domainContent[domain]);
+      this._syncHomeVisibility();
+      this._updateToolbarTabs(domain);
+      return;
+    }
+    // Fallback: try loading last rendered content from server
+    try {
+      const resp = await fetch('/current-html');
+      if (resp.ok) {
+        const html = await resp.text();
+        if (html && html.includes('data-anc="' + domain)) {
+          this._domainContent[domain] = html;
+          this.render(html);
+          this._syncHomeVisibility();
+          this._updateToolbarTabs(domain);
+          return;
+        }
+      }
+    } catch (_) {}
+    // Last resort: render inbox items as blog page
     try {
       const data = await fetch('/api/inbox/' + domain).then(r => r.json());
       const counts = data.meta || {};
@@ -438,6 +483,7 @@ const Anchor = {
   },
 
   submitPrompt(text, route = '') {
+    if (this._staticMode) { this.toast('Static mode — prompts disabled'); return; }
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       this.toast('Not connected — please wait');
       return;
@@ -462,6 +508,7 @@ const Anchor = {
     this.container.innerHTML = '';
     this._updateToolbarTabs(effectiveRoute);
     this.ws.send(JSON.stringify({ type: 'prompt', text, route: effectiveRoute, ts: Date.now() }));
+    this._captureIntent('query', text, 'route:' + effectiveRoute);
     this.showProcessing('Generating…');
     this.toast('Prompt sent');
   },
@@ -726,6 +773,11 @@ const Anchor = {
         this.clearProcessing();
         this._clearSessionBlockConfig();
         this.render(msg.content);
+        // Cache AI-generated content per domain so tab switches restore it
+        const route = this._pendingPromptRoute || window.location.hash.slice(1);
+        if (route && ['market','position','target','sentiment'].includes(route)) {
+          this._domainContent[route] = msg.content;
+        }
         this._pendingPromptRoute = '';
         break;
       case 'manifest_updated':
@@ -869,8 +921,10 @@ const Anchor = {
     this.currentHtml = html;
     if (window.OpBars) OpBars.clearAll();
     this.container.innerHTML = html;
-    this.injectHandles();
-    this.injectCollapse();
+    if (!this._staticMode) {
+      this.injectHandles();
+      this.injectCollapse();
+    }
     this.infoEl.textContent = this.countAnchors() + ' anchors';
     if (window.WorkspacePanel) WorkspacePanel.persistCurrentHtml(html);
     if (window.PromptPanel) PromptPanel.clearSelection();
@@ -921,8 +975,10 @@ const Anchor = {
     patches.forEach(p => {
       const newEl = this.container.querySelector('[data-anc="' + p.anchor_id.replace(/"/g, '\\"') + '"]');
       if (newEl) {
-        this.injectHandlesIn(newEl);
-        this.injectCollapseIn(newEl);
+        if (!this._staticMode) {
+          this.injectHandlesIn(newEl);
+          this.injectCollapseIn(newEl);
+        }
         this._mountAnnotations(p.anchor_id);
         this._clearStreamingOverlay(p.anchor_id);
       }
@@ -981,6 +1037,12 @@ const Anchor = {
         this._showTimings();
       }
     }, 0);
+
+    // Keep domain content cache in sync with patched DOM
+    const domain = window.location.hash.slice(1);
+    if (domain && this._domainContent[domain]) {
+      this._domainContent[domain] = this.container.innerHTML;
+    }
   },
 
   injectHandles(rootEl) {
@@ -1680,9 +1742,61 @@ const Anchor = {
       if (this._timing) this._timing.t2_sent = performance.now();
       this.ws.send(JSON.stringify({ type: 'envelope', envelope }));
       this.toast('Sent: ' + envelope.intent.op + ' → ' + targetRef);
+      // Intent capture: map anchor op → intent type
+      var _op = envelope.intent && envelope.intent.op || '';
+      var _instr = envelope.intent && envelope.intent.instruction || '';
+      if (_instr) {
+        var _hasUrl = /https?:\/\//.test(_instr);
+        var _itype = this._intentTypeForOp(_op, _hasUrl);
+        this._captureIntent(_itype, _instr, 'op:' + _op + ' target:' + (targetRef || ''), {
+          anchor_op: _op,
+          anchor_id: targetRef || '',
+          anchor_kind: (envelope.intent && envelope.intent.target_kind) || '',
+          anchor_content: this._anchorPreviewFromEnvelope(envelope),
+        });
+      }
     } else {
       this.toast('Connection lost — reconnecting...');
     }
+  },
+
+  _captureIntent(inputType, rawInput, extraContext, anchorContext) {
+    if (!rawInput || !rawInput.trim()) return;
+    var sid = localStorage.getItem('anchor-session-id');
+    if (!sid) { sid = 'anchor-' + Date.now().toString(36); localStorage.setItem('anchor-session-id', sid); }
+    var payload = {
+      input_type: inputType,
+      raw_input: rawInput.trim(),
+      extra_context: extraContext || '',
+      session_id: sid
+    };
+    if (anchorContext) {
+      payload.anchor_op = anchorContext.anchor_op || '';
+      payload.anchor_id = anchorContext.anchor_id || '';
+      payload.anchor_kind = anchorContext.anchor_kind || '';
+      payload.anchor_content = (anchorContext.anchor_content || '').slice(0, 2000);
+    }
+    fetch('http://localhost:3002/intent/capture', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(function() {});
+  },
+
+  _intentTypeForOp(op, hasUrl) {
+    if (hasUrl) return 'resource_share';
+    if (op === 'edit' || op === 'restructure') return 'strategy_edit';
+    if (op === 'annotate') return 'feedback';
+    return 'query';
+  },
+
+  _anchorPreviewFromEnvelope(envelope) {
+    var rs = envelope && envelope.render_state && envelope.render_state.relevant_subtree;
+    var html = rs && rs.target_html;
+    if (!html) return '';
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return (tmp.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 2000);
   },
 
   _handleAnnotateOp(anchorId, text) {
@@ -1884,7 +1998,7 @@ const Anchor = {
       return Math.max(2, Math.min(100, Math.round(ms / tot * 100)));
     };
     const total = t.t6_dom - t.t0_click;
-    const BRAIN_URL = "http://127.0.0.1:3001";
+    const BRAIN_URL = "http://127.0.0.1:3002";
 
     (async () => {
       let stages = [], domDetail = [], serverTimings = [], op = "?", target = "?", agentCtx = "";

@@ -2,16 +2,19 @@
 
 Flow per run():
   1. Receive task + context + resource_menu (ranked by disclosure policy)
-  2. LLM loop: Hand can call fetch_resource() to pull connector data
+  2. LLM loop: Hand can call fetch_resource(), web_search(), fetch_url()
   3. On stop_reason=end_turn: parse the structured artifact
   4. Return { metadata, narrative } with resource tracking metadata merged in
 """
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from bridge import get_connector_data
-from provider_client import get_client_for_hand
+from provider_client import get_client_for_hand, _resolve
+
+import httpx
 
 ROOT = Path(__file__).parent.parent
 
@@ -37,6 +40,49 @@ FETCH_RESOURCE_TOOL = {
         "required": ["resource_id"],
     },
 }
+
+# Anthropic server-side built-in — no input_schema needed, API handles execution.
+WEB_SEARCH_TOOL = {
+    "type": "web_search_20250305",
+    "name": "web_search",
+}
+
+FETCH_URL_TOOL = {
+    "name": "fetch_url",
+    "description": (
+        "Fetch the text content of any public URL — RSS feeds, Yahoo Finance pages, "
+        "free financial data APIs (FRED, SEC EDGAR), news articles. "
+        "Returns plain text truncated to 8 000 characters."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "description": "Full URL to fetch",
+            },
+        },
+        "required": ["url"],
+    },
+}
+
+
+async def _fetch_url(url: str, max_chars: int = 8000) -> str:
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15) as c:
+            r = await c.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible; LoomFin/1.0)"})
+        if r.status_code != 200:
+            return f"HTTP {r.status_code} for {url}"
+        text = r.text
+        ct = r.headers.get("content-type", "")
+        if "html" in ct:
+            text = re.sub(r"<script[^>]*>.*?</script>", " ", text, flags=re.DOTALL)
+            text = re.sub(r"<style[^>]*>.*?</style>", " ", text, flags=re.DOTALL)
+            text = re.sub(r"<[^>]+>", " ", text)
+            text = re.sub(r"\s+", " ", text).strip()
+        return text[:max_chars]
+    except Exception as e:
+        return f"fetch_url error: {e}"
 
 
 class BaseHand:
@@ -84,9 +130,16 @@ class BaseHand:
 
     async def run(self, task: str, context: dict, resource_menu: list[dict]) -> dict:
         client, model = get_client_for_hand(self.hand_id)
+        provider = _resolve(self.hand_id).get("provider", "anthropic")
+
         system = self._assemble_prompt(context)
         shown = [r["resource_id"] for r in resource_menu]
         used: list[str] = []
+
+        # web_search is Anthropic-only built-in; OAI-compat providers skip it
+        tools: list[dict] = [FETCH_RESOURCE_TOOL, FETCH_URL_TOOL]
+        if provider == "anthropic":
+            tools.insert(1, WEB_SEARCH_TOOL)
 
         menu_text = self._format_menu(resource_menu)
         user_parts = [f"Task: {task}", f"\nAvailable resources:\n{menu_text}"]
@@ -101,7 +154,7 @@ class BaseHand:
                 model=model,
                 max_tokens=4096,
                 system=system,
-                tools=[FETCH_RESOURCE_TOOL],
+                tools=tools,
                 messages=messages,
             )
 
@@ -117,7 +170,10 @@ class BaseHand:
             if resp.stop_reason == "tool_use":
                 tool_results = []
                 for block in resp.content:
-                    if block.type == "tool_use" and block.name == "fetch_resource":
+                    if block.type != "tool_use":
+                        continue
+
+                    if block.name == "fetch_resource":
                         rid = block.input.get("resource_id", "")
                         params = block.input.get("params", {})
                         data = await get_connector_data(rid, params)
@@ -132,7 +188,27 @@ class BaseHand:
                                 else json.dumps({"error": "no data available for this connector"})
                             ),
                         })
-                messages.append({"role": "user", "content": tool_results})
+
+                    elif block.name == "fetch_url":
+                        url = block.input.get("url", "")
+                        content = await _fetch_url(url)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": content,
+                        })
+
+                    elif block.name == "web_search":
+                        # Anthropic server-side built-in: API executes search automatically.
+                        # Send back an empty tool_result to continue the loop.
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": "",
+                        })
+
+                if tool_results:
+                    messages.append({"role": "user", "content": tool_results})
 
         artifact = self._parse_artifact(final_text)
         artifact["metadata"]["resources_shown"] = shown
@@ -145,7 +221,6 @@ class BaseHand:
         """Extract structured artifact from LLM response. Falls back to wrapping plain text."""
         stripped = text.strip()
 
-        # Try direct JSON parse
         try:
             data = json.loads(stripped)
             if isinstance(data, dict) and "metadata" in data and "narrative" in data:
@@ -153,7 +228,6 @@ class BaseHand:
         except (json.JSONDecodeError, ValueError):
             pass
 
-        # Try extracting from ```json ... ``` block
         try:
             if "```json" in stripped:
                 start = stripped.index("```json") + 7
@@ -164,7 +238,6 @@ class BaseHand:
         except (ValueError, json.JSONDecodeError):
             pass
 
-        # Fallback
         return {
             "metadata": {
                 "confidence": 0.5,

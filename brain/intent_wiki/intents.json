@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "zones": {
+    "content_requirements": "What generated content should include or emphasize.",
+    "decision_style": "How the user weighs tradeoffs, uncertainty, and decisions.",
+    "workflow_preferences": "How the user wants work organized across steps.",
+    "source_preferences": "What evidence, resources, or authors the user tends to value.",
+    "object_behavior": "How the user acts on anchors, cards, sections, or other objects.",
+    "risk_sensitivity": "How the user wants counterarguments, failure modes, and uncertainty handled.",
+    "personal_style": "Preferred style, granularity, and presentation shape.",
+    "domain_principles": "Domain-specific long-lived principles supplied by a domain pack or inferred from usage."
+  },
+  "intents": [
+    {
+      "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
+      "zone": "content_requirements",
+      "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
+      "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "market",
+          "今日市场简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-09T17:55:31.728583",
+      "updated_at": "2026-06-09T17:55:31.728583",
+      "last_evidence_ts": "2026-06-09T17:55:31.716522"
+    },
+    {
+      "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件",
+      "zone": "risk_sensitivity",
+      "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
+      "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "market",
+          "今日市场简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-09T17:55:31.731061",
+      "updated_at": "2026-06-09T17:55:31.728583",
+      "last_evidence_ts": "2026-06-09T17:55:31.716522"
+    }
+  ]
+}

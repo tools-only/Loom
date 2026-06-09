@@ -215,35 +215,54 @@ class _OAIClient:
 
 # ── Factory ──────────────────────────────────────────────────────────────────
 
+def _build_client(r: dict) -> tuple:
+    """Build (client, model) from a resolved config dict."""
+    provider = r.get("provider", "anthropic").lower()
+    api_key  = r.get("api_key") or None
+    base_url = r.get("base_url") or None
+    model    = r.get("model") or _DEFAULT["model"]
+
+    if provider == "anthropic":
+        import anthropic
+        kwargs: dict = {}
+        if api_key:
+            kwargs["api_key"] = api_key
+        if base_url:
+            kwargs["base_url"] = base_url
+        client = anthropic.AsyncAnthropic(**kwargs)
+    else:
+        try:
+            import openai as _oai
+        except ImportError as exc:
+            raise ImportError(
+                "openai package required for non-Anthropic providers: pip install openai"
+            ) from exc
+        preset = _PRESETS.get(provider, {})
+        key = api_key or os.environ.get(preset.get("env_key", "OPENAI_API_KEY"), "")
+        url = base_url or preset.get("base_url", "https://api.openai.com/v1")
+        raw = _oai.AsyncOpenAI(api_key=key, base_url=url)
+        client = _OAIClient(raw)
+    return (client, model)
+
+
 def get_client_for_hand(hand_id: str) -> tuple:
     """Return (client, model) for the given hand, cached until write_config() clears it."""
     if hand_id not in _client_cache:
-        r = _resolve(hand_id)
-        provider = r.get("provider", "anthropic").lower()
-        api_key  = r.get("api_key") or None
-        base_url = r.get("base_url") or None
-        model    = r.get("model") or _DEFAULT["model"]
-
-        if provider == "anthropic":
-            import anthropic
-            kwargs: dict = {}
-            if api_key:
-                kwargs["api_key"] = api_key
-            if base_url:
-                kwargs["base_url"] = base_url
-            client = anthropic.AsyncAnthropic(**kwargs)
-        else:
-            try:
-                import openai as _oai
-            except ImportError as exc:
-                raise ImportError(
-                    "openai package required for non-Anthropic providers: pip install openai"
-                ) from exc
-            preset = _PRESETS.get(provider, {})
-            key = api_key or os.environ.get(preset.get("env_key", "OPENAI_API_KEY"), "")
-            url = base_url or preset.get("base_url", "https://api.openai.com/v1")
-            raw = _oai.AsyncOpenAI(api_key=key, base_url=url)
-            client = _OAIClient(raw)
-
-        _client_cache[hand_id] = (client, model)
+        _client_cache[hand_id] = _build_client(_resolve(hand_id))
     return _client_cache[hand_id]
+
+
+def get_client_for_brain() -> tuple:
+    """Return (client, model) for the Brain agent.
+
+    Reads config["brain"] section if present; falls back to config["default"].
+    Uses a more capable model than hands by default (sonnet vs haiku).
+    """
+    cache_key = "__brain__"
+    if cache_key not in _client_cache:
+        cfg = read_config()
+        base = {**_DEFAULT, "model": "claude-sonnet-4-6"}
+        base.update(cfg.get("default", {}))
+        base.update({k: v for k, v in cfg.get("brain", {}).items() if v})
+        _client_cache[cache_key] = _build_client(base)
+    return _client_cache[cache_key]

@@ -209,8 +209,8 @@ class AgentAdapter:
             },
             ensure_ascii=False,
         )
-        # Merge system prompt into user message for compatibility with models
-        # that only accept a single user message (e.g. MiniMax via nanobot).
+        # Merge system prompt + task into one user message — many OAI-compat
+        # agents (DeepSeek, nanobot) reject system role or multi-message.
         merged = f"{self._system_prompt}\n\n{user_content}"
         body: dict[str, Any] = {
             "messages": [{"role": "user", "content": merged}],
@@ -263,11 +263,27 @@ class AgentAdapter:
                 artifact_event = event
 
         if artifact_event is None:
-            yield {
-                "type": "run.error",
-                "run_id": run_id,
-                "message": "agent response contained no run.artifact event",
-            }
+            # Fallback: wrap plain text response as narrative artifact
+            content_stripped = content.strip()
+            if content_stripped:
+                yield {
+                    "type": "run.artifact",
+                    "artifact": {
+                        "metadata": {
+                            "confidence": 0.5,
+                            "key_claims": [],
+                            "gaps": ["hand agent did not return structured JSON"],
+                        },
+                        "narrative": content_stripped,
+                    },
+                }
+                yield {"type": "run.completed", "run_id": run_id, "exit_code": 0}
+            else:
+                yield {
+                    "type": "run.error",
+                    "run_id": run_id,
+                    "message": "agent response contained no run.artifact event",
+                }
             return
 
         yield artifact_event

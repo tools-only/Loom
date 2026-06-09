@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>标的跟踪 · Loom</title>
+<link rel="stylesheet" href="resource/colors_and_type.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="mobile.css">
+<style>
+  /* ── Override: no bottom-nav padding for standalone page ────────── */
+  body { padding-bottom: 0; }
+  [data-route] { bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
+
+  /* ── Header bar ──────────────────────────────────────────────────── */
+  .mob-target-header {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    padding-top: max(12px, env(safe-area-inset-top));
+    background: rgba(10, 10, 20, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .mob-target-header h1 {
+    flex: 1; margin: 0;
+    font-family: var(--font-display);
+    font-size: 20px; font-weight: 800;
+    color: var(--dark-text);
+    letter-spacing: -0.02em;
+  }
+  .mob-target-header .ph-crosshair {
+    font-size: 22px; color: var(--accent-cyan);
+  }
+  .mob-target-close {
+    width: 38px; height: 38px; flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: var(--dark-surface);
+    color: var(--dark-text-2);
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: background 0.12s, transform 0.12s;
+    -webkit-tap-highlight-color: transparent;
+    text-decoration: none;
+  }
+  .mob-target-close:active {
+    background: var(--dark-raised);
+    transform: scale(0.9);
+  }
+
+  /* ── Content area ──────────────────────────────────────────────────── */
+  #target-content {
+    min-height: calc(100dvh - 62px - env(safe-area-inset-top));
+    padding: 0;
+  }
+  #target-content:empty::after {
+    content: '暂无目标跟踪数据 · 在桌面端打开 Targets 标签页生成';
+    display: flex;
+    align-items: center; justify-content: center;
+    min-height: inherit;
+    padding: 60px 32px;
+    text-align: center;
+    color: var(--dark-text-2);
+    opacity: 0.35;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  /* ── Status ────────────────────────────────────────────────────────── */
+  .mob-target-status {
+    position: fixed;
+    top: max(14px, env(safe-area-inset-top));
+    right: 56px;
+    z-index: 101;
+    font-size: 10px; font-weight: 700;
+    padding: 4px 10px;
+    border-radius: var(--r-pill);
+    background: rgba(31, 33, 56, 0.8);
+    color: var(--dark-text-2);
+    border: 1px solid var(--dark-border);
+    pointer-events: none;
+    letter-spacing: 0.03em;
+  }
+  .mob-target-status--live {
+    color: #4ADE80;
+    border-color: rgba(43, 182, 115, 0.3);
+  }
+
+  /* ── Mobile Compact Overrides ────────────────────────── */
+  @media (max-width: 440px) {
+    #target-content .anc-section {
+      border-radius: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      padding: 14px 14px !important;
+    }
+    #target-content .anc-kpi-grid {
+      grid-template-columns: 1fr 1fr !important;
+      gap: 8px !important;
+    }
+    /* KPI cards: tighter */
+    #target-content .anc-kpi {
+      padding: 10px 12px !important;
+      border-radius: 14px !important;
+    }
+    #target-content .anc-kpi .kpi-value {
+      font-size: 22px !important;
+    }
+    #target-content .anc-kpi .kpi-label,
+    #target-content .anc-kpi .kpi-unit {
+      font-size: 11px !important;
+    }
+    #target-content .anc-kpi .kpi-top {
+      margin-bottom: 4px !important;
+    }
+    #target-content .anc-kpi .kpi-label-top {
+      font-size: 12px !important;
+    }
+    /* Headings */
+    #target-content h2 {
+      font-size: 18px !important;
+      padding: 12px 4px 6px !important;
+    }
+    #target-content h3 {
+      font-size: 15px !important;
+      padding: 8px 4px 4px !important;
+    }
+    /* Paragraphs and text */
+    #target-content p {
+      font-size: 13px !important;
+      line-height: 1.5 !important;
+      margin: 4px 0 !important;
+    }
+    /* Tables */
+    #target-content table {
+      font-size: 12px !important;
+    }
+    #target-content td, #target-content th {
+      padding: 4px 6px !important;
+    }
+    /* Dividers */
+    #target-content .anc-divider {
+      margin: 8px 0 !important;
+    }
+    /* Lists */
+    #target-content ul, #target-content ol {
+      padding-left: 18px !important;
+      margin: 4px 0 !important;
+    }
+    #target-content li {
+      font-size: 13px !important;
+      margin: 2px 0 !important;
+    }
+    /* Status pills */
+    #target-content .anc-pill {
+      font-size: 10px !important;
+      padding: 3px 10px !important;
+    }
+    #target-content .anc-pill-row {
+      gap: 4px !important;
+      margin: 4px 0 !important;
+    }
+    /* Buttons */
+    #target-content .btn {
+      font-size: 12px !important;
+      padding: 6px 14px !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="mob-target-header">
+  <i class="ph-bold ph-crosshair"></i>
+  <h1>标的跟踪</h1>
+  <span class="mob-target-status" id="status">connecting…</span>
+  <a class="mob-target-close" href="/mobile.html" title="返回"><i class="ph-bold ph-x"></i></a>
+</div>
+
+<!-- Content (populated by WS + fetch) -->
+<div id="target-content"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var statusEl = document.getElementById('status');
+  var content  = document.getElementById('target-content');
+  var ws       = null;
+
+  function setStatus(text, kind) {
+    if (!statusEl) return;
+    statusEl.textContent = text;
+    statusEl.className = 'mob-target-status' + (kind ? ' mob-target-status--' + kind : '');
+  }
+
+  // ── Fetch current content on load ─────────────────────────────────
+  function fetchCurrent() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/current-html', true);
+    xhr.onload = function () {
+      if (xhr.status === 200 && xhr.responseText) {
+        content.innerHTML = xhr.responseText;
+        setStatus('Live', 'live');
+      }
+    };
+    xhr.onerror = function () {};
+    xhr.send();
+  }
+
+  // ── WS: receive live html/patch ───────────────────────────────────
+  function initWS() {
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var url   = proto + '//' + location.host;
+
+    try {
+      ws = new WebSocket(url);
+    } catch (e) {
+      setStatus('Error');
+      return;
+    }
+
+    ws.onopen = function () {
+      setStatus('Live', 'live');
+      // Register as viewer ("type":"view")
+      ws.send(JSON.stringify({ type: 'view', page: 'mobile-target' }));
+    };
+
+    ws.onclose = function () {
+      setStatus('Reconnecting…');
+      setTimeout(initWS, 3000);
+    };
+
+    ws.onmessage = function (evt) {
+      var msg;
+      try { msg = JSON.parse(evt.data); } catch (e) { return; }
+
+      if (msg.type === 'html' || (msg.type === 'msg' && msg.html)) {
+        // Full render
+        content.innerHTML = msg.html || msg.content || '';
+        setStatus('Live', 'live');
+      } else if (msg.type === 'patch' && msg.patches) {
+        // Apply patches in-place
+        msg.patches.forEach(function (p) {
+          var el = content.querySelector('[data-anc="' + p.anchor_id + '"]');
+          if (el) {
+            var temp = document.createElement('div');
+            temp.innerHTML = p.html_fragment;
+            el.replaceWith(temp.firstElementChild || el);
+          }
+        });
+      }
+    };
+
+    ws.onerror = function () {
+      setStatus('Error');
+    };
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────
+  fetchCurrent();
+  setStatus('Connecting…');
+  initWS();
+
+})();
+</script>
+</body>
+</html>

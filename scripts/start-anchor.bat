@@ -21,7 +21,7 @@ if %errorlevel% == 0 (
   echo Loom Brain already running on http://localhost:3002
 ) else (
   echo Starting Loom Brain on http://localhost:3002 ...
-  start "Loom Brain" /MIN cmd /c "cd loom && python main.py"
+  start "Loom Brain" /MIN cmd /c "cd loom && D:\conda\python.exe main.py"
 )
 
 timeout /t 2 /nobreak >nul

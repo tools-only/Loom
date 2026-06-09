@@ -9,6 +9,7 @@ REGISTRY = {
         "prompt": str(ROOT / "hands" / "prompts" / "market.md"),
         "anchor_id": "loom-market",
         "runtime": "sdk",
+        "domains": ["finance"],
         "wiki_dir": str(ROOT.parent / "hands" / "market" / "wiki"),
         "config_schema": {
             "watched_sectors": {"type": "list", "label": "关注板块"},
@@ -22,6 +23,7 @@ REGISTRY = {
         "prompt": str(ROOT / "hands" / "prompts" / "sentiment.md"),
         "anchor_id": "loom-sentiment",
         "runtime": "sdk",
+        "domains": ["finance"],
         "wiki_dir": str(ROOT.parent / "hands" / "sentiment" / "wiki"),
         "config_schema": {
             "reddit_subs": {"type": "list", "label": "Reddit 社区"},
@@ -34,6 +36,7 @@ REGISTRY = {
         "prompt": str(ROOT / "hands" / "prompts" / "target.md"),
         "anchor_id": "loom-target",
         "runtime": "sdk",
+        "domains": ["finance"],
         "wiki_dir": str(ROOT.parent / "hands" / "target" / "wiki"),
         "config_schema": {
             "tickers": {"type": "list", "label": "目标标的"},
@@ -46,6 +49,7 @@ REGISTRY = {
         "prompt": str(ROOT / "hands" / "prompts" / "position.md"),
         "anchor_id": "loom-position",
         "runtime": "sdk",
+        "domains": ["finance"],
         "wiki_dir": str(ROOT.parent / "hands" / "position" / "wiki"),
         "config_schema": {
             "positions": {"type": "list", "label": "持仓数据"},
@@ -58,6 +62,7 @@ REGISTRY = {
         "prompt": str(ROOT.parent / "domains" / "loom-human-ag" / "hands" / "canvas" / "CLAUDE.md"),
         "anchor_id": "canvas-root",
         "runtime": "canvas",
+        "domains": ["general"],
         "wiki_dir": str(ROOT.parent / "skills" / "canvas-codesign"),
         "config_schema": {},
     },

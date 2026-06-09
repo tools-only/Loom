@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rewarded Intent Harness Architecture</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --paper: #ffffff;
+      --ink: #16202a;
+      --muted: #5d6b7a;
+      --line: #dbe2ea;
+      --blue: #2563eb;
+      --green: #159a68;
+      --amber: #b7791f;
+      --red: #c24141;
+      --violet: #7c3aed;
+      --slate: #334155;
+      --code: #0f172a;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+
+    header {
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+      padding: 32px 40px 26px;
+    }
+
+    main {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 28px 28px 64px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 34px 0 14px;
+      font-size: 22px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 22px 0 10px;
+      font-size: 17px;
+      line-height: 1.35;
+    }
+
+    p { margin: 0 0 12px; }
+
+    .subtitle {
+      max-width: 900px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+      color: var(--slate);
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 22px;
+      margin-bottom: 18px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      background: #fbfcfe;
+    }
+
+    .card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+      margin: 18px 0 6px;
+    }
+
+    .flow-node {
+      position: relative;
+      min-height: 88px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfe;
+      padding: 12px;
+    }
+
+    .flow-node::after {
+      content: "→";
+      position: absolute;
+      right: -13px;
+      top: 34px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .flow-node:nth-child(4n)::after,
+    .flow-node:last-child::after { content: ""; }
+
+    .tag {
+      display: inline-block;
+      margin-bottom: 8px;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 750;
+      color: #fff;
+      background: var(--blue);
+    }
+
+    .tag.green { background: var(--green); }
+    .tag.amber { background: var(--amber); }
+    .tag.red { background: var(--red); }
+    .tag.violet { background: var(--violet); }
+    .tag.slate { background: var(--slate); }
+
+    pre {
+      overflow-x: auto;
+      margin: 12px 0 0;
+      padding: 14px;
+      background: var(--code);
+      color: #e5edf7;
+      border-radius: var(--radius);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    }
+
+    ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    li { margin: 5px 0; }
+
+    .note {
+      border-left: 4px solid var(--blue);
+      background: #eff6ff;
+      padding: 12px 14px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: #1e3a8a;
+    }
+
+    .warning {
+      border-left-color: var(--amber);
+      background: #fff7ed;
+      color: #7c2d12;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+
+    .table th,
+    .table td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .table th {
+      background: #f8fafc;
+      color: var(--slate);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .talent-map {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .zone {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfe;
+      padding: 12px;
+    }
+
+    .zone-title {
+      margin-bottom: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--slate);
+      text-transform: uppercase;
+    }
+
+    .node {
+      margin: 7px 0;
+      padding: 8px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      background: #f1f5f9;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .node.active {
+      background: #e0f2fe;
+      border-color: #38bdf8;
+      color: #075985;
+      font-weight: 700;
+    }
+
+    @media (max-width: 900px) {
+      header { padding: 24px 20px; }
+      main { padding: 20px; }
+      .grid, .grid-3, .flow, .talent-map { grid-template-columns: 1fr; }
+      .flow-node::after { content: ""; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Rewarded Intent Harness Architecture</h1>
+    <p class="subtitle">
+      将 BrainHarness 从“读取记忆并拼接 prompt”的浅层机制，升级为可维护意图状态、选择策略、评估输出、分配奖励并持续更新的通用学习型 harness。
+    </p>
+    <div class="meta">
+      <span class="pill">Date: 2026-06-09</span>
+      <span class="pill">Scope: Generic Brain Harness</span>
+      <span class="pill">Current Domain: Investment Research</span>
+      <span class="pill">Pattern: Contextual Bandit + Reward Ledger</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <h2>1. 背景与问题</h2>
+      <p>
+        当前 intent layer 已经能捕获用户行为、提炼长期意图，并在生成时激活部分意图。但它本质上仍是 memory layer：
+        行为被写成文件，意图被表达为文字，生成时主要依赖 prompt 注入。这不足以支撑高级 BrainHarness。
+      </p>
+      <div class="note warning">
+        关键缺陷：Brain 没有显式维护“策略选择、奖励信号、评估器、归因更新”。因此它不能真正学习哪类意图在什么上下文中应该被采用，也无法解释一次生成为什么好或差。
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>2. 目标架构</h2>
+      <p>
+        新架构称为 <strong>Rewarded Intent Harness</strong>。它不直接追求完整强化学习，而是采用更适合产品环境的 RL-lite：
+        每次生成是一个 episode，Brain 根据当前状态选择 intent policies，生成后由 evaluator ensemble 打分，再把 reward 归因回 intent、policy、hand choice 和 prompt constraint。
+      </p>
+
+      <div class="flow">
+        <div class="flow-node">
+          <span class="tag">1</span>
+          <strong>Intent Events</strong>
+          <p>用户行为、资源分享、anchor 操作、反馈、编辑。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag green">2</span>
+          <strong>Intent State Builder</strong>
+          <p>将事件转为长期意图状态、belief、activation prior。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag violet">3</span>
+          <strong>Policy Planner</strong>
+          <p>选择本次生成应采用的 intent policies。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag amber">4</span>
+          <strong>Generation</strong>
+          <p>编排 hands、工具、检索、输出结构。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag red">5</span>
+          <strong>Evaluator Ensemble</strong>
+          <p>评估意图覆盖、相关性、时效性、决策价值。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag slate">6</span>
+          <strong>Reward Ledger</strong>
+          <p>记录每个 episode 的奖励和诊断。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag">7</span>
+          <strong>Credit Assignment</strong>
+          <p>判断奖励应归因给 intent、policy、hand 或 prompt。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag green">8</span>
+          <strong>Policy Update</strong>
+          <p>更新权重、失败模式、激活先验和策略钩子。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>3. 核心对象模型</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>IntentState</strong>
+          <p>长期用户意图的结构化状态，不只是文字描述。</p>
+          <pre><code>{
+  "intent_id": "content.fresh_event_judgement",
+  "belief": 0.82,
+  "activation_prior": 0.71,
+  "decay": "slow",
+  "domains": ["research", "writing"],
+  "policy_hooks": ["retrieve_recent_context", "add_event_judgement"],
+  "failure_modes": ["overuses stale news", "adds irrelevant events"],
+  "reward_history": []
+}</code></pre>
+        </div>
+        <div class="card">
+          <strong>IntentPolicy</strong>
+          <p>可执行策略，而不是 prompt 片段。</p>
+          <pre><code>{
+  "policy_id": "policy.add_fresh_context",
+  "when": ["intent_active:fresh_event_judgement"],
+  "actions": [
+    "retrieve_recent_context",
+    "ask_domain_hand_for_event_impact",
+    "require_output_section:recent_event_judgement"
+  ],
+  "reward_targets": ["freshness", "relevance", "decision_usefulness"],
+  "weight": 0.64
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <strong>RewardSignal</strong>
+          <p>来自显式反馈、隐式行为和自动 evaluator。</p>
+          <pre><code>{
+  "episode_id": "ep_20260609_001",
+  "overall_reward": 0.76,
+  "intent_rewards": {
+    "content.fresh_event_judgement": 0.91,
+    "risk.reversal_condition": 0.43
+  },
+  "diagnosis": "Fresh context useful; risk section too generic."
+}</code></pre>
+        </div>
+        <div class="card">
+          <strong>CreditAssignment</strong>
+          <p>把结果质量归因到具体策略和组件。</p>
+          <pre><code>{
+  "episode_id": "ep_20260609_001",
+  "policy_updates": [
+    {
+      "policy_id": "policy.add_risk_countercase",
+      "weight_before": 0.62,
+      "weight_after": 0.54,
+      "reason": "Activated but produced generic risk framing."
+    }
+  ]
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>4. 为什么用 Contextual Bandit，而不是完整 RL</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>方案</th>
+            <th>优点</th>
+            <th>问题</th>
+            <th>建议</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Prompt + Memory</td>
+            <td>实现快，容易调试</td>
+            <td>没有奖励和归因，无法学习策略质量</td>
+            <td>保留为输入层，不作为核心 harness</td>
+          </tr>
+          <tr>
+            <td>Contextual Bandit</td>
+            <td>每次生成都是一次可评估 episode，适合产品交互</td>
+            <td>不处理复杂多步长期回报</td>
+            <td>第一阶段推荐</td>
+          </tr>
+          <tr>
+            <td>Full RL</td>
+            <td>理论上可优化长期策略</td>
+            <td>需要大量 episode、稳定环境和明确 reward</td>
+            <td>暂不直接上，后续可演进</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>5. Evaluator Ensemble</h2>
+      <p>生成完成后自动运行多评估器，避免只依赖用户显式反馈。</p>
+      <div class="grid-3">
+        <div class="card">
+          <strong>IntentCoverageEvaluator</strong>
+          <p>检查激活 intent 是否被实际满足。</p>
+        </div>
+        <div class="card">
+          <strong>RelevanceEvaluator</strong>
+          <p>检查是否强行塞入无关长期偏好。</p>
+        </div>
+        <div class="card">
+          <strong>FreshnessEvaluator</strong>
+          <p>需要时效信息时，检查是否检索并使用近期上下文。</p>
+        </div>
+        <div class="card">
+          <strong>DecisionUsefulnessEvaluator</strong>
+          <p>判断输出是否提高决策质量，而非只增加内容。</p>
+        </div>
+        <div class="card">
+          <strong>UserStyleEvaluator</strong>
+          <p>检查粒度、表达和结构是否符合用户偏好。</p>
+        </div>
+        <div class="card">
+          <strong>DomainEvaluator</strong>
+          <p>由 domain pack 提供，例如投资研究、写作、代码审查。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>6. 可视化：从天赋点到策略面板</h2>
+      <p>
+        Intent Graph 不只显示是否激活，还要显示 belief、activation prior、last reward、linked policies、failure modes 和 evidence。
+        当前生成后，高亮被激活的 intent、采用的 policy、奖励高/低的节点，以及被抑制的原因。
+      </p>
+      <div class="talent-map">
+        <div class="zone">
+          <div class="zone-title">Content Requirements</div>
+          <div class="node active">近期热点事件研判</div>
+          <div class="node">增加结构化摘要</div>
+          <div class="node">保留反例视角</div>
+        </div>
+        <div class="zone">
+          <div class="zone-title">Decision Style</div>
+          <div class="node active">要求反转条件</div>
+          <div class="node">权衡多情景</div>
+          <div class="node">偏好可执行结论</div>
+        </div>
+        <div class="zone">
+          <div class="zone-title">Workflow Preferences</div>
+          <div class="node active">先检索再生成</div>
+          <div class="node">多 hand 交叉验证</div>
+          <div class="node">按 anchor 局部更新</div>
+        </div>
+        <div class="zone">
+          <div class="zone-title">Risk Sensitivity</div>
+          <div class="node">避免泛泛风险</div>
+          <div class="node active">突出下行触发器</div>
+          <div class="node">标注不确定性</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>7. 建议文件结构</h2>
+      <pre><code>brain/
+  intent_harness/
+    state.json
+    policies.json
+    reward_ledger.jsonl
+    episodes.jsonl
+    credit_assignments.jsonl
+    evaluators/
+      intent_coverage.md
+      relevance.md
+      freshness.md
+
+loom/brain_harness/
+  intent_state.py
+  intent_policy.py
+  reward_model.py
+  evaluators.py
+  credit_assignment.py
+  intent_harness.py</code></pre>
+    </section>
+
+    <section class="section">
+      <h2>8. 分阶段落地路线</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>阶段</th>
+            <th>目标</th>
+            <th>交付物</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Phase 1</td>
+            <td>从 Intent Wiki 升级为 IntentStateStore</td>
+            <td>状态对象、belief、activation prior、failure modes</td>
+          </tr>
+          <tr>
+            <td>Phase 2</td>
+            <td>引入 PolicyPlanner</td>
+            <td>policy schema、激活策略、prompt/tool/hand hooks</td>
+          </tr>
+          <tr>
+            <td>Phase 3</td>
+            <td>引入 Evaluator Ensemble</td>
+            <td>intent coverage、freshness、relevance、decision usefulness evaluator</td>
+          </tr>
+          <tr>
+            <td>Phase 4</td>
+            <td>引入 Reward Ledger 与 Credit Assignment</td>
+            <td>episode log、reward log、policy weight update</td>
+          </tr>
+          <tr>
+            <td>Phase 5</td>
+            <td>升级可视化</td>
+            <td>天赋图 + 策略面板 + reward 归因视图</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>9. 架构原则</h2>
+      <ul>
+        <li>核心 harness 必须通用，投资研究只是 domain pack。</li>
+        <li>事件流是证据，不是长期意图本身。</li>
+        <li>长期意图必须有 belief、reward history、failure modes 和 activation policy。</li>
+        <li>生成时必须显式记录采用了哪些 intent 和 policy。</li>
+        <li>生成后必须评估，而不是假设 prompt 注入就代表满足意图。</li>
+        <li>奖励更新必须可解释，避免隐藏式用户画像。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

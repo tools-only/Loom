@@ -1416,13 +1416,66 @@ tr:hover td { background: rgba(122,90,248,0.04); }
 }
 
 @media (max-width: 480px) {
-  #anchor-toolbar { padding: 8px 14px; gap: 8px; }
+  #anchor-toolbar { display: none; }
+  #trigger-context, #trigger-timeline, #trigger-inbox { display: none !important; }
+  .anc-panel-trigger { display: none !important; }
+  .prompt-hover-zone { display: none; }
+
+  .toolbar-domain-tabs { gap: 1px; }
+  .domain-tab { padding: 4px 8px; font-size: 10px; }
+  .domain-tab span { font-size: 9px; }
   .toolbar-info { display: none; }
-  .anc-kpi-grid { grid-template-columns: 1fr; }
-  .anc-section { padding: 14px; }
-  .anc-kpi { min-height: 120px; padding: 20px 18px; }
-  .anc-kpi .kpi-value { font-size: 36px; }
-  .anc-kpi--center .kpi-value { font-size: 40px; }
+  .toolbar-logo { width: 22px; height: 22px; }
+  .toolbar-brand { font-size: 13px; }
+
+  #anchor-content .anc-kpi-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 6px; margin: 4px 0; }
+  .anc-section { padding: 4px !important; }
+  .anc-section--gc { padding: 6px 6px !important; border-radius: 10px !important; }
+  .anc-section--gc > h2 { font-size: 13px; margin: 0 0 2px; }
+  .anc-section--gc > h3 { font-size: 11px; margin: 0 0 2px; }
+
+  .anc-kpi { min-height: auto; padding: 4px 6px !important; border-radius: 8px; }
+  .anc-kpi .kpi-value { font-size: 14px !important; }
+  .anc-kpi--center .kpi-value { font-size: 17px !important; }
+  .anc-kpi .kpi-label,
+  .anc-kpi .kpi-unit { font-size: 9px !important; }
+  .anc-kpi .kpi-label-top { font-size: 9px !important; }
+  .anc-kpi .kpi-top { margin-bottom: 0 !important; }
+  .anc-kpi .kpi-bottom { gap: 0 !important; }
+  .anc-kpi--center { padding: 6px !important; gap: 0; }
+
+  #anchor-content h2 { font-size: 14px; padding: 3px 0 1px; margin: 4px 0 1px; }
+  #anchor-content h3 { font-size: 12px; padding: 2px 0 1px; margin: 3px 0 1px; }
+  #anchor-content p { font-size: 11px; line-height: 1.4; margin: 1px 0; }
+  #anchor-content table { font-size: 10px; }
+  #anchor-content td, #anchor-content th { padding: 1px 3px; }
+  #anchor-content ul, #anchor-content ol { padding-left: 12px; margin: 1px 0; }
+  #anchor-content li { font-size: 11px; margin: 0; }
+  #anchor-content .anc-divider { margin: 2px 0; }
+  #anchor-content blockquote { padding: 3px 6px; margin: 2px 0; font-size: 11px; }
+  #anchor-content pre { padding: 4px 6px; font-size: 10px; }
+  #anchor-content code { font-size: 10px; }
+
+  #anchor-stage { padding: 2px 2px 24px; }
+  #anchor-shell { min-height: auto; }
+
+  /* Blog pages */
+  .blog-header.anc-section--gc { padding: 8px 6px 6px !important; margin-bottom: 4px; }
+  .blog-header-inner { gap: 2px; }
+  .blog-domain-icon { font-size: 12px; width: 28px; height: 28px; }
+  .blog-domain-title { font-size: 14px !important; }
+  .blog-domain-count { font-size: 10px !important; }
+  .blog-card.anc-section--gc { padding: 6px 6px !important; margin-bottom: 4px !important; }
+  .blog-card-title { font-size: 12px !important; }
+  .blog-card-summary { font-size: 10px !important; line-height: 1.4; }
+  .blog-card-meta { font-size: 9px !important; }
+  .blog-ticker-tag { font-size: 9px; padding: 1px 4px; }
+
+  .anc-pill { font-size: 8px; padding: 1px 5px; }
+  .anc-pill-row { gap: 2px; margin: 1px 0; }
+  .btn { font-size: 10px; padding: 3px 8px; }
+  .btn--lg { padding: 6px 12px; font-size: 12px; }
+  .btn--icon { width: 26px; height: 26px; font-size: 12px; }
 }
 
 /* ─────────────────────────────────────────────────────
@@ -4675,3 +4728,78 @@ h2 .layer-tag, h3 .layer-tag { font-size: 13px; font-weight: 500; padding: 2px 1
     linear-gradient(135deg, #f8fafc 0%, #fdf2f8 50%, #ffffff 100%);
 }
 /* End rendered-content report surface adaptation. */
+
+/* ═══════════════════════════════════════════════════════════
+   #sta — Static display mode (read-only, no interaction)
+══════════════════════════════════════════════════════════════ */
+body.sta-mode #anchor-toolbar,
+body.sta-mode #anchor-floating-toolbar,
+body.sta-mode #anchor-execute-all,
+body.sta-mode .anc-floating-toolbar,
+body.sta-mode .prompt-hover-zone,
+body.sta-mode .prompt-panel-trigger,
+body.sta-mode .anc-panel-trigger,
+body.sta-mode .workspace-panel,
+body.sta-mode .workspace-hover-zone,
+body.sta-mode .anc-handle-popup,
+body.sta-mode .anc-op-bar,
+body.sta-mode .anc-collapse-caret,
+body.sta-mode #anchor-home,
+body.sta-mode .mob-sel-bar {
+  display: none !important;
+}
+body.sta-mode #anchor-shell.has-content { display: block; }
+body.sta-mode #anchor-stage { padding: 0; max-width: none; }
+body.sta-mode #anchor-content .anc-section { border-radius: 0; margin: 0; border: none; box-shadow: none; }
+body.sta-mode #anchor-content .anc-section--gc { box-shadow: none; }
+
+/* ── Brain synthesis card ─────────────────────────────────── */
+.brain-synthesis {
+  border-top: 3px solid var(--accent-iris, #7A5AF8);
+  margin-bottom: 8px;
+}
+
+.brain-confidence {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--ink-muted, #666);
+}
+
+.confidence-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--surface-2, #eee);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.confidence-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7A5AF8, #38b2ac);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.strategy-ref {
+  font-size: 11px;
+  background: var(--surface-iris, rgba(122,90,248,0.08));
+  color: var(--accent-iris, #7A5AF8);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-right: 6px;
+  cursor: help;
+}
+
+.strategy-tag {
+  display: inline-block;
+  font-size: 10px;
+  background: var(--surface-2, #f0f0f0);
+  color: var(--ink-muted, #888);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}

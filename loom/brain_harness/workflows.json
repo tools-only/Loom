@@ -1,0 +1,14 @@
+{
+  "finance": {
+    "mode": "full_fanout",
+    "trigger_keywords": ["买", "卖", "持仓", "macro", "ticker", "股票", "财报", "估值", "仓位", "利率", "美联储", "通胀", "CPI", "VIX", "SPX", "AAPL", "NVDA", "TSLA", "beta", "regime", "sector", "earnings", "guidance", "portfolio", "标的", "板块", "情绪"],
+    "hands": ["market", "sentiment", "target", "position"],
+    "rationale": "金融决策需要多维度并行视图：宏观(market) + 情绪(sentiment) + 标的(target) + 持仓(position) 四个维度互相关联，缺一不可"
+  },
+  "general": {
+    "mode": "dynamic",
+    "trigger_keywords": [],
+    "hands_pool": ["canvas"],
+    "rationale": "通用任务按相关性动态选 hand"
+  }
+}
