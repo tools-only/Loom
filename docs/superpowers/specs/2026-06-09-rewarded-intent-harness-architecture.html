@@ -416,6 +416,11 @@
 
     <section class="section">
       <h2>4. 为什么用 Contextual Bandit，而不是完整 RL</h2>
+      <p>
+        当前系统主要使用闭源 API，因此不能把这个 harness 设计成 PPO、GRPO 或 DPO 那类直接更新模型参数的传统 RL。
+        更准确的定位是 <strong>Closed-Model RL-lite</strong> 或 <strong>Agentic Policy Learning Harness</strong>：
+        不训练 LLM 本体，而是训练 Brain 外部的策略层。
+      </p>
       <table class="table">
         <thead>
           <tr>
@@ -446,10 +451,255 @@
           </tr>
         </tbody>
       </table>
+      <div class="note">
+        结论：闭源 LLM 负责推理与生成，BrainHarness 负责可训练的外部策略。可被学习和更新的是 workflow policy、retrieval policy、intent activation policy、prompt constraint policy、critic/debate policy、output structure policy 和 hand selection policy。
+      </div>
     </section>
 
     <section class="section">
-      <h2>5. Evaluator Ensemble</h2>
+      <h2>5. 闭源 API 下的 Agentic RL 边界</h2>
+      <p>
+        一般意义上的 agentic RL 往往默认存在一个可训练模型：模型 rollout，reward model 打分，然后通过 PPO、DPO、GRPO 等方法更新模型权重。
+        但在闭源 API 场景中，模型权重不可更新。因此，harness 不应声称自己在训练 LLM，而应明确训练的是 <strong>agent 外部控制策略</strong>。
+      </p>
+
+      <div class="grid">
+        <div class="card">
+          <strong>不训练的部分</strong>
+          <ul>
+            <li>LLM weights</li>
+            <li>Decoder policy</li>
+            <li>Base reward model weights</li>
+            <li>API provider 内部模型行为</li>
+          </ul>
+        </div>
+        <div class="card">
+          <strong>可以训练/更新的部分</strong>
+          <ul>
+            <li>Workflow policy：调用哪些 hand / tool / agent</li>
+            <li>Retrieval policy：何时检索、检索什么、检索多少</li>
+            <li>Intent activation policy：哪些长期意图参与本次生成</li>
+            <li>Prompt constraint policy：采用哪些结构和约束</li>
+            <li>Critic/debate policy：是否启用 critic、自辩或多候选</li>
+            <li>Output structure policy：用 brief、memo、matrix 还是 graph</li>
+            <li>Hand selection policy：不同 hand 在不同状态下的历史收益</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>推荐闭环</h3>
+      <pre><code>Closed API LLM = reasoning / generation engine
+BrainHarness = trainable policy layer
+Episode Ledger = offline dataset
+Evaluator Ensemble = reward source
+Credit Assignment = update mechanism</code></pre>
+
+      <h3>为什么这仍然有价值</h3>
+      <p>
+        即使不更新模型权重，Brain 仍然可以学习“如何使用模型”。这包括什么时候调用资源检索、什么时候启用 critic、什么时候添加风险矩阵、什么时候优先调用某个 hand，以及哪些长期 intent 在什么任务中应该激活。
+        这些策略选择会直接影响最终输出质量，且可以被 episode reward 持续更新。
+      </p>
+
+      <h3>未来开源模型路径</h3>
+      <p>
+        当前积累的 episode ledger 不会浪费。未来如果接入开源 planner model 或 domain model，可以将这些 episode、reward report、credit assignment 转化为 preference dataset，用于训练 judge model、reward model，或通过 DPO/GRPO 微调 planner。
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>6. Brain-Hand 分离架构下的 Harness 作用面</h2>
+      <p>
+        Loom Core 的关键边界是：Brain 不直接实现具体领域业务，Hand / external agent 执行领域分析；Brain 负责将用户意图包装成任务 envelope，选择 hand，接收 artifact，编排结果，并记录 harness signals。
+        Rewarded Intent Harness 应该作用在这条边界上，而不是把 hand 的领域职责上移到 Brain。
+      </p>
+
+      <div class="flow">
+        <div class="flow-node">
+          <span class="tag">1</span>
+          <strong>Task State</strong>
+          <p>用户问题、anchor context、intent graph、资源状态、历史 reward。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag violet">2</span>
+          <strong>Workflow Policy</strong>
+          <p>决定调用哪些 hand、是否 fanout、是否串行/并行/二阶段。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag green">3</span>
+          <strong>Hand Envelope Shaping</strong>
+          <p>为每个 hand 注入不同任务、约束、资源菜单和 intent hooks。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag amber">4</span>
+          <strong>Hand Execution</strong>
+          <p>hand 返回 artifact、claims、confidence、resources、gaps。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag red">5</span>
+          <strong>Artifact Critic</strong>
+          <p>评估每个 hand 是否满足任务、证据是否足够、是否跑偏。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag slate">6</span>
+          <strong>Synthesis Policy</strong>
+          <p>决定如何加权、冲突解决、引用哪些 hand 结果。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag">7</span>
+          <strong>Reward & Credit</strong>
+          <p>把最终 reward 归因回 workflow、hand、resource 和 synthesis。</p>
+        </div>
+        <div class="flow-node">
+          <span class="tag green">8</span>
+          <strong>Policy Update</strong>
+          <p>更新 hand selection、routing、prompt constraints 和 evaluator 权重。</p>
+        </div>
+      </div>
+
+      <h3>6.1 BrainHarness 如何影响 hand 架构编排</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>编排层</th>
+            <th>BrainHarness 决策</th>
+            <th>对 Hand 的影响</th>
+            <th>Reward 来源</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Hand selection</td>
+            <td>根据 intent、domain、历史 hand reward 选择 hand 集合。</td>
+            <td>不是固定 market/sentiment/target/position，而是按任务状态选择。</td>
+            <td>hand artifact usefulness、最终 synthesis 引用率、用户后续行为。</td>
+          </tr>
+          <tr>
+            <td>Execution topology</td>
+            <td>决定 full fanout、single hand、sequential hand、critic round 或二阶段检索。</td>
+            <td>hand 可以并行跑，也可以让一个 hand 的 artifact 成为另一个 hand 的输入。</td>
+            <td>质量提升是否抵消 latency / token 成本。</td>
+          </tr>
+          <tr>
+            <td>Envelope shaping</td>
+            <td>为不同 hand 生成不同任务描述、资源菜单、intent constraints。</td>
+            <td>同一个用户问题到不同 hand 时不是同一 prompt，而是 role-specific task。</td>
+            <td>hand 是否返回更具体 key_claims、是否减少 gaps。</td>
+          </tr>
+          <tr>
+            <td>Resource allocation</td>
+            <td>决定哪些 hand 能访问哪些资源、是否要求 fresh context。</td>
+            <td>market hand 可能拿新闻，position hand 可能拿用户仓位，target hand 可能拿估值框架。</td>
+            <td>freshness、evidence grounding、无关资源污染程度。</td>
+          </tr>
+          <tr>
+            <td>Budget control</td>
+            <td>根据预期收益控制 hand 数量、critic 次数、上下文长度。</td>
+            <td>高价值任务启用更深编排，低价值任务走轻量路径。</td>
+            <td>reward / latency / cost 的综合收益。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>6.2 BrainHarness 如何影响 hand 结果编排</h3>
+      <p>
+        Hand artifact 不应该只是被拼接到 Brain synthesis prompt。Rewarded Harness 应在 artifact 进入 synthesis 前做结构化处理：
+      </p>
+      <div class="grid">
+        <div class="card">
+          <strong>Artifact Normalization</strong>
+          <p>把每个 hand 输出规整为 claims、evidence、confidence、gaps、intent coverage、resource usage。</p>
+        </div>
+        <div class="card">
+          <strong>Claim Graph</strong>
+          <p>将不同 hand 的 key_claims 变成支持、冲突、补充、缺证据的 claim graph。</p>
+        </div>
+        <div class="card">
+          <strong>Hand Weighting</strong>
+          <p>根据 hand 历史 reward、当前任务匹配度、artifact confidence 动态加权。</p>
+        </div>
+        <div class="card">
+          <strong>Conflict Resolution</strong>
+          <p>当 market 和 sentiment、target 和 position 结论冲突时，要求 Brain 显式解释冲突来源。</p>
+        </div>
+        <div class="card">
+          <strong>Intent Coverage Gate</strong>
+          <p>检查 active intents 是否在 hand artifacts 中已有支撑；不足时触发补充 hand 或标注 gap。</p>
+        </div>
+        <div class="card">
+          <strong>Synthesis Contract</strong>
+          <p>Brain synthesis 必须说明采用了哪些 hand claim，忽略了哪些 claim，以及原因。</p>
+        </div>
+      </div>
+
+      <h3>6.3 推荐新增的 Brain-Hand Harness 对象</h3>
+      <pre><code>{
+  "workflow_episode": {
+    "state": "question + intent state + anchor context + resources",
+    "selected_hands": ["market", "sentiment"],
+    "execution_topology": "parallel_then_synthesis",
+    "hand_envelopes": {
+      "market": {"task": "...", "policy_hooks": ["retrieve_recent_context"]},
+      "sentiment": {"task": "...", "policy_hooks": ["event_sentiment_shift"]}
+    },
+    "hand_artifact_scores": {
+      "market": {"usefulness": 0.82, "freshness": 0.91, "gaps": []},
+      "sentiment": {"usefulness": 0.63, "freshness": 0.72, "gaps": ["limited source diversity"]}
+    },
+    "synthesis_decision": {
+      "used_claims": ["market.claim_1", "sentiment.claim_2"],
+      "suppressed_claims": ["sentiment.claim_4"],
+      "conflicts": ["market bullish catalyst vs sentiment uncertainty"]
+    },
+    "credit_assignment": {
+      "workflow_policy": "+0.04",
+      "market_hand": "+0.06",
+      "sentiment_hand": "-0.01",
+      "retrieval_policy": "+0.08"
+    }
+  }
+}</code></pre>
+
+      <h3>6.4 对现有代码的映射</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>现有位置</th>
+            <th>当前职责</th>
+            <th>升级方向</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>WorkflowResolver.resolve()</code></td>
+            <td>domain + keyword + LLM classification，返回 hands。</td>
+            <td>接入 workflow policy 和 hand performance prior，输出 topology 与预算。</td>
+          </tr>
+          <tr>
+            <td><code>LoomCoreAgent.analyze()</code></td>
+            <td>并行调用 hands，然后 synthesize。</td>
+            <td>支持 sequential / two-stage / critic topology，并记录 workflow episode。</td>
+          </tr>
+          <tr>
+            <td><code>_brain_hand_runner()</code></td>
+            <td>把 task/context 发给 sdk 或 mounted adapter。</td>
+            <td>按 hand 生成不同 envelope，注入 policy hooks、resource policy、intent constraints。</td>
+          </tr>
+          <tr>
+            <td><code>BrainHarness.synthesize()</code></td>
+            <td>读取 hand key_claims，生成最终 JSON synthesis。</td>
+            <td>先做 artifact critic、claim graph、hand weighting，再做 synthesis。</td>
+          </tr>
+          <tr>
+            <td><code>RewardedIntentHarness</code></td>
+            <td>选择 intent policies 并评估最终结果。</td>
+            <td>扩展为 workflow/hand/retrieval/synthesis 多策略 reward ledger。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>7. Evaluator Ensemble</h2>
       <p>生成完成后自动运行多评估器，避免只依赖用户显式反馈。</p>
       <div class="grid-3">
         <div class="card">
@@ -480,7 +730,7 @@
     </section>
 
     <section class="section">
-      <h2>6. 可视化：从天赋点到策略面板</h2>
+      <h2>8. 可视化：从天赋点到策略面板</h2>
       <p>
         Intent Graph 不只显示是否激活，还要显示 belief、activation prior、last reward、linked policies、failure modes 和 evidence。
         当前生成后，高亮被激活的 intent、采用的 policy、奖励高/低的节点，以及被抑制的原因。
@@ -514,7 +764,7 @@
     </section>
 
     <section class="section">
-      <h2>7. 建议文件结构</h2>
+      <h2>9. 建议文件结构</h2>
       <pre><code>brain/
   intent_harness/
     state.json
@@ -530,6 +780,10 @@
 loom/brain_harness/
   intent_state.py
   intent_policy.py
+  workflow_policy.py
+  hand_performance.py
+  artifact_critic.py
+  claim_graph.py
   reward_model.py
   evaluators.py
   credit_assignment.py
@@ -537,7 +791,7 @@ loom/brain_harness/
     </section>
 
     <section class="section">
-      <h2>8. 分阶段落地路线</h2>
+      <h2>10. 分阶段落地路线</h2>
       <table class="table">
         <thead>
           <tr>
@@ -556,6 +810,11 @@ loom/brain_harness/
             <td>Phase 2</td>
             <td>引入 PolicyPlanner</td>
             <td>policy schema、激活策略、prompt/tool/hand hooks</td>
+          </tr>
+          <tr>
+            <td>Phase 2.5</td>
+            <td>引入 Brain-Hand Workflow Harness</td>
+            <td>hand selection prior、execution topology、artifact critic、hand reward ledger</td>
           </tr>
           <tr>
             <td>Phase 3</td>
@@ -577,7 +836,7 @@ loom/brain_harness/
     </section>
 
     <section class="section">
-      <h2>9. 架构原则</h2>
+      <h2>11. 架构原则</h2>
       <ul>
         <li>核心 harness 必须通用，投资研究只是 domain pack。</li>
         <li>事件流是证据，不是长期意图本身。</li>
@@ -585,6 +844,8 @@ loom/brain_harness/
         <li>生成时必须显式记录采用了哪些 intent 和 policy。</li>
         <li>生成后必须评估，而不是假设 prompt 注入就代表满足意图。</li>
         <li>奖励更新必须可解释，避免隐藏式用户画像。</li>
+        <li>Brain 负责策略、编排、评估和归因；Hand 负责领域执行和 artifact 生产。</li>
+        <li>Harness 应影响 hand selection、envelope shaping、artifact weighting，而不是吞并 hand 的领域职责。</li>
       </ul>
     </section>
   </main>

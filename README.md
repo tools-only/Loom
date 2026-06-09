@@ -1,243 +1,253 @@
-# Loom — AI-Native Workspace
-[[Demo]](https://tools-only.github.io/Loom/demo.html) **Think it. Live it.** 
+# Loom
 
-Loom is an AI-native desktop workspace where HTML is the shared language between user and AI. Describe anything — dashboards, reports, prototypes — and watch it take shape. Click any element to refine, expand, or branch.
+**An AI-native workspace where the document is the interface, every block is addressable, and agents learn how to coordinate around your intent.**
 
-An AI-generated market research report rendered with the Bloom Design System. Hover over any section or KPI card to see available AI operations. No agent connection — pure interactive preview.
+[Live demo](https://tools-only.github.io/Loom/demo.html) | [Hand agent guide](docs/loom-hand-agent-guide.md) | [Rewarded intent harness design](docs/superpowers/specs/2026-06-09-rewarded-intent-harness-architecture.html)
 
-## Architecture
+Loom turns generated HTML into a live human-agent workspace. Ask for a report, dashboard, memo, market brief, canvas, or prototype; Loom renders it as structured HTML. Every meaningful block is annotated with stable anchors, so you can click a section and ask an agent to refine, expand, branch, restructure, or annotate only that part.
 
+The long-term goal is not another chat wrapper. Loom is an experiment in **agentic work surfaces**: documents that remember intent, route work to specialist agents, evaluate results, and improve the policies that decide what happens next.
+
+## What Loom Does
+
+- **Renders AI work as interactive HTML** instead of plain chat transcripts.
+- **Makes every section addressable** with `data-anc` anchors and local operation handles.
+- **Routes tasks through a Brain-Hand architecture**: Brain orchestrates; Hands perform domain work.
+- **Captures user intent as structured signals** rather than ephemeral chat context.
+- **Uses a rewarded harness** to select intent policies, evaluate outputs, and update policy weights.
+- **Supports local and cloud agents** through adapter contracts and task envelopes.
+- **Runs locally first** with an Electron/webview shell, HTTP service, WebSocket loop, and Python Brain.
+
+## Why This Exists
+
+Most AI tools still treat the conversation as the product. Loom treats the **workspace state** as the product.
+
+```text
+Chat UI:
+  user message -> assistant answer -> scrollback
+
+Loom:
+  user intent -> anchored workspace -> local edits -> agent envelopes
+              -> specialist artifacts -> Brain synthesis -> learned harness signals
 ```
-Browser ──op/envelope──► Anchor Service (daemon, port 3000)
-                               │ push via /ws/agent WebSocket
-                               ▼
-                          MCP Shim ──stdio JSON-RPC──► Claude Code
-                               ▲
-                          anchor_patch / anchor_render
+
+In Loom, the user does not need to restate context every time. The system can see which block you touched, which resource you added, which section you kept refining, which agent produced useful claims, and which long-lived intent should influence the next generation.
+
+## Demo
+
+The public demo is a static interactive preview:
+
+[https://tools-only.github.io/Loom/demo.html](https://tools-only.github.io/Loom/demo.html)
+
+It shows an AI-generated market research report rendered with Loom's Bloom design system. Hover over sections and KPI cards to see the operations that a connected agent can perform.
+
+## Core Architecture
+
+```mermaid
+flowchart LR
+  User[Human] --> Webview[Anchor Webview<br/>HTML workspace]
+  Webview --> Anchor[Anchor Service<br/>Node HTTP + WebSocket<br/>:3000]
+  Anchor --> Brain[Loom Brain<br/>FastAPI<br/>:3002]
+  Brain --> Harness[Brain Harness<br/>intent, policy, reward]
+  Brain --> Registry[Agent Adapter Registry]
+  Registry --> HandA[Market Hand]
+  Registry --> HandB[Sentiment Hand]
+  Registry --> HandC[Target Hand]
+  Registry --> HandD[Position Hand]
+  Registry --> External[Claude / Codex / OpenClaw<br/>or cloud agents]
+  HandA --> Brain
+  HandB --> Brain
+  HandC --> Brain
+  HandD --> Brain
+  Brain --> Anchor
+  Anchor --> Webview
 ```
 
-- **`mcp/server.cjs`** — persistent HTTP + WebSocket daemon
-- **`mcp/shim.cjs`** — thin stdio bridge; MCP tools for Claude Code
-- **`bridge/webview/`** — frontend (Bloom Design System, vanilla JS)
-- **`electron/`** — desktop wrapper (Electron + system tray)
+### Anchor: HTML as the Interaction Protocol
+
+Loom's webview is not a passive render target. It is an operation surface. Semantic blocks carry anchors and handles:
+
+```html
+<section
+  class="anc-section anc-section--gc"
+  data-anc="analysis.summary"
+  data-handles="refine,expand,shorten,annotate">
+  <h2>Summary</h2>
+  <p data-anc="analysis.summary.text" data-handles="refine,edit">
+    ...
+  </p>
+</section>
+```
+
+Available operations include:
+
+`refine` | `expand` | `shorten` | `edit` | `annotate` | `branch` | `restructure` | `lock`
+
+Each browser operation becomes a structured envelope with the target anchor, operation, selected context, render state, and provenance.
+
+### Brain: Orchestration, Not Domain Execution
+
+Brain is responsible for coordination:
+
+- resolve the workflow
+- select hands or external agents
+- shape task envelopes
+- collect artifacts
+- synthesize claims
+- patch the workspace
+- record harness signals
+
+Brain should not directly own domain business logic. Domain work belongs to Hands.
+
+### Hands: Specialist Agents
+
+Hands are independent domain agents. In the current Loom Fin task pack, examples include:
+
+| Hand | Responsibility |
+| --- | --- |
+| `market` | macro signals, market regime, sector rotation, fresh events |
+| `sentiment` | narratives, crowd positioning, sentiment shifts |
+| `target` | company or asset thesis, valuation logic, catalysts |
+| `position` | portfolio fit, risk, sizing, reversal conditions |
+
+Hands can run through:
+
+- in-process Python SDK adapters
+- local subprocess agents such as Claude Code, Codex, or OpenClaw
+- cloud agent endpoints that return NDJSON events
+
+See [docs/loom-hand-agent-guide.md](docs/loom-hand-agent-guide.md).
+
+## Intent and Reward Harness
+
+Loom's Brain side is moving beyond memory injection. It now has a first version of a **reward-bearing harness**.
+
+```mermaid
+flowchart TD
+  Event[User behavior event] --> Stream[Intent event stream]
+  Stream --> Wiki[Intent Wiki<br/>long-lived intent graph]
+  Wiki --> Activation[Intent activation]
+  Activation --> Policy[Policy planner]
+  Policy --> Generation[Brain + Hands generation]
+  Generation --> Eval[Evaluator ensemble]
+  Eval --> Reward[Reward ledger]
+  Reward --> Credit[Credit assignment]
+  Credit --> Policy
+```
+
+The current implementation is **closed-model RL-lite**. It does not train the LLM weights. Instead, it learns the external agent policy layer:
+
+- which long-lived intents should activate
+- which generation policies should be applied
+- when to ask for fresh context
+- which hands are worth calling
+- how to evaluate whether the result satisfied the active intent
+- how to update policy weights after an episode
+
+Important files:
+
+| File | Purpose |
+| --- | --- |
+| `loom/brain_harness/intent_processor.py` | Parses raw behavior into structured intent events |
+| `loom/brain_harness/intent_wiki.py` | Maintains a long-lived intent graph |
+| `loom/brain_harness/intent_harness.py` | Plans policies, evaluates outputs, writes reward signals |
+| `loom/brain_harness/base.py` | Assembles Brain prompts and runs synthesis under selected policies |
+| `brain/intent_wiki/` | Persisted intent graph and evidence |
+| `brain/intent_harness/` | Policies, episodes, reward ledger, credit assignments |
+
+The design rationale is documented in [the rewarded intent harness architecture](docs/superpowers/specs/2026-06-09-rewarded-intent-harness-architecture.html).
 
 ## Quick Start
 
 ### Windows
 
 ```bat
-REM Start services (first run installs deps automatically)
+REM Start Anchor (:3000) and Brain (:3002)
 scripts\start-anchor.bat
-REM → opens http://localhost:3000 in your browser
 
-REM Run as desktop app (Electron)
+REM Open the workspace
+REM http://localhost:3000
+
+REM Run as an Electron desktop app
 npm start
-
-REM Build installer
-npm run build
 ```
 
-### Linux (headless server)
-
-**Prerequisites:** Node.js, Python 3, curl — installed and in PATH.
+### Linux Headless
 
 ```bash
-# One-time setup: creates loom/.venv and installs all dependencies
+# One-time setup
 bash scripts/setup-linux.sh
 
-# Start services (run each time)
+# Start Anchor and Brain
 bash scripts/start-anchor.sh
-# → open http://localhost:3000 in your browser
 
-# Stop services
-bash scripts/stop-anchor.sh
+# Open from your browser
+# http://localhost:3000
 ```
 
-**`setup-linux.sh`** — run once, all steps idempotent:
+Logs:
 
-| Step | Action | Skipped if |
-|------|--------|-----------|
-| ① Prereq check | Verify `node`, `python3`, `curl` in PATH | — |
-| ② Node deps | `npm install` inside `mcp/` | `mcp/node_modules` exists |
-| ③ Python venv | `python3 -m venv loom/.venv` | `loom/.venv` exists |
-| ④ Python deps | `pip install -r loom/requirements.txt` | `requirements.txt` unchanged since last install |
-
-**`start-anchor.sh`** — run each time:
-
-| Step | Action | Skipped if |
-|------|--------|-----------|
-| ① Anchor | Start `mcp/server.cjs` on :3000 | Already running |
-| ② Brain | Start `loom/main.py` (FastAPI) on :3002 | Already running |
-
-Logs: `logs/anchor.log` · `logs/brain.log`
-
-## Anchor HTML Protocol
-
-Elements are annotated with `data-anc` and `data-handles` for AI interaction:
-
-```html
-<section class="anc-section anc-section--gc"
-         data-anc="analysis.summary"
-         data-handles="refine,expand,shorten,annotate">
-  <h2>Summary</h2>
-  <p data-anc="analysis.summary.text" data-handles="refine,edit">...</p>
-</section>
+```text
+logs/anchor.log
+logs/brain.log
 ```
 
-Available ops: `refine` · `expand` · `shorten` · `edit` · `annotate` · `branch` · `restructure` · `lock`
+## Useful Local URLs
 
-## Bloom Design System
+| URL | Purpose |
+| --- | --- |
+| `http://localhost:3000` | Main Loom workspace |
+| `http://localhost:3000/canvas` | Freeform canvas workspace |
+| `http://localhost:3002/health` | Brain health check |
+| `http://localhost:3002/intent-stream` | Intent stream, intent graph, rewarded harness panel |
+| `http://localhost:3002/intent-graph/data` | Long-lived intent graph JSON |
+| `http://localhost:3002/intent-harness/data` | Policy and reward snapshot JSON |
 
-All UI uses CSS variables from `resource/colors_and_type.css`. Never hard-code colors — use `var(--accent-iris)`, `var(--pastel-*)`, `var(--shadow-*)`, etc.
+## Repository Map
 
-| Component | Class |
-|-----------|-------|
-| Section card | `anc-section anc-section--gc` |
-| KPI card | `anc-kpi anc-kpi--aurora` (7 gradient themes) |
-| Status pill | `anc-pill anc-pill--active` |
-| Button | `btn btn--brand` |
-
----
-
-## Loom Fin — Hand Agents
-
-> **使用手册：** [`docs/loom-fin.md`](docs/loom-fin.md)
-
-Loom Fin connects **hand agents** — independent AI processes that handle specific trading analysis domains (market, sentiment, target, position). Each hand runs as its own agent process with a persistent wiki-style memory.
-
-```
-POST /run  →  Loom Brain (port 3001)  →  AgentAdapterRegistry
-                                                  │
-                              ┌───────────────────┼───────────────────┐
-                              ▼                   ▼                   ▼
-                        Local Subprocess    HTTP Cloud Agent    In-Process SDK
-                        (claude -p, codex)  (openclaw, custom)  (legacy)
+```text
+bridge/webview/          Browser workspace UI, Anchor client, Canvas client
+mcp/                     Anchor service and MCP shim
+electron/                Desktop shell
+loom/                    Python Brain service and hand runtime
+loom/brain_harness/      Brain state, intent, policy, reward, synthesis harness
+loom_core/               Core runtime, adapters, agent orchestration contracts
+hands/                   Per-hand workspaces and persistent hand context
+skills/                  Brain and hand skill packs
+brain/                   Brain personal state, intent wiki, reward ledgers
+docs/                    Architecture notes, hand guide, design references
 ```
 
-### Mounting a Local Hand Agent (claude / codex / openclaw)
-
-Run hand agents as local subprocesses — the agent reads a task envelope from stdin, works in its own directory with a persistent wiki, and returns a JSON event stream.
-
-**1. Set the runtime in `loom/hand_registry.py`:**
-
-```python
-REGISTRY = {
-    "market": {
-        "runtime": "cc",          # "cc" | "codex" | "openclaw" | "sdk"
-        "wiki_dir": str(ROOT.parent / "hands" / "market" / "wiki"),
-        ...
-    }
-}
-```
-
-**2. Prepare the hand workspace** (`hands/<id>/`):
-
-```
-hands/market/
-  CLAUDE.md          ← agent instructions + wiki schema
-  config.json        ← user settings (watched sectors, KOL feeds, etc.)
-  wiki/
-    index.md         ← persistent context across runs
-    macro.md
-```
-
-**3. Trigger a run:**
+## Development Checks
 
 ```bash
-curl -X POST http://127.0.0.1:3001/run \
-  -H "Content-Type: application/json" \
-  -d '{"hand_id": "market", "task": "分析当前市场环境", "runtime": "cc"}'
+# JavaScript syntax
+node --check bridge/webview/anchor-client.js
+node --check bridge/webview/canvas-client.js
+
+# Existing Node regression tests
+node --test bridge/webview/timing-waterfall.test.cjs bridge/webview/styles.regression.test.cjs
+
+# Python syntax on Windows if python alias is broken
+D:\conda\python.exe -c "from pathlib import Path; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in ['loom/brain.py','loom/brain_harness/base.py']]"
 ```
 
-The Brain spawns `claude -p <envelope>` in `hands/market/` as the working directory. The agent reads `wiki/`, calls `/resources` for live data, writes updated wiki pages, and outputs `{"type":"run.artifact","artifact":{...}}` on stdout. The artifact is patched into the webview at the `loom-market` anchor.
+## Project Status
 
-**Supported local runtimes:**
+Loom is an active prototype. The architecture is intentionally local-first and inspectable:
 
-| `runtime` value | Command | Notes |
-|---|---|---|
-| `cc` | `claude -p` | Claude Code CLI |
-| `codex` | `codex run` | OpenAI Codex CLI |
-| `openclaw` | `openclaw run` | OpenClaw CLI |
-| `sdk` | in-process Python | Legacy SDK path, no subprocess |
+- The workspace is real HTML.
+- Agent operations are explicit envelopes.
+- Brain and hand responsibilities are separated.
+- Intent and reward state is stored on disk as JSON/JSONL.
+- Policies are currently deterministic and inspectable rather than hidden model weights.
 
-> **Full guide:** [`docs/loom-hand-agent-guide.md`](docs/loom-hand-agent-guide.md)
+The next major direction is a deeper Brain-Hand Workflow Harness: hand performance tracking, artifact critics, claim graphs, workflow reward, and better credit assignment across Brain, Hands, retrieval, and synthesis.
 
----
+## Related Docs
 
-### Mounting a Cloud-Deployed Hand Agent
-
-Run hand agents as remote HTTPS services — Loom Core sends a self-contained snapshot envelope (wiki, config, recent feedback, pre-fetched resources) and receives back a streaming NDJSON response. No tunnel or port exposure needed.
-
-```
-Brain  →  POST https://your-agent.example.com/run
-               Authorization: Bearer <token>
-               Body: { task, wiki_snapshot, config, feedback_recent, resources }
-
-Agent  →  NDJSON stream:
-               {"type":"wiki.write","path":"macro.md","content":"..."}  ← applied locally
-               {"type":"run.artifact","artifact":{...}}                 ← patches webview
-```
-
-**1. Declare the endpoint** in `config/cloud-agents.json` (safe to commit — no secrets):
-
-```json
-{
-  "openclaw-cloud": {
-    "endpoint": "https://api.openclaw.ai/v1/run",
-    "capabilities": ["market.analysis"],
-    "timeout_s": 120,
-    "token_env": "OPENCLAW_CLOUD_TOKEN",
-    "require_auth": true
-  }
-}
-```
-
-**2. Set the token** in `.env` (gitignored):
-
-```bash
-OPENCLAW_CLOUD_TOKEN=your-token-here
-```
-
-**3. Point a hand at the cloud adapter:**
-
-```python
-# loom/hand_registry.py
-"market": {
-    "runtime": "openclaw-cloud",   # matches the key in cloud-agents.json
-    ...
-}
-```
-
-**4. (Optional) Declare resources to pre-fetch** in `hands/market/cloud.json`:
-
-```json
-{
-  "include_wiki_snapshot": true,
-  "prefetch_resources": ["fred", "reuters-rss"]
-}
-```
-
-**5. Restart Brain and trigger a run** — the adapter is auto-registered:
-
-```bash
-curl -X POST http://127.0.0.1:3001/run \
-  -d '{"hand_id":"market","task":"分析当前市场环境"}'
-```
-
-**Cloud agent NDJSON protocol** — your agent endpoint must accept the snapshot body and return a stream:
-
-| Event type | Direction | Meaning |
-|---|---|---|
-| `run.artifact` | agent → Loom | **Required.** Final analysis result. |
-| `wiki.write` | agent → Loom | Write a file to `hands/<id>/wiki/`. Applied locally; not forwarded to webview. |
-| `feedback.signal` | agent → Loom | Append an event to the feedback log. |
-| `run.error` | agent → Loom | Signal failure; Brain returns an error response. |
-| `run.started` / `run.completed` | agent → Loom | Optional bookkeeping events. |
-
-**Security notes:**
-- Loom Core stays bound to `127.0.0.1` — it is never exposed to the public internet.
-- Cloud agents cannot call back into `localhost`; all data is shipped in the envelope.
-- Paths in `wiki.write` events containing `..` are silently rejected (path traversal guard).
-- Tokens live only in `.env`; `cloud-agents.json` contains no secrets.
-
-> **Full protocol reference:** [`docs/loom-hand-agent-guide.md`](docs/loom-hand-agent-guide.md) §10–13
+- [Loom Core README](loom_core/README.md)
+- [Loom Fin](docs/loom-fin.md)
+- [Hand agent guide](docs/loom-hand-agent-guide.md)
+- [Rewarded intent harness architecture](docs/superpowers/specs/2026-06-09-rewarded-intent-harness-architecture.html)
+- [Harness technical design](docs/loom-harness-technical-design.md)
