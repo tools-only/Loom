@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import html
 import json
 import time
 from pathlib import Path
@@ -103,6 +104,8 @@ from brain_harness.dispatcher import WorkflowResolver
 from brain_harness.distiller import ResourceDistiller
 from brain_harness.intent_processor import IntentProcessor, IntentStream
 from brain_harness.intent_wiki import IntentWiki
+from brain_harness.goal_context import GoalContextStore
+from brain_harness.flywheel import FlywheelRecord, FlywheelWriter
 from loom_core.agents.core_agent import LoomCoreAgent
 
 _brain_harness = BrainHarness(_ROOT)
@@ -114,6 +117,9 @@ _intent_processor = IntentProcessor(_ROOT, _brain_client, _brain_model)
 _intent_wiki = IntentWiki(_ROOT)
 _brain_harness.intent_wiki = _intent_wiki
 _brain_harness._intent_stream = _intent_stream  # inject stream into harness prompt layer
+
+_goal_store = GoalContextStore(_ROOT)
+_flywheel = FlywheelWriter(_ROOT)
 
 
 async def _brain_hand_runner(hand_id: str, task: str, ctx: dict) -> dict:
@@ -297,7 +303,235 @@ def _build_hand_system_prompt(hand_id: str, description: str) -> str:
 _load_mounts()
 
 
-def _render_brain_synthesis(synthesis: dict, workflow: dict, cold_start: bool) -> str:
+def _confidence_delta(goal) -> float:
+    h = goal.synthesis_history
+    if len(h) < 2:
+        return 0.0
+    return h[-1].confidence - h[-2].confidence
+
+
+def _build_state_engine(goal, fw_record, synthesis, intent_activation, reward_report) -> dict:
+    """Assemble Brain state engine dict from goal/flywheel/intent/reward."""
+    stance_history = [
+        {"stance": s.stance, "confidence": s.confidence, "ts": s.ts}
+        for s in goal.synthesis_history
+    ]
+    latest_reversal = ""
+    if goal.synthesis_history:
+        latest_reversal = goal.synthesis_history[-1].reversal_condition or ""
+
+    active_nodes = []
+    if intent_activation is not None:
+        active_nodes = intent_activation.active_intents or []
+
+    latest_score = None
+    if reward_report is not None:
+        latest_score = reward_report.overall_reward
+
+    return {
+        "goal": {
+            "goal_id": goal.goal_id,
+            "title": goal.title,
+            "goal_type": goal.goal_type,
+            "status": goal.status,
+            "stance_history": stance_history,
+            "latest_reversal": latest_reversal,
+            "episode_count": len(goal.episode_ids),
+        },
+        "flywheel": {
+            "episode_id": fw_record.episode_id,
+            "domain": fw_record.domain,
+        },
+        "intent_focus": {
+            "active_nodes": active_nodes,
+        },
+        "reward": {
+            "latest_score": latest_score,
+        },
+        "targeted_abstract": {
+            "regime_relevance": synthesis.get("regime_relevance", ""),
+            "watch_conditions": synthesis.get("watch_conditions", []),
+            "priority_signal": synthesis.get("priority_signal", ""),
+        },
+    }
+
+
+def _render_state_engine(state_engine: dict) -> str:
+    """Render Brain State Engine as Anchor section card."""
+    g = state_engine.get("goal", {})
+    fw = state_engine.get("flywheel", {})
+    intent_focus = state_engine.get("intent_focus", {})
+    reward = state_engine.get("reward", {})
+    targeted = state_engine.get("targeted_abstract", {})
+
+    title = html.escape(g.get("title", ""))
+    domain = html.escape(fw.get("domain", "?"))
+    episode_id = html.escape(fw.get("episode_id", ""))
+    status = g.get("status", "open")
+    status_class = {"open": "anc-pill--active", "investigating": "anc-pill--review",
+                    "concluded": "anc-pill--done"}.get(status, "anc-pill--gen")
+
+    stance_history = g.get("stance_history", [])
+    history_parts = []
+    for s in stance_history[-5:]:
+        sv = s.get("stance", "?")
+        conf = int(s.get("confidence", 0) * 100)
+        sc = {"buy": "anc-pill--active", "hold": "anc-pill--review",
+              "reduce": "anc-pill--warn"}.get(sv, "anc-pill--edit")
+        history_parts.append(f'<span class="anc-pill {sc}" style="font-size:10px">'
+                              f'{html.escape(sv)} {conf}%</span>')
+    history_html = ('<div class="anc-pill-row">' + "".join(history_parts) + '</div>'
+                    if history_parts else "")
+
+    latest_reversal = html.escape(g.get("latest_reversal", ""))
+    reversal_html = (f'<blockquote style="font-size:12px">{latest_reversal}</blockquote>'
+                     if latest_reversal else "")
+
+    priority_signal = html.escape(targeted.get("priority_signal", ""))
+    priority_html = (
+        f'<div class="insight-box" style="border-left:3px solid var(--accent-iris)">'
+        f'<strong>优先信号：</strong> {priority_signal}</div>'
+    ) if priority_signal else ""
+
+    watch = targeted.get("watch_conditions", [])
+    watch_html = ""
+    if watch:
+        items = "".join(f"<li>{html.escape(str(w))}</li>" for w in watch)
+        watch_html = f"<ul>{items}</ul>"
+
+    regime = html.escape(targeted.get("regime_relevance", ""))
+    regime_html = f'<p style="font-size:12px;color:var(--ink-muted)">{regime}</p>' if regime else ""
+
+    active_nodes = intent_focus.get("active_nodes", [])
+    intents_html = ""
+    if active_nodes:
+        items = "".join(
+            f'<li>{html.escape(str(n.get("label", n.get("intent_id", "?"))))}</li>'
+            for n in active_nodes[:5]
+        )
+        intents_html = f"<ul>{items}</ul>"
+
+    latest_score = reward.get("latest_score")
+    reward_html = ""
+    if latest_score is not None:
+        pct = int(latest_score * 100)
+        reward_html = (
+            f'<div class="anc-eval-block"><div class="anc-eval-label">Reward</div>'
+            f'<div class="confidence-bar"><div class="confidence-fill" style="width:{pct}%">'
+            f'</div></div> {pct}%</div>'
+        )
+
+    episode_count = g.get("episode_count", 0)
+
+    return (
+        f'<section class="anc-section anc-section--gc brain-state-engine" '
+        f'data-anc="brain-state-engine" data-handles="refine" data-has-detail="true">'
+        f'<div class="anc-pill-row">'
+        f'<span class="anc-pill anc-pill--gen">状态推理</span>'
+        f'<span class="anc-pill {status_class}">{html.escape(status)}</span>'
+        f'</div>'
+        f'<h2>{title}</h2>'
+        f'{priority_html}'
+        f'{regime_html}'
+        f'<h4>观察变量</h4>{watch_html}'
+        f'<h4>立场历史</h4>{history_html}'
+        f'{"<h4>反转条件</h4>" + reversal_html if latest_reversal else ""}'
+        f'<p style="font-size:11px;color:var(--ink-muted)">'
+        f'Domain: {domain} — Episode #{episode_count} [{episode_id}]</p>'
+        f'<aside class="anc-detail" hidden>'
+        f'<section class="anc-detail-section" data-detail-section="intent-focus" '
+        f'data-detail-label="Intent Focus"><h3>Intent Focus</h3>{intents_html}</section>'
+        f'<section class="anc-detail-section" data-detail-section="reward" '
+        f'data-detail-label="Reward"><h3>Reward</h3>{reward_html}</section>'
+        f'</aside>'
+        f'</section>'
+    )
+
+
+def _render_raw_sources(artifact: dict) -> str:
+    """Render raw_sources as an L2 detail section. Returns '' when empty."""
+    sources = artifact.get("raw_sources") or []
+    if not sources:
+        return ""
+    parts = []
+    for s in sources:
+        rid = html.escape(str(s.get("resource_id", "")))
+        ts = html.escape(str(s.get("fetched_at", "")))
+        ct = html.escape(str(s.get("content_type", "")))
+        summary = html.escape(str(s.get("summary", "")))
+        parts.append(
+            f'<div class="anc-source-row" data-layer-type="raw_source">'
+            f'<strong>{rid}</strong>'
+            f'<span style="font-size:11px;color:var(--ink-muted)"> [{ct}] {ts}</span>'
+            f'<p style="margin:2px 0 0">{summary}</p>'
+            f'</div>'
+        )
+    return (
+        f'<section class="anc-detail-section" data-detail-section="raw-sources" '
+        f'data-detail-label="Raw Sources" data-layer-type="raw_source">'
+        f'<h3>Raw Sources</h3>{"".join(parts)}'
+        f'</section>'
+    )
+
+
+def _render_raw_items(artifact: dict) -> str:
+    """Render raw_items as an L2 detail section. Returns '' when empty."""
+    items = artifact.get("raw_items") or []
+    if not items:
+        return ""
+    parts = []
+    for item in items:
+        item_type = item.get("item_type", "")
+        tier = html.escape(str(item.get("tier", "")))
+        relevance = html.escape(str(item.get("relevance", "")))
+        if item_type == "news":
+            title_text = html.escape(str(item.get("title", "")))
+            source = html.escape(str(item.get("source", "")))
+            pub = html.escape(str(item.get("published_at", "")))
+            summary = html.escape(str(item.get("summary", "")))
+            parts.append(
+                f'<div class="anc-raw-item" data-layer-type="raw_item" data-item-type="news">'
+                f'<strong>{title_text}</strong>'
+                f'<span class="anc-pill anc-pill--review" style="font-size:10px">Tier {tier}</span>'
+                f'<span style="font-size:11px;color:var(--ink-muted)"> {source} · {pub}</span>'
+                f'<p style="margin:2px 0 0">{summary}</p>'
+                f'<p style="font-size:11px;color:var(--accent-iris)">{relevance}</p>'
+                f'</div>'
+            )
+        elif item_type == "data_point":
+            label = html.escape(str(item.get("label", "")))
+            value = html.escape(str(item.get("value", "")))
+            source = html.escape(str(item.get("source", "")))
+            freshness = html.escape(str(item.get("freshness", "")))
+            parts.append(
+                f'<div class="anc-raw-item" data-layer-type="raw_item" data-item-type="data_point">'
+                f'<strong>{label}</strong>: <code>{value}</code>'
+                f'<span class="anc-pill anc-pill--gen" style="font-size:10px">Tier {tier}</span>'
+                f'<span style="font-size:11px;color:var(--ink-muted)"> {source} · {freshness}</span>'
+                f'<p style="font-size:11px;color:var(--accent-iris)">{relevance}</p>'
+                f'</div>'
+            )
+        else:
+            text = html.escape(str(item.get("title", item.get("label", ""))))
+            parts.append(
+                f'<div class="anc-raw-item" data-layer-type="raw_item">'
+                f'<span>{text}</span>'
+                f'<span class="anc-pill anc-pill--review" style="font-size:10px">Tier {tier}</span>'
+                f'<p style="font-size:11px;color:var(--accent-iris)">{relevance}</p>'
+                f'</div>'
+            )
+    return (
+        f'<section class="anc-detail-section" data-detail-section="raw-items" '
+        f'data-detail-label="Raw Items" data-layer-type="raw_item">'
+        f'<h3>Raw Items</h3>{"".join(parts)}'
+        f'</section>'
+    )
+
+
+def _render_brain_synthesis(
+    synthesis: dict, workflow: dict, cold_start: bool,
+    episode_id: str = "", goal_id: str = "",
+) -> str:
     """Render Brain synthesis as an Anchor section card above hand cards."""
     stance = synthesis.get("stance", "n/a")
     confidence = synthesis.get("confidence", 0.0)
@@ -352,9 +586,19 @@ def _render_brain_synthesis(synthesis: dict, workflow: dict, cold_start: bool) -
 
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
+    ep_attrs = ""
+    if episode_id:
+        ep_attrs += f' data-episode-id="{episode_id}"'
+    if goal_id:
+        ep_attrs += f' data-goal-id="{goal_id}"'
+    reversal_detail_html = (
+        '<div class="anc-eval-block"><div class="anc-eval-label">Reversal condition</div>'
+        + reversal + '</div>'
+    ) if reversal else ''
+
     return (
         f'<section class="anc-section anc-section--gc anc-section--aurora brain-synthesis" '
-        f'data-anc="brain-synthesis" data-handles="refine,expand">'
+        f'data-anc="brain-synthesis" data-handles="refine,expand" data-has-detail="true"{ep_attrs}>'
         f'{cold_html}'
         f'<div class="anc-pill-row">'
         f'<span class="anc-pill anc-pill--gen">Brain 整合</span>'
@@ -371,6 +615,17 @@ def _render_brain_synthesis(synthesis: dict, workflow: dict, cold_start: bool) -
         f'{refs_html}'
         f'<p style="font-size:11px;color:var(--ink-muted)">'
         f'Domain: {domain} ({mode}) — {rationale} ｜ {ts}</p>'
+        f'<aside class="anc-detail" hidden>'
+        f'<section class="anc-detail-section anc-detail-section--brain-eval" data-detail-section="brain-eval" data-detail-label="Brain Eval">'
+        f'<h3>Brain Eval</h3>'
+        f'<div class="anc-eval-block"><div class="anc-eval-label">Confidence</div>{confidence_pct}%</div>'
+        f'<div class="anc-eval-block"><div class="anc-eval-label">Stance</div>{stance}</div>'
+        f'{reversal_detail_html}'
+        f'</section>'
+        f'<section class="anc-detail-section anc-detail-section--content" data-detail-section="reasoning" data-detail-label="Reasoning">'
+        f'<h3>Reasoning</h3>{drivers_html}{refs_html}'
+        f'</section>'
+        f'</aside>'
         f'</section>'
     )
 
@@ -452,7 +707,21 @@ async def analyze(req: AnalyzeRequest):
         ctx["domain_hint"] = req.domain_hint
     if req.hands:
         ctx["hands"] = req.hands
-    print(f"[brain] /analyze question={req.question[:60]!r}", flush=True)
+
+    # Resolve or create a GoalContext for this request
+    goal_id = ctx.get("goal_id", "")
+    goal = None
+    if goal_id:
+        goal = _goal_store.load(goal_id)
+    if goal is None:
+        goal = _goal_store.create(
+            goal_type=ctx.get("goal_type", "ad_hoc"),
+            title=req.question[:80],
+        )
+        goal_id = goal.goal_id
+    ctx["goal_id"] = goal_id
+
+    print(f"[brain] /analyze question={req.question[:60]!r} goal={goal_id}", flush=True)
 
     # Parse intent concurrently with synthesis; stream uses PREVIOUS events for context
     intent_task = asyncio.create_task(
@@ -476,17 +745,67 @@ async def analyze(req: AnalyzeRequest):
     synthesis = result["synthesis"]
     wf = result["workflow_decision"]
     cold = result["cold_start"]
+    presentation = result.get("presentation") or {}
 
-    brain_html = _render_brain_synthesis(synthesis, wf, cold)
+    # Write flywheel record and link episode to goal
+    try:
+        fw_record = FlywheelRecord.new(
+            goal_id=goal_id,
+            question=req.question,
+            domain=wf.get("domain", "") if wf else "",
+            synthesis=synthesis,
+            hand_artifacts=result.get("hand_artifacts", {}),
+            cold_start=cold,
+        )
+        _flywheel.append_record(fw_record)
+        goal.record_episode(fw_record.episode_id)
+        if synthesis:
+            from brain_harness.goal_context import SynthesisSnapshot
+            goal.append_synthesis(SynthesisSnapshot(
+                episode_id=fw_record.episode_id,
+                ts=fw_record.ts,
+                stance=synthesis.get("stance", "n/a"),
+                confidence=synthesis.get("confidence", 0.0),
+                key_drivers=[d.get("claim", "") for d in synthesis.get("key_drivers", [])],
+                reversal_condition=synthesis.get("reversal_condition", ""),
+            ))
+        _goal_store.save(goal)
+        episode_id = fw_record.episode_id
+    except Exception as exc:
+        print(f"[brain] flywheel write error: {exc}", flush=True)
+        episode_id = ""
+
+    brain_html = _render_brain_synthesis(synthesis, wf, cold, episode_id=episode_id, goal_id=goal_id)
     await patch_webview("brain-synthesis", brain_html)
+
+    try:
+        se_data = _build_state_engine(
+            goal, fw_record, synthesis,
+            _brain_harness._last_intent_activation,
+            _brain_harness._last_reward_report,
+        )
+        await patch_webview("brain-state-engine", _render_state_engine(se_data))
+    except Exception as _se_exc:
+        print(f"[brain] state-engine render error: {_se_exc}", flush=True)
 
     for hand_id, art in result["hand_artifacts"].items():
         info = REGISTRY.get(hand_id, {})
         anchor_id = info.get("anchor_id", hand_id)
-        hand_html = _render_artifact(art, hand_id)
+        # Error cards skip the Brain presentation layer — the enrichment function
+        # produces the full card structure (error/impact/recovery sections) directly.
+        # This ensures every card, even from a failed/unconfigured hand, follows
+        # the same 5-dimensional framework as a successful hand card.
+        if art.get("metadata", {}).get("error"):
+            art = _enrich_error_artifact(art, hand_id)
+            hand_html = _render_artifact(art, hand_id)
+        else:
+            hand_html = _render_artifact(
+                _presentation_artifact_for_hand(presentation, hand_id, art),
+                hand_id,
+            )
         await patch_webview(anchor_id, hand_html)
 
-    return {"ok": True, **result}
+    return {"ok": True, "episode_id": episode_id, "goal_id": goal_id, **result}
 
 
 class DistillRequest(BaseModel):
@@ -1315,51 +1634,461 @@ async def put_hand_config(hand_id: str, request: Request):
     return {"ok": True, "hand_id": hand_id}
 
 
-_TIER_A_B = {"fred", "sec-edgar", "finnhub", "yahoo-finance", "cftc-cot", "investing-calendar", "config.json"}
+# Connector ID → tier mapping (for backward compat when no per-claim tier available)
+_TIER_A = {"fred", "sec-edgar"}
+_TIER_B = {"finnhub", "yahoo-finance", "cftc-cot", "investing-calendar", "config.json"}
 _TIER_C = {"reuters-rss", "marketwatch-rss", "cnbc-rss"}
-_TIER_E_F = {"fear-greed", "aaii", "naaim", "stocktwits", "reddit", "kol-rss"}
+_TIER_D = set()  # industry sources (eia, sema, sia, gartner, etc.)
+_TIER_E = set()  # handled alongside F below for historical compat
+_TIER_F = {"fear-greed", "aaii", "naaim", "stocktwits", "reddit", "kol-rss"}
+_TIER_G = set()  # secondary commentary (newsletters, KOL blogs, podcasts)
+_TIER_A_B = _TIER_A | _TIER_B
+_TIER_E_F = _TIER_F  # no longer merged with E; E is company filings
 
 
 def _source_authority(sources: list) -> tuple[str, str]:
-    """Return (label, pill_class) based on highest-tier source present."""
+    """Return (label, pill_class) based on highest-tier source present.
+    Falls back to connector IDs when per-claim tier data is unavailable.
+    """
     s = set(sources)
-    if s & _TIER_A_B:
+    has_a = bool(s & _TIER_A)
+    has_b = bool(s & _TIER_B)
+    has_c = bool(s & _TIER_C)
+    has_d = bool(s & _TIER_D)
+    has_e = bool(s & _TIER_E)
+    has_f = bool(s & _TIER_F)
+    has_g = bool(s & _TIER_G)
+    if has_a or has_b:
         return "权威数据", "anc-pill--done"
-    if s & _TIER_C:
+    if has_c or has_d:
         return "新闻来源", "anc-pill--warn"
-    if s & _TIER_E_F:
+    if has_e:
+        return "公司来源", "anc-pill--review"
+    if has_f:
         return "情绪参考", "anc-pill--edit"
+    if has_g:
+        return "二手参考", "anc-pill--edit"
     return "来源未知", "anc-pill--edit"
 
 
+def _compute_source_distribution(artifact: dict) -> dict:
+    """Scan key_claims and evidence for per-item source/tier data.
+
+    Returns {"best_tier": "A"|...|"unknown", "worst_tier": ..., "mixed": bool, "tiers": {...}}.
+    """
+    tiers_seen: dict[str, int] = {}
+    meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
+    evidence = artifact.get("evidence", []) if isinstance(artifact, dict) else []
+
+    for claim in (meta.get("key_claims", []) or []):
+        if isinstance(claim, dict):
+            t = (claim.get("tier") or claim.get("source_tier") or "").strip().upper()
+            if t:
+                tiers_seen[t] = tiers_seen.get(t, 0) + 1
+
+    for row in (evidence or []):
+        if isinstance(row, dict):
+            t = (row.get("source_tier") or "").strip().upper()
+            if t:
+                tiers_seen[t] = tiers_seen.get(t, 0) + 1
+
+    if not tiers_seen:
+        return {"best_tier": "unknown", "worst_tier": "unknown", "mixed": False, "tiers": {}}
+
+    tier_order = ["A", "B", "C", "D", "E", "F", "G"]
+    seen_ranks = [tier_order.index(t) for t in tiers_seen if t in tier_order]
+    if not seen_ranks:
+        return {"best_tier": "unknown", "worst_tier": "unknown", "mixed": False, "tiers": tiers_seen}
+    best = tier_order[min(seen_ranks)]
+    worst = tier_order[max(seen_ranks)]
+    return {
+        "best_tier": best,
+        "worst_tier": worst,
+        "mixed": best != worst,
+        "tiers": tiers_seen,
+    }
+
+
+def _html_text(value) -> str:
+    return html.escape(str(value if value is not None else ""))
+
+
+def _list_html(items: list) -> str:
+    rendered = []
+    for item in items or []:
+        if isinstance(item, dict):
+            primary = item.get("claim") or item.get("source") or item.get("note") or item.get("title") or ""
+            support = item.get("support") or item.get("freshness") or ""
+            tier = _claim_source_tag(item)
+            text = " | ".join(str(part) for part in (primary, support) if part)
+            rendered.append(f"<li>{tier}{_html_text(text or str(item))}</li>")
+        else:
+            rendered.append(f"<li>{_html_text(item)}</li>")
+    return "".join(rendered)
+
+
+def _provenance_html(items: list) -> str:
+    if not isinstance(items, list) or not items:
+        return ""
+    rows = []
+    for item in items[:8]:
+        if not isinstance(item, dict):
+            rows.append(f"<li>{_html_text(item)}</li>")
+            continue
+        source = item.get("source", "unknown")
+        tier = item.get("source_tier", item.get("tier", "unknown"))
+        tier_tag = ""
+        if str(tier).upper() in {"A","B","C","D","E","F","G"}:
+            css = {"A":"anc-tier-pill--a","B":"anc-tier-pill--b","C":"anc-tier-pill--c",
+                   "D":"anc-tier-pill--c","E":"anc-tier-pill--b","F":"anc-tier-pill--e",
+                   "G":"anc-tier-pill--e"}.get(tier.upper(), "anc-tier-pill--e")
+            tier_tag = f'<span class="anc-tier-pill {css}">{tier.upper()}</span> '
+        freshness = item.get("freshness", "")
+        note = item.get("note", "")
+        rows.append(
+            f"<li>{tier_tag}<strong>{_html_text(source)}</strong>"
+            f'{(" · " + _html_text(freshness)) if freshness else ""}'
+            f'{("<br>" + _html_text(note)) if note else ""}</li>'
+        )
+    return '<h4>Provenance</h4><ul class="anc-source-list">' + "".join(rows) + "</ul>"
+
+
+def _render_artifact_sections(artifact: dict, fallback_narrative: str, fallback_claims_html: str) -> str:
+    layers = artifact.get("layers") or []
+    if isinstance(layers, list) and layers:
+        rendered_layers = []
+        for idx, layer in enumerate(layers[:8]):
+            if not isinstance(layer, dict):
+                continue
+            lid = _html_text(layer.get("id") or f"layer-{idx + 1}")
+            title = _html_text(layer.get("title") or layer.get("id") or f"Layer {idx + 1}")
+            summary = _html_text(layer.get("summary") or "")
+            items = layer.get("items") if isinstance(layer.get("items"), list) else []
+            provenance = layer.get("provenance") if isinstance(layer.get("provenance"), list) else []
+            rendered_layers.append(
+                f'<section class="anc-detail-section anc-detail-section--content" '
+                f'data-detail-section="{lid}" data-detail-label="{title}">'
+                f'<h3>{title}</h3>'
+                f'{("<p>" + summary + "</p>") if summary else ""}'
+                f'{("<ul>" + _list_html(items) + "</ul>") if items else ""}'
+                f'{_provenance_html(provenance)}'
+                '</section>'
+            )
+        if rendered_layers:
+            return "".join(rendered_layers)
+
+    sections = artifact.get("sections") or []
+    if not isinstance(sections, list) or not sections:
+        return (
+            '<section class="anc-detail-section anc-detail-section--content" '
+            'data-detail-section="content" data-detail-label="Full Detail">'
+            '<h3>Full Detail</h3>'
+            f'<p>{_html_text(fallback_narrative)}</p>'
+            f'{("<h4>Key Claims</h4><ul>" + fallback_claims_html + "</ul>") if fallback_claims_html else ""}'
+            '</section>'
+        )
+
+    rendered = []
+    for idx, sec in enumerate(sections[:8]):
+        if not isinstance(sec, dict):
+            continue
+        sid = _html_text(sec.get("id") or f"section-{idx + 1}")
+        title = _html_text(sec.get("title") or sec.get("id") or f"Section {idx + 1}")
+        summary = _html_text(sec.get("summary") or "")
+        bullets = sec.get("bullets") if isinstance(sec.get("bullets"), list) else []
+        rendered.append(
+            f'<section class="anc-detail-section anc-detail-section--content" '
+            f'data-detail-section="{sid}" data-detail-label="{title}">'
+            f'<h3>{title}</h3>'
+            f'{("<p>" + summary + "</p>") if summary else ""}'
+            f'{("<ul>" + _list_html(bullets) + "</ul>") if bullets else ""}'
+            '</section>'
+        )
+    return "".join(rendered) or _render_artifact_sections({}, fallback_narrative, fallback_claims_html)
+
+
+def _presentation_artifact_for_hand(presentation: dict, hand_id: str, fallback: dict) -> dict:
+    """Use Brain-composed presentation layers as the UI artifact when available."""
+    if not isinstance(presentation, dict):
+        return fallback
+    panels = presentation.get("detail_panels", {})
+    panel = panels.get(hand_id, {}) if isinstance(panels, dict) else {}
+    cards = presentation.get("cards", [])
+    card = next(
+        (item for item in cards if isinstance(item, dict) and item.get("hand_id") == hand_id),
+        {},
+    )
+    if not panel and not card:
+        return fallback
+
+    fallback_meta = fallback.get("metadata", {}) if isinstance(fallback, dict) else {}
+    error = fallback_meta.get("error")
+    return {
+        "metadata": {
+            "confidence": card.get("confidence", fallback_meta.get("confidence", 0.0)),
+            "key_claims": [],
+            "source_notes": panel.get("source_notes", fallback_meta.get("source_notes", [])),
+            "gaps": [],
+            "resources_used": [],
+            "brain_requirements": panel.get("brain_requirements", {}),
+            "overview_only": True,
+            **({"error": error} if error else {}),
+        },
+        "narrative": card.get("visible_summary", fallback.get("narrative", "") if isinstance(fallback, dict) else ""),
+        "sections": panel.get("sections", fallback.get("sections", []) if isinstance(fallback, dict) else []),
+        "layers": panel.get("layers", []),
+        "evidence": panel.get("evidence", fallback.get("evidence", []) if isinstance(fallback, dict) else []),
+    }
+
+
+def _render_evidence_section(artifact: dict) -> str:
+    evidence = artifact.get("evidence") or []
+    if not isinstance(evidence, list) or not evidence:
+        return ""
+    rows = []
+    for ev in evidence[:12]:
+        if not isinstance(ev, dict):
+            continue
+        tier = ev.get("source_tier", "").strip().upper()
+        tier_css = {"A":"anc-tier-pill--a","B":"anc-tier-pill--b","C":"anc-tier-pill--c",
+                    "D":"anc-tier-pill--c","E":"anc-tier-pill--b","F":"anc-tier-pill--e",
+                    "G":"anc-tier-pill--e"}.get(tier, "")
+        tier_html = (
+            f'<span class="anc-tier-pill {tier_css}">{_html_text(tier)}</span>'
+            if tier and tier_css else _html_text(tier)
+        )
+        rows.append(
+            "<tr>"
+            f"<td>{_html_text(ev.get('claim', ''))}</td>"
+            f"<td>{_html_text(ev.get('support', ''))}</td>"
+            f"<td>{_html_text(ev.get('source', ''))}</td>"
+            f"<td>{tier_html}</td>"
+            f"<td>{_html_text(ev.get('freshness', ''))}</td>"
+            "</tr>"
+        )
+    if not rows:
+        return ""
+    return (
+        '<section class="anc-detail-section anc-detail-section--sources" '
+        'data-detail-section="evidence" data-detail-label="Evidence">'
+        '<h3>Evidence</h3>'
+        '<table class="anc-detail-kv"><thead><tr>'
+        '<th>Claim</th><th>Support</th><th>Source</th><th>Tier</th><th>Freshness</th>'
+        '</tr></thead><tbody>'
+        + "".join(rows) +
+        '</tbody></table></section>'
+    )
+
+
+def _render_source_notes(meta: dict, sources_html: str) -> str:
+    notes = meta.get("source_notes") or []
+    if isinstance(notes, list) and notes:
+        items = []
+        for note in notes[:10]:
+            if isinstance(note, dict):
+                source = _html_text(note.get("source", "Unknown"))
+                tier = note.get("tier", note.get("source_tier", "unknown"))
+                freshness = _html_text(note.get("freshness", ""))
+                body = _html_text(note.get("note", ""))
+                tier_upper = str(tier).strip().upper()
+                css = {"A":"anc-tier-pill--a","B":"anc-tier-pill--b","C":"anc-tier-pill--c",
+                       "D":"anc-tier-pill--c","E":"anc-tier-pill--b","F":"anc-tier-pill--e",
+                       "G":"anc-tier-pill--e"}.get(tier_upper, "anc-tier-pill--e")
+                items.append(
+                    f'<li><span class="anc-tier-pill {css}">{_html_text(tier_upper)}</span>'
+                    f'<div><strong>{source}</strong>{(" · " + freshness) if freshness else ""}'
+                    f'{("<br>" + body) if body else ""}</div></li>'
+                )
+            else:
+                items.append(f'<li><span class="anc-tier-pill anc-tier-pill--c">Source</span><div>{_html_text(note)}</div></li>')
+        return '<ul class="anc-source-list">' + "".join(items) + '</ul>'
+    return f"<p>{sources_html}</p>"
+
+
+def _claim_text(item) -> str:
+    """Extract display text from a key_claims item (string or dict)."""
+    if isinstance(item, str):
+        return item
+    if isinstance(item, dict):
+        return item.get("claim", item.get("text", str(item)))
+    return str(item)
+
+
+def _claim_source_tag(item) -> str:
+    """Return HTML source tier tag for a claim item, or empty string."""
+    if not isinstance(item, dict):
+        return ""
+    tier = (item.get("tier") or item.get("source_tier") or "").strip().upper()
+    if not tier:
+        return ""
+    css = {
+        "A": "anc-tier-pill--a", "B": "anc-tier-pill--b",
+        "C": "anc-tier-pill--c", "D": "anc-tier-pill--c",
+        "E": "anc-tier-pill--b", "F": "anc-tier-pill--e",
+        "G": "anc-tier-pill--e",
+    }.get(tier, "anc-tier-pill--e")
+    return f'<span class="anc-tier-pill {css}">{tier}</span> '
+
+
+def _enrich_error_artifact(artifact: dict, hand_id: str) -> dict:
+    """Enrich an error artifact with proper card structure so it follows the same
+    dimensional framework as a successful hand card.
+
+    All hand agents — configured or not — produce cards measured by the same 5
+    dimensions. A connection-refused error is just (L0 provenance, L4 gap transparency,
+    L2 structure, etc.) rather than an empty card.
+    """
+    meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
+    if not meta.get("error"):
+        return artifact
+    info = REGISTRY.get(hand_id, {})
+    label = info.get("label", hand_id)
+    description = info.get("description", f"{hand_id} analysis")
+    err = str(meta["error"])
+    # Only enrich once — subsequent calls see a non-error artifact
+    if meta.get("_enriched"):
+        return artifact
+    artifact.setdefault("sections", [])
+    artifact.setdefault("evidence", [])
+    meta.setdefault("gaps", [])
+    meta.setdefault("source_notes", [])
+    meta.setdefault("resources_used", [])
+    meta.setdefault("key_claims", [])
+    meta["_enriched"] = True
+    meta["confidence"] = max(meta.get("confidence", 0.0), 0.0)
+    # narrative
+    if not artifact.get("narrative"):
+        artifact["narrative"] = f"{label} hand unavailable — {err}. This card normally contains {description}."
+    # gaps
+    if not meta["gaps"]:
+        meta["gaps"].append(f"Hand {hand_id} failed with: {err}. All data that would normally be provided by this hand is unavailable.")
+    # key_claims
+    if not meta["key_claims"]:
+        meta["key_claims"].append({"claim": f"{label} hand did not respond", "source": "system", "tier": "G"})
+    # source_notes
+    if not meta["source_notes"]:
+        meta["source_notes"].append({"source": "system", "tier": "G", "freshness": "now", "note": f"Hand agent error: {err}"})
+    # sections
+    sections = artifact.setdefault("sections", [])
+    if not sections:
+        sections.append({
+            "id": "error",
+            "title": "Error Detail",
+            "summary": "The hand agent process could not be reached or returned no data.",
+            "bullets": [{"claim": err, "source": "system", "tier": "G"}],
+        })
+        sections.append({
+            "id": "impact",
+            "title": "Missing Analysis",
+            "summary": f"Normally covers: {description}.",
+            "bullets": [
+                {"claim": "All connector data for this hand is unavailable", "source": "system", "tier": "G"},
+                {"claim": "No key claims, evidence rows, or structured sections were produced", "source": "system", "tier": "G"},
+                {"claim": "Confidence is 0 — no data was received", "source": "system", "tier": "G"},
+            ],
+        })
+        sections.append({
+            "id": "recovery",
+            "title": "Recovery",
+            "summary": "Actions to restore this hand.",
+            "bullets": [
+                {"claim": f"Start the {hand_id} hand service (port 3002 if using Brain)", "source": "system", "tier": "G"},
+                {"claim": "Restart the analysis after the service is running", "source": "system", "tier": "G"},
+            ],
+        })
+    # evidence is intentionally left empty — no data was received
+    meta.setdefault("evidence", [])
+    return artifact
+
+
 def _render_artifact(artifact: dict, hand_id: str) -> str:
+    artifact = _enrich_error_artifact(artifact, hand_id)
     meta = artifact.get("metadata", {})
     narrative = artifact.get("narrative", "")
     gaps = meta.get("gaps", [])
     key_claims = meta.get("key_claims", [])
     sources_used = meta.get("resources_used", [])
+    overview_only = bool(meta.get("overview_only"))
 
-    authority_label, auth_class = _source_authority(sources_used)
-    gaps_html = "".join(f"<li>{g}</li>" for g in gaps) or "<li>无明显数据缺口</li>"
-    claims_html = "".join(f"<li>{c}</li>" for c in key_claims)
-    sources_html = ", ".join(f"<code>{s}</code>" for s in sources_used) or "无"
+    # Per-claim source distribution (overrides connector-only label when data exists)
+    dist = _compute_source_distribution(artifact)
+    if dist["best_tier"] != "unknown":
+        best_label, best_class = {
+            "A": ("权威数据", "anc-pill--done"), "B": ("市场数据", "anc-pill--done"),
+            "C": ("新闻来源", "anc-pill--warn"), "D": ("行业数据", "anc-pill--warn"),
+            "E": ("公司来源", "anc-pill--review"), "F": ("情绪参考", "anc-pill--edit"),
+            "G": ("二手参考", "anc-pill--edit"),
+        }.get(dist["best_tier"], ("来源未知", "anc-pill--edit"))
+        authority_label, auth_class = best_label, best_class
+        if dist["mixed"]:
+            authority_label += " · 多级混用"
+            auth_class = "anc-pill--warn"
+    else:
+        authority_label, auth_class = _source_authority(sources_used)
+
+    gaps_html = "".join(f"<li>{_html_text(g)}</li>" for g in gaps) or "<li>无明显数据缺口</li>"
+    claims_html = "".join(
+        f"<li>{_claim_source_tag(c)}{_html_text(_claim_text(c))}</li>"
+        for c in (key_claims or [])
+    )
+    sources_html = ", ".join(f"<code>{_html_text(s)}</code>" for s in sources_used) or "无"
 
     info = REGISTRY.get(hand_id, {})
     anchor_id = info.get("anchor_id", hand_id)
     label = info.get("label", hand_id)
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    detail_sections_html = _render_artifact_sections(artifact, narrative, claims_html)
+    evidence_html = _render_evidence_section(artifact)
+    source_notes_html = _render_source_notes(meta, sources_html)
 
-    return f"""<section class="anc-section anc-section--gc" data-anc="{anchor_id}" data-handles="refine,expand">
+    if overview_only:
+        # True summary: pill + title + narrative only visible; detail in aside
+        return f"""<section class="anc-section anc-section--gc" data-anc="{anchor_id}" data-handles="refine,expand" data-has-detail="true">
   <div class="anc-pill-row">
     <span class="anc-pill anc-pill--gen">AI 生成</span>
     <span class="anc-pill {auth_class}">{authority_label}</span>
   </div>
   <h2>{label}</h2>
-  <div class="insight-box"><p>{narrative}</p></div>
+  <div class="insight-box"><p>{_html_text(narrative)}</p></div>
+  <aside class="anc-detail" hidden>
+    {detail_sections_html}
+    {evidence_html}
+    <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources">
+      <h3>Sources</h3>
+      {source_notes_html}
+    </section>
+    <section class="anc-detail-section anc-detail-section--hand-eval" data-detail-section="hand-eval" data-detail-label="Hand Eval">
+      <h3>Hand Eval</h3>
+      <div class="anc-eval-block"><div class="anc-eval-label">Authority</div>{authority_label}</div>
+      <div class="anc-eval-block"><div class="anc-eval-label">Coverage gaps</div><ul>{gaps_html}</ul></div>
+    </section>
+  </aside>
+</section>"""
+
+    return f"""<section class="anc-section anc-section--gc" data-anc="{anchor_id}" data-handles="refine,expand" data-has-detail="true">
+  <div class="anc-pill-row">
+    <span class="anc-pill anc-pill--gen">AI 生成</span>
+    <span class="anc-pill {auth_class}">{authority_label}</span>
+  </div>
+  <h2>{label}</h2>
+  <div class="insight-box"><p>{_html_text(narrative)}</p></div>
   {('<h4>关键判断</h4><ul>' + claims_html + '</ul>') if claims_html else ''}
   <h4>数据缺口</h4>
   <ul class="risk-list">{gaps_html}</ul>
   <p>数据来源：{sources_html} ｜ {ts}</p>
+  <aside class="anc-detail" hidden>
+    {detail_sections_html}
+    {evidence_html}
+    <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources">
+      <h3>Sources</h3>
+      {source_notes_html}
+    </section>
+    <section class="anc-detail-section anc-detail-section--hand-eval" data-detail-section="hand-eval" data-detail-label="Hand Eval">
+      <h3>Hand Eval</h3>
+      <div class="anc-eval-block"><div class="anc-eval-label">Authority</div>{authority_label}</div>
+      <div class="anc-eval-block"><div class="anc-eval-label">Coverage gaps</div><ul>{gaps_html}</ul></div>
+    </section>
+  </aside>
 </section>"""
 
 
@@ -1413,6 +2142,66 @@ def health():
         "adapters": [a.id for a in _adapter_registry.list()],
         "mounted": dict(_mounted),
     }
+
+
+@app.get("/goals")
+async def list_goals(status: str = "open"):
+    if status == "all":
+        goals = _goal_store.list_all()
+    else:
+        goals = _goal_store.list_open()
+    return {
+        "ok": True,
+        "count": len(goals),
+        "goals": [
+            {
+                "goal_id": g.goal_id,
+                "goal_type": g.goal_type,
+                "title": g.title,
+                "status": g.status,
+                "updated_at": g.updated_at,
+                "episode_count": len(g.episode_ids),
+                "latest_stance": g.latest_stance(),
+            }
+            for g in goals
+        ],
+    }
+
+
+@app.get("/goals/{goal_id}")
+async def get_goal(goal_id: str):
+    goal = _goal_store.load(goal_id)
+    if not goal:
+        return {"ok": False, "error": "goal not found"}
+    return {"ok": True, "goal": goal.to_dict()}
+
+
+@app.get("/flywheel")
+async def flywheel_log(limit: int = 50):
+    records = _flywheel.read_summary_log(limit=limit)
+    return {"ok": True, "count": len(records), "records": records}
+
+
+class FeedbackRequest(BaseModel):
+    episode_id: str
+    signal: str = "thumbs_up"
+    comment: str = ""
+    corrected_stance: str = ""
+
+
+@app.post("/flywheel/feedback")
+async def flywheel_feedback(req: FeedbackRequest):
+    from brain_harness.flywheel import HumanFeedback
+    import datetime
+    fb = HumanFeedback(
+        episode_id=req.episode_id,
+        ts=datetime.datetime.utcnow().isoformat() + "Z",
+        signal=req.signal,
+        comment=req.comment,
+        corrected_stance=req.corrected_stance,
+    )
+    ok = _flywheel.append_human_feedback(req.episode_id, fb)
+    return {"ok": ok}
 
 
 @app.get("/review")
