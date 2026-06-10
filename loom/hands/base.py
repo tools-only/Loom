@@ -11,12 +11,19 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from bridge import get_connector_data
-from provider_client import get_client_for_hand, _resolve
+try:
+    from bridge import get_connector_data
+except ImportError:
+    from loom.bridge import get_connector_data
+
+try:
+    from provider_client import get_client_for_hand, _resolve
+except ImportError:
+    from loom.provider_client import get_client_for_hand, _resolve
 
 import httpx
 
-ROOT = Path(__file__).parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 
 FETCH_RESOURCE_TOOL = {
     "name": "fetch_resource",
@@ -145,6 +152,36 @@ class BaseHand:
         user_parts = [f"Task: {task}", f"\nAvailable resources:\n{menu_text}"]
         if context:
             user_parts.append(f"\nContext:\n{json.dumps(context, ensure_ascii=False, indent=2)}")
+        user_parts.append(
+            "\nOutput contract:\n"
+            "Return ONLY one JSON object with this shape:\n"
+            "{\n"
+            '  "metadata": {\n'
+            '    "confidence": 0.0,\n'
+            '    "key_claims": [\n'
+            '      {"claim":"specific claim","source":"FRED 30Y","tier":"A","freshness":"2026-06-09"},\n'
+            '      {"claim":"another claim","source":"Reuters","tier":"C","freshness":"2026-06-08"}\n'
+            '    ],\n'
+            '    "gaps": ["missing/stale data"],\n'
+            '    "source_notes": [{"source":"...", "tier":"A|B|C|D|E|F|G|unknown", "freshness":"...", "note":"..."}]\n'
+            "  },\n"
+            '  "narrative": "2-4 sentence high-level judgment for the visible Loom card.",\n'
+            '  "sections": [\n'
+            '    {"id":"summary", "title":"High-level judgment", "summary":"...", "bullets":["string bullet", {"claim":"sourced bullet","source":"FRED","tier":"A"}]},\n'
+            '    {"id":"evidence", "title":"Evidence and data support", "summary":"...", "bullets":[...]},\n'
+            '    {"id":"analysis", "title":"Detailed analysis", "summary":"...", "bullets":[...]},\n'
+            '    {"id":"gaps", "title":"Coverage gaps", "summary":"...", "bullets":[...]}\n'
+            "  ],\n"
+            '  "evidence": [{"claim":"...", "support":"...", "source":"...", "source_tier":"A|B|C|D|E|F|G|unknown", "freshness":"...", "confidence":0.0}]\n'
+            "}\n"
+            "Minimum information density:\n"
+            "- metadata.key_claims: 3-5 data-backed claims, each with source and tier.\n"
+            "- metadata.source_notes: at least 3 source notes when any source/data was available.\n"
+            "- sections: at least 4 sections, each with summary plus at least 3 bullets.\n"
+            "- evidence: at least 5 evidence rows when data was available.\n"
+            "- If data was unavailable, fill gaps with the exact missing data and explain what could not be expanded.\n"
+            "The visible narrative must be short. Put the deeper support in sections/evidence."
+        )
 
         messages: list[dict] = [{"role": "user", "content": "\n".join(user_parts)}]
         final_text = ""
@@ -211,10 +248,213 @@ class BaseHand:
                     messages.append({"role": "user", "content": tool_results})
 
         artifact = self._parse_artifact(final_text)
+        density_gaps = self._artifact_density_gaps(artifact, used, shown)
+        if density_gaps:
+            artifact = await self._repair_low_density_artifact(
+                client=client,
+                model=model,
+                system=system,
+                tools=tools,
+                messages=messages,
+                artifact=artifact,
+                density_gaps=density_gaps,
+                used_resources=used,
+                shown_resources=shown,
+            )
+            density_gaps = self._artifact_density_gaps(artifact, used, shown)
+            if density_gaps:
+                artifact.setdefault("metadata", {}).setdefault("gaps", [])
+                artifact["metadata"]["gaps"].extend(density_gaps)
         artifact["metadata"]["resources_shown"] = shown
         artifact["metadata"]["resources_used"] = used
         artifact["metadata"]["resources_ignored"] = [r for r in shown if r not in used]
         return artifact
+
+    async def _repair_low_density_artifact(
+        self,
+        *,
+        client,
+        model: str,
+        system: str,
+        tools: list[dict],
+        messages: list[dict],
+        artifact: dict,
+        density_gaps: list[str],
+        used_resources: list[str],
+        shown_resources: list[str],
+    ) -> dict:
+        """Give the hand one chance to expand a thin artifact before it reaches UI."""
+        repair_prompt = (
+            "Your previous JSON artifact is too low-density for Loom's drill-down UI.\n"
+            "Rewrite it as one JSON object using only the facts, tool results, and resource data already in this conversation.\n"
+            "Do not invent missing data. If detail is unavailable, put the precise missing detail in metadata.gaps and the gaps section.\n"
+            f"Density gaps to fix: {json.dumps(density_gaps, ensure_ascii=False)}\n"
+            f"Resources shown: {json.dumps(shown_resources, ensure_ascii=False)}\n"
+            f"Resources used: {json.dumps(used_resources, ensure_ascii=False)}\n"
+            "Required minimums: 3-5 metadata.key_claims, at least 4 sections, at least 3 bullets per section, "
+            "at least 5 evidence rows when data was available, and source_notes covering used resources.\n"
+            "Keep narrative short for the visible card. Put expansion material in sections/evidence/source_notes.\n"
+            "Return ONLY the corrected JSON object."
+        )
+
+        try:
+            resp = await client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=system,
+                tools=tools,
+                messages=messages + [{"role": "user", "content": repair_prompt}],
+            )
+        except Exception:
+            return artifact
+
+        if getattr(resp, "stop_reason", None) != "end_turn":
+            return artifact
+
+        final_text = ""
+        for block in resp.content:
+            if hasattr(block, "text"):
+                final_text = block.text
+        candidate = self._parse_artifact(final_text)
+        if self._density_score(candidate) > self._density_score(artifact):
+            return candidate
+        return artifact
+
+    @staticmethod
+    def _artifact_density_gaps(artifact: dict, used_resources: list[str], shown_resources: list[str]) -> list[str]:
+        gaps: list[str] = []
+        meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
+        sections = artifact.get("sections", []) if isinstance(artifact, dict) else []
+        evidence = artifact.get("evidence", []) if isinstance(artifact, dict) else []
+
+        claims = meta.get("key_claims", []) or []
+        if len(claims) < 3:
+            gaps.append("Artifact density low: fewer than 3 key_claims returned")
+        else:
+            unsourced = [str(i) for i, c in enumerate(claims) if isinstance(c, dict) and not c.get("source")]
+            if unsourced:
+                gaps.append(f"Artifact quality: key_claims [{','.join(unsourced[:3])}] missing source annotation")
+        if shown_resources and used_resources and len(meta.get("source_notes", []) or []) < min(3, len(used_resources)):
+            gaps.append("Artifact density low: source_notes did not cover used resources")
+        if len(sections or []) < 4:
+            gaps.append("Artifact density low: fewer than 4 drill-down sections returned")
+        else:
+            sparse = [
+                str(sec.get("id") or sec.get("title") or idx)
+                for idx, sec in enumerate(sections)
+                if isinstance(sec, dict) and len(sec.get("bullets", []) or []) < 3
+            ]
+            if sparse:
+                gaps.append("Artifact density low: sparse section bullets in " + ", ".join(sparse[:4]))
+        if used_resources and len(evidence or []) < 5:
+            gaps.append("Artifact density low: fewer than 5 evidence rows returned despite resource usage")
+        return gaps
+
+    @staticmethod
+    def _density_score(artifact: dict) -> int:
+        if not isinstance(artifact, dict):
+            return 0
+        meta = artifact.get("metadata", {}) if isinstance(artifact.get("metadata", {}), dict) else {}
+        sections = artifact.get("sections", []) if isinstance(artifact.get("sections", []), list) else []
+        evidence = artifact.get("evidence", []) if isinstance(artifact.get("evidence", []), list) else []
+        claims = meta.get("key_claims", []) or []
+        score = min(len(claims), 3)
+        score += 1 if any(isinstance(c, dict) and c.get("source") for c in claims) else 0
+        score += min(len(meta.get("source_notes", []) or []), 3)
+        score += min(len(sections), 4)
+        score += min(
+            sum(len(sec.get("bullets", []) or []) for sec in sections if isinstance(sec, dict)),
+            12,
+        )
+        score += min(len(evidence), 5)
+        return score
+
+    @staticmethod
+    def _normalize_artifact(data: dict) -> dict:
+        """Normalize key_claims and section bullets to support both string and object formats.
+
+        Strings → {"claim": <string>} so downstream always works with structured items.
+        """
+        meta = data.get("metadata", {})
+        if isinstance(meta, dict):
+            raw = meta.get("key_claims", [])
+            if isinstance(raw, list):
+                meta["key_claims"] = [
+                    {"claim": item} if isinstance(item, str) else item
+                    for item in raw
+                ]
+            source_notes = meta.get("source_notes", [])
+            if isinstance(source_notes, list):
+                for sn in source_notes:
+                    if isinstance(sn, dict) and "tier" in sn and "source_tier" not in sn:
+                        sn["source_tier"] = sn["tier"]
+        sections = data.get("sections", [])
+        if isinstance(sections, list):
+            for sec in sections:
+                if isinstance(sec, dict):
+                    raw_bullets = sec.get("bullets", [])
+                    if isinstance(raw_bullets, list):
+                        sec["bullets"] = [
+                            {"claim": b} if isinstance(b, str) else b
+                            for b in raw_bullets
+                        ]
+
+        # ── layers ↔ sections backward-compat shim ────────────────────────
+        has_layers = isinstance(data.get("layers"), list) and bool(data.get("layers"))
+        has_sections = isinstance(data.get("sections"), list) and bool(data.get("sections"))
+
+        _LAYER_TYPE_MAP = {
+            "summary": "summary", "evidence": "evidence",
+            "analysis": "analysis", "gaps": "gaps",
+        }
+
+        if has_layers and not has_sections:
+            sections_from_layers: list[dict] = []
+            evidence_from_layers: list[dict] = []
+            for layer in data["layers"]:
+                if not isinstance(layer, dict):
+                    continue
+                lt = layer.get("layer_type", "summary")
+                if lt == "evidence":
+                    evidence_from_layers.extend(layer.get("items") or [])
+                else:
+                    sections_from_layers.append({
+                        "id": layer.get("layer_id") or lt,
+                        "title": layer.get("title") or lt,
+                        "summary": layer.get("summary") or "",
+                        "bullets": [
+                            {"claim": item} if isinstance(item, str) else item
+                            for item in (layer.get("items") or [])
+                        ],
+                    })
+            data["sections"] = sections_from_layers
+            if evidence_from_layers and not data.get("evidence"):
+                data["evidence"] = evidence_from_layers
+
+        elif has_sections and not has_layers:
+            layers_from_sections: list[dict] = []
+            for sec in data.get("sections") or []:
+                if not isinstance(sec, dict):
+                    continue
+                sid = sec.get("id") or ""
+                lt = _LAYER_TYPE_MAP.get(sid, "summary")
+                layers_from_sections.append({
+                    "layer_id": sid or lt,
+                    "layer_type": lt,
+                    "title": sec.get("title") or sid,
+                    "summary": sec.get("summary") or "",
+                    "items": [
+                        {"claim": b} if isinstance(b, str) else b
+                        for b in (sec.get("bullets") or [])
+                    ],
+                })
+            data["layers"] = layers_from_sections
+
+        # ── raw defaults ──────────────────────────────────────────────────
+        data.setdefault("raw_sources", [])
+        data.setdefault("raw_items", [])
+
+        return data
 
     @staticmethod
     def _parse_artifact(text: str) -> dict:
@@ -224,7 +464,9 @@ class BaseHand:
         try:
             data = json.loads(stripped)
             if isinstance(data, dict) and "metadata" in data and "narrative" in data:
-                return data
+                data.setdefault("sections", [])
+                data.setdefault("evidence", [])
+                return BaseHand._normalize_artifact(data)
         except (json.JSONDecodeError, ValueError):
             pass
 
@@ -234,15 +476,26 @@ class BaseHand:
                 end = stripped.index("```", start)
                 data = json.loads(stripped[start:end].strip())
                 if isinstance(data, dict) and "metadata" in data and "narrative" in data:
-                    return data
+                    data.setdefault("sections", [])
+                    data.setdefault("evidence", [])
+                    return BaseHand._normalize_artifact(data)
         except (ValueError, json.JSONDecodeError):
             pass
 
-        return {
+        return BaseHand._normalize_artifact({
             "metadata": {
                 "confidence": 0.5,
                 "gaps": ["LLM did not return structured JSON — raw text captured"],
                 "key_claims": [],
             },
             "narrative": stripped or "(no output)",
-        }
+            "sections": [
+                {
+                    "id": "raw",
+                    "title": "Raw hand output",
+                    "summary": "The hand did not return the structured artifact contract.",
+                    "bullets": [{"claim": stripped or "(no output)"}],
+                }
+            ],
+            "evidence": [],
+        })
