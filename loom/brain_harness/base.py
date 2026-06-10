@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -191,6 +192,114 @@ class BrainHarness:
         self.state._reload()
         return self.state.is_empty()
 
+    def select_state_context(
+        self,
+        domain: str,
+        question: str,
+        context: dict | None = None,
+    ) -> dict:
+        """Programmatically select Brain-side state before hand dispatch."""
+        self.state._reload()
+        rules = self.state.query_rules(domain, question)
+        frameworks = self.state.query_frameworks(domain, hand_claims=None, min_confidence="medium")
+        notes = self.state.query_notes(domain, n=5)
+        intent_context = {}
+        recent_intents: list[dict] = []
+        if self._intent_stream is not None:
+            intent_context = self._intent_stream.derive_context()
+            recent_intents = [self._serialize(ev) for ev in self._intent_stream.tail(5)]
+        return {
+            "domain": domain,
+            "strategy_rules": [self._serialize(rule) for rule in rules],
+            "frameworks": [self._serialize(framework) for framework in frameworks],
+            "learned_notes": [self._serialize(note) for note in notes],
+            "intent_context": intent_context,
+            "recent_intents": recent_intents,
+            "request_context": context or {},
+        }
+
+    def compose_presentation(
+        self,
+        *,
+        question: str,
+        synthesis: dict,
+        hand_artifacts: dict[str, dict],
+        workflow_decision: dict,
+        presentation_spec: dict,
+    ) -> dict:
+        """Brain-owned final content hierarchy for the user-facing UI."""
+        cards: list[dict] = []
+        detail_panels: dict[str, dict] = {}
+        quality_gaps: list[str] = []
+
+        for hand_id in workflow_decision.get("hands", list(hand_artifacts.keys())):
+            artifact = hand_artifacts.get(hand_id, {})
+            meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
+            hand_spec = presentation_spec.get("hand_specs", {}).get(hand_id, {})
+            claims = list(meta.get("key_claims", []) or [])
+            gaps = list(meta.get("gaps", []) or [])
+            sections = self._normalize_sections(artifact, claims, gaps)
+            evidence = list(artifact.get("evidence", []) or []) if isinstance(artifact, dict) else []
+            source_notes = list(meta.get("source_notes", []) or [])
+            layers = self._compose_detail_layers(
+                schema=presentation_spec.get("ui_contract", {})
+                .get("detail_layer", {})
+                .get("card_detail_schema", []),
+                hand_id=hand_id,
+                artifact=artifact,
+                synthesis=synthesis,
+                workflow_decision=workflow_decision,
+                claims=claims,
+                sections=sections,
+                evidence=evidence,
+                source_notes=source_notes,
+                gaps=gaps,
+            )
+
+            if len(sections) < 4:
+                quality_gaps.append(f"{hand_id}: fewer than 4 detail sections available")
+            if not evidence and claims:
+                quality_gaps.append(f"{hand_id}: claims exist but evidence rows are missing")
+
+            cards.append({
+                "hand_id": hand_id,
+                "title": self._hand_title(hand_id),
+                "visible_role": hand_spec.get("visible_role", ""),
+                "visible_summary": artifact.get("narrative", "") if isinstance(artifact, dict) else "",
+                "confidence": meta.get("confidence", 0.0),
+                "detail_ref": hand_id,
+            })
+            detail_panels[hand_id] = {
+                "hand_id": hand_id,
+                "title": self._hand_title(hand_id),
+                "sections": sections,
+                "layers": layers,
+                "evidence": evidence,
+                "source_notes": source_notes,
+                "gaps": gaps,
+                "brain_requirements": hand_spec,
+            }
+
+        overview = {
+            "question": question,
+            "domain": workflow_decision.get("domain", "general"),
+            "mode": workflow_decision.get("mode", "dynamic"),
+            "stance": synthesis.get("stance", "n/a") if synthesis else "n/a",
+            "confidence": synthesis.get("confidence", 0.0) if synthesis else 0.0,
+            "key_drivers": synthesis.get("key_drivers", []) if synthesis else [],
+            "reversal_condition": synthesis.get("reversal_condition", "") if synthesis else "",
+            "clarifying_question": synthesis.get("clarifying_question") if synthesis else None,
+        }
+        return {
+            "version": presentation_spec.get("version", "brain.presentation.v1"),
+            "overview": overview,
+            "cards": cards,
+            "detail_panels": detail_panels,
+            "quality_gaps": quality_gaps,
+            "state_context": presentation_spec.get("state_context", {}),
+            "ui_contract": presentation_spec.get("ui_contract", {}),
+        }
+
     def write_last_synthesis(self, question: str, workflow: dict, synthesis: dict) -> None:
         path = self.root / "brain" / "context" / "last-synthesis.md"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -208,6 +317,270 @@ class BrainHarness:
             f"**Reversal:** {synthesis.get('reversal_condition')}\n",
             encoding="utf-8",
         )
+
+    @staticmethod
+    def _serialize(value):
+        if is_dataclass(value):
+            return asdict(value)
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, list):
+            return [BrainHarness._serialize(item) for item in value]
+        return value
+
+    @staticmethod
+    def _hand_title(hand_id: str) -> str:
+        return {
+            "market": "Market",
+            "sentiment": "Sentiment",
+            "target": "Targets",
+            "position": "Position",
+        }.get(hand_id, hand_id.title())
+
+    @staticmethod
+    def _normalize_sections(artifact: dict, claims: list[str], gaps: list[str]) -> list[dict]:
+        sections = list(artifact.get("sections", []) or []) if isinstance(artifact, dict) else []
+        normalized = [sec for sec in sections if isinstance(sec, dict)]
+        existing_ids = {str(sec.get("id", "")) for sec in normalized}
+        if claims and "evidence" not in existing_ids:
+            normalized.append({
+                "id": "evidence",
+                "title": "Evidence and claims",
+                "summary": "Brain promoted hand key claims into the detail layer.",
+                "bullets": claims,
+            })
+        if gaps and "gaps" not in existing_ids:
+            normalized.append({
+                "id": "gaps",
+                "title": "Coverage gaps",
+                "summary": "Limits that should remain visible in drill-down.",
+                "bullets": gaps,
+            })
+        if not normalized:
+            narrative = artifact.get("narrative", "") if isinstance(artifact, dict) else ""
+            normalized.append({
+                "id": "summary",
+                "title": "Summary",
+                "summary": narrative or "No structured detail returned.",
+                "bullets": claims or gaps or [narrative or "No expandable detail available."],
+            })
+        return normalized
+
+    @staticmethod
+    def _compose_detail_layers(
+        *,
+        schema: list[dict],
+        hand_id: str,
+        artifact: dict,
+        synthesis: dict,
+        workflow_decision: dict,
+        claims: list[str],
+        sections: list[dict],
+        evidence: list[dict],
+        source_notes: list[dict],
+        gaps: list[str],
+    ) -> list[dict]:
+        if not schema:
+            schema = [
+                {"id": "judgment", "title": "Judgment"},
+                {"id": "drivers", "title": "Drivers"},
+                {"id": "evidence", "title": "Evidence"},
+                {"id": "implications", "title": "Implications"},
+                {"id": "gaps", "title": "Gaps"},
+                {"id": "watchlist", "title": "Watchlist"},
+            ]
+        section_text = BrainHarness._section_lookup(sections)
+        layers: list[dict] = []
+        for item in schema:
+            layer_id = item.get("id", "")
+            title = item.get("title", layer_id.title())
+            layers.append({
+                "id": layer_id,
+                "title": title,
+                "summary": BrainHarness._layer_summary(
+                    layer_id=layer_id,
+                    hand_id=hand_id,
+                    artifact=artifact,
+                    synthesis=synthesis,
+                    workflow_decision=workflow_decision,
+                    section_text=section_text,
+                    gaps=gaps,
+                ),
+                "items": BrainHarness._layer_items(
+                    layer_id=layer_id,
+                    claims=claims,
+                    evidence=evidence,
+                    source_notes=source_notes,
+                    gaps=gaps,
+                    sections=sections,
+                    synthesis=synthesis,
+                ),
+                "provenance": BrainHarness._layer_provenance(
+                    layer_id=layer_id,
+                    evidence=evidence,
+                    source_notes=source_notes,
+                    claims=claims,
+                    sections=sections,
+                    synthesis=synthesis,
+                    gaps=gaps,
+                ),
+                "schema": item,
+            })
+        return layers
+
+    @staticmethod
+    def _section_lookup(sections: list[dict]) -> dict[str, dict]:
+        lookup: dict[str, dict] = {}
+        for sec in sections:
+            if not isinstance(sec, dict):
+                continue
+            sec_id = str(sec.get("id", "")).lower()
+            title = str(sec.get("title", "")).lower()
+            if sec_id:
+                lookup[sec_id] = sec
+            if title:
+                lookup[title] = sec
+        return lookup
+
+    @staticmethod
+    def _layer_summary(
+        *,
+        layer_id: str,
+        hand_id: str,
+        artifact: dict,
+        synthesis: dict,
+        workflow_decision: dict,
+        section_text: dict[str, dict],
+        gaps: list[str],
+    ) -> str:
+        narrative = artifact.get("narrative", "") if isinstance(artifact, dict) else ""
+        if layer_id == "judgment":
+            return narrative or f"{hand_id} did not return a visible judgment."
+        if layer_id == "drivers":
+            sec = section_text.get("drivers") or section_text.get("analysis") or section_text.get("summary")
+            return sec.get("summary", "") if sec else "Brain grouped the strongest available claims as drivers."
+        if layer_id == "evidence":
+            return "Traceable support rows and source notes backing the card judgment."
+        if layer_id == "implications":
+            stance = synthesis.get("stance", "n/a") if synthesis else "n/a"
+            domain = workflow_decision.get("domain", "general")
+            return f"For {domain}, this card contributes to a {stance} stance and its next decision checks."
+        if layer_id == "gaps":
+            return "No explicit gaps were returned." if not gaps else "Known limits that weaken or qualify the judgment."
+        if layer_id == "watchlist":
+            return synthesis.get("reversal_condition", "") or "No reversal condition was provided."
+        return ""
+
+    @staticmethod
+    def _layer_items(
+        *,
+        layer_id: str,
+        claims: list[str],
+        evidence: list[dict],
+        source_notes: list[dict],
+        gaps: list[str],
+        sections: list[dict],
+        synthesis: dict,
+    ) -> list:
+        if layer_id == "judgment":
+            return claims[:3]
+        if layer_id == "drivers":
+            drivers = []
+            for sec in sections:
+                bullets = sec.get("bullets", []) if isinstance(sec, dict) else []
+                drivers.extend(bullets or [])
+            return (drivers or claims)[:6]
+        if layer_id == "evidence":
+            return evidence or source_notes
+        if layer_id == "implications":
+            implications = []
+            for driver in synthesis.get("key_drivers", []) if synthesis else []:
+                if isinstance(driver, dict) and driver.get("claim"):
+                    implications.append(driver["claim"])
+            return implications or claims[:3]
+        if layer_id == "gaps":
+            return gaps
+        if layer_id == "watchlist":
+            items = []
+            reversal = synthesis.get("reversal_condition", "") if synthesis else ""
+            if reversal:
+                items.append(reversal)
+            items.extend(gaps[:3])
+            return items
+        return []
+
+    @staticmethod
+    def _layer_provenance(
+        *,
+        layer_id: str,
+        evidence: list[dict],
+        source_notes: list[dict],
+        claims: list[str],
+        sections: list[dict],
+        synthesis: dict,
+        gaps: list[str],
+    ) -> list[dict]:
+        provenance: list[dict] = []
+        if layer_id in ("judgment", "drivers") and claims:
+            provenance.append({
+                "source": "hand.metadata.key_claims",
+                "source_tier": "derived",
+                "freshness": "current run",
+                "note": "Brain selected from hand claims for this layer.",
+            })
+        if layer_id == "drivers" and sections:
+            provenance.append({
+                "source": "hand.sections",
+                "source_tier": "derived",
+                "freshness": "current run",
+                "note": "Brain grouped hand section bullets as causal drivers.",
+            })
+        if layer_id == "evidence":
+            for row in evidence[:5]:
+                if isinstance(row, dict):
+                    provenance.append({
+                        "source": row.get("source", "hand.evidence"),
+                        "source_tier": row.get("source_tier", "unknown"),
+                        "freshness": row.get("freshness", ""),
+                        "note": row.get("support", row.get("claim", "")),
+                    })
+            for note in source_notes[:5]:
+                if isinstance(note, dict):
+                    provenance.append({
+                        "source": note.get("source", "hand.metadata.source_notes"),
+                        "source_tier": note.get("tier", note.get("source_tier", "unknown")),
+                        "freshness": note.get("freshness", ""),
+                        "note": note.get("note", ""),
+                    })
+        if layer_id == "implications":
+            provenance.append({
+                "source": "brain.synthesis",
+                "source_tier": "derived",
+                "freshness": "current run",
+                "note": "Brain translated synthesis stance and key drivers into user-facing implications.",
+            })
+        if layer_id == "gaps" and gaps:
+            provenance.append({
+                "source": "hand.metadata.gaps",
+                "source_tier": "gap",
+                "freshness": "current run",
+                "note": "Brain preserved missing, stale, or conflicting information.",
+            })
+        if layer_id == "watchlist":
+            provenance.append({
+                "source": "brain.synthesis.reversal_condition",
+                "source_tier": "derived",
+                "freshness": "current run",
+                "note": "Brain used reversal condition and gaps as update signals.",
+            })
+        if not provenance:
+            provenance.append({
+                "source": "brain.presentation",
+                "source_tier": "derived",
+                "freshness": "current run",
+                "note": "Brain generated this layer from available artifact structure; no external source was provided.",
+            })
+        return provenance
 
     # ── B-business synthesis ───────────────────────────────────────────────────
 
@@ -243,7 +616,15 @@ class BrainHarness:
                 claims = meta.get("key_claims", [])
                 confidence = meta.get("confidence", "?")
                 sources = meta.get("resources_used", [])
-                claims_text = "\n".join(f"  - {c}" for c in claims) or "  (no claims)"
+                def _claim_text(item):
+                    if isinstance(item, str):
+                        return item
+                    if isinstance(item, dict):
+                        claim = item.get("claim", item.get("text", str(item)))
+                        source = item.get("source", "")
+                        return f"{claim} ({source})" if source else claim
+                    return str(item)
+                claims_text = "\n".join(f"  - {_claim_text(c)}" for c in (claims or [])) or "  (no claims)"
                 blocks.append(
                     f"### [{hand_id}] confidence={confidence}\n"
                     f"sources: {sources}\n"
@@ -262,7 +643,10 @@ class BrainHarness:
             '"key_drivers":[{"rule":"<strategy rule id or text>","hand":"<hand_id>","claim":"<specific claim>"}],'
             '"reversal_condition":"...",'
             '"strategy_refs":["rule-id-1"],'
-            '"clarifying_question":null}'
+            '"clarifying_question":null,'
+            '"regime_relevance":"当前 regime 为何使本次问题权重异常（≤80字符，无信号时填空字符串）",'
+            '"watch_conditions":["需要持续监控的变量或事件，2-3条，无则空数组"],'
+            '"priority_signal":"本次分析的最高优先级信号，一句话（无明确信号时填空字符串）"}'
         )
 
         resp = await client.messages.create(
