@@ -218,6 +218,9 @@
           <p>选择一个 Hand 开始分析</p>
           <p style="font-size:12px;margin-top:8px;color:#d1d5db">结果将显示在此处，同时 patch 到主 webview</p>
         </div>
+        <section class="anc-section anc-section--gc" data-anc="brain-state-engine" data-handles="refine,expand" style="min-height:48px;display:none">
+          <!-- Brain 分析完成后由 State Engine 填充 -->
+        </section>
       </div>
 
       <!-- Config main -->
@@ -534,7 +537,9 @@
           <div class="detail-grid">
             <div class="detail-block">
               <h4>关键判断</h4>
-              <ul>${claims.length ? claims.map(c=>`<li>• ${esc(c)}</li>`).join('') : '<li style="color:#9ca3af">无结构化判断</li>'}</ul>
+              const claimText = c => typeof c==='string' ? c : (c.claim||c.source||'');
+              const claimTier = c => c&&typeof c==='object'&&c.tier ? ` <span class="tier-pill" style="font-size:10px;padding:1px 6px;border-radius:999px;background:#e5e7eb;color:#374151;font-weight:600">${c.tier}</span>` : '';
+              <ul>${claims.length ? claims.map(c=>`<li>• ${claimText(c)}${claimTier(c)}</li>`).join('') : '<li style="color:#9ca3af">无结构化判断</li>'}</ul>
             </div>
             <div class="detail-block">
               <h4>数据缺口</h4>

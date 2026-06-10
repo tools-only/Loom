@@ -2040,6 +2040,8 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
     detail_sections_html = _render_artifact_sections(artifact, narrative, claims_html)
     evidence_html = _render_evidence_section(artifact)
     source_notes_html = _render_source_notes(meta, sources_html)
+    raw_sources_html = _render_raw_sources(artifact)
+    raw_items_html = _render_raw_items(artifact)
 
     if overview_only:
         # True summary: pill + title + narrative only visible; detail in aside
@@ -2051,6 +2053,8 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
   <h2>{label}</h2>
   <div class="insight-box"><p>{_html_text(narrative)}</p></div>
   <aside class="anc-detail" hidden>
+    {raw_sources_html}
+    {raw_items_html}
     {detail_sections_html}
     {evidence_html}
     <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources">
@@ -2077,6 +2081,8 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
   <ul class="risk-list">{gaps_html}</ul>
   <p>数据来源：{sources_html} ｜ {ts}</p>
   <aside class="anc-detail" hidden>
+    {raw_sources_html}
+    {raw_items_html}
     {detail_sections_html}
     {evidence_html}
     <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources">
