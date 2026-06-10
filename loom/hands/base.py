@@ -142,6 +142,7 @@ class BaseHand:
         system = self._assemble_prompt(context)
         shown = [r["resource_id"] for r in resource_menu]
         used: list[str] = []
+        raw_sources: list[dict] = []
 
         # web_search is Anthropic-only built-in; OAI-compat providers skip it
         tools: list[dict] = [FETCH_RESOURCE_TOOL, FETCH_URL_TOOL]
@@ -166,21 +167,27 @@ class BaseHand:
             '    "source_notes": [{"source":"...", "tier":"A|B|C|D|E|F|G|unknown", "freshness":"...", "note":"..."}]\n'
             "  },\n"
             '  "narrative": "2-4 sentence high-level judgment for the visible Loom card.",\n'
-            '  "sections": [\n'
-            '    {"id":"summary", "title":"High-level judgment", "summary":"...", "bullets":["string bullet", {"claim":"sourced bullet","source":"FRED","tier":"A"}]},\n'
-            '    {"id":"evidence", "title":"Evidence and data support", "summary":"...", "bullets":[...]},\n'
-            '    {"id":"analysis", "title":"Detailed analysis", "summary":"...", "bullets":[...]},\n'
-            '    {"id":"gaps", "title":"Coverage gaps", "summary":"...", "bullets":[...]}\n'
+            '  "layers": [\n'
+            '    {"layer_id":"summary",  "layer_type":"summary",  "title":"High-level judgment",  "summary":"...", "items":[{"claim":"sourced bullet","source":"FRED","tier":"A"}]},\n'
+            '    {"layer_id":"evidence", "layer_type":"evidence", "title":"Evidence and data",     "summary":"...", "items":[{"claim":"...","support":"...","source":"...","source_tier":"A","freshness":"..."}]},\n'
+            '    {"layer_id":"analysis", "layer_type":"analysis", "title":"Detailed analysis",     "summary":"...", "items":[{"claim":"...","source":"...","tier":"B"}]},\n'
+            '    {"layer_id":"gaps",     "layer_type":"gaps",     "title":"Coverage gaps",         "summary":"...", "items":[{"claim":"gap description"}]}\n'
             "  ],\n"
-            '  "evidence": [{"claim":"...", "support":"...", "source":"...", "source_tier":"A|B|C|D|E|F|G|unknown", "freshness":"...", "confidence":0.0}]\n'
+            '  "raw_items": [\n'
+            '    {"item_type":"data_point","label":"10Y Treasury","value":"4.52%","source":"FRED","tier":"A","freshness":"2026-06-10","relevance":"rate regime anchor"},\n'
+            '    {"item_type":"news","title":"Fed holds rates","source":"Reuters","tier":"C","published_at":"2026-06-10","summary":"首句摘要","relevance":"regime signal","url":""},\n'
+            '    {"item_type":"tweet","author":"@handle","text":"原文","source":"web_search","tier":"E","published_at":"","relevance":"sentiment signal"},\n'
+            '    {"item_type":"search_snippet","title":"标题","summary":"snippet","source":"web_search","tier":"C","published_at":"","relevance":"context"}\n'
+            "  ]\n"
             "}\n"
             "Minimum information density:\n"
             "- metadata.key_claims: 3-5 data-backed claims, each with source and tier.\n"
             "- metadata.source_notes: at least 3 source notes when any source/data was available.\n"
-            "- sections: at least 4 sections, each with summary plus at least 3 bullets.\n"
-            "- evidence: at least 5 evidence rows when data was available.\n"
+            "- layers: at least 4 layers (summary/evidence/analysis/gaps), each with summary plus at least 3 items.\n"
+            "- layers[evidence].items: at least 5 items when data was available.\n"
+            "- raw_items: at least 5 entries covering sources used; data_point must have value; all entries must have relevance.\n"
             "- If data was unavailable, fill gaps with the exact missing data and explain what could not be expanded.\n"
-            "The visible narrative must be short. Put the deeper support in sections/evidence."
+            "The visible narrative must be short. Put the deeper support in layers/raw_items."
         )
 
         messages: list[dict] = [{"role": "user", "content": "\n".join(user_parts)}]
@@ -216,6 +223,14 @@ class BaseHand:
                         data = await get_connector_data(rid, params)
                         if rid and rid not in used:
                             used.append(rid)
+                        import datetime as _dt
+                        raw_sources.append({
+                            "resource_id": rid,
+                            "fetched_at": _dt.datetime.utcnow().isoformat() + "Z",
+                            "content_type": "json",
+                            "summary": BaseHand._summarize_raw(data),
+                            "raw": data,
+                        })
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
@@ -229,6 +244,14 @@ class BaseHand:
                     elif block.name == "fetch_url":
                         url = block.input.get("url", "")
                         content = await _fetch_url(url)
+                        import datetime as _dt
+                        raw_sources.append({
+                            "resource_id": "fetch_url",
+                            "url": url,
+                            "fetched_at": _dt.datetime.utcnow().isoformat() + "Z",
+                            "content_type": "html",
+                            "raw": content,
+                        })
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
@@ -248,6 +271,7 @@ class BaseHand:
                     messages.append({"role": "user", "content": tool_results})
 
         artifact = self._parse_artifact(final_text)
+        artifact["raw_sources"] = raw_sources
         density_gaps = self._artifact_density_gaps(artifact, used, shown)
         if density_gaps:
             artifact = await self._repair_low_density_artifact(
@@ -348,6 +372,8 @@ class BaseHand:
                 gaps.append("Artifact density low: sparse section bullets in " + ", ".join(sparse[:4]))
         if used_resources and len(evidence or []) < 5:
             gaps.append("Artifact density low: fewer than 5 evidence rows returned despite resource usage")
+        if used_resources and len(artifact.get("raw_items", []) or []) < 5:
+            gaps.append("raw_items density low: fewer than 5 annotated raw items despite resource usage")
         return gaps
 
     @staticmethod
@@ -368,6 +394,15 @@ class BaseHand:
         )
         score += min(len(evidence), 5)
         return score
+
+    @staticmethod
+    def _summarize_raw(data) -> str:
+        text = (
+            json.dumps(data, ensure_ascii=False)
+            if not isinstance(data, str)
+            else data
+        )
+        return text[:200].rstrip() + ("…" if len(text) > 200 else "")
 
     @staticmethod
     def _normalize_artifact(data: dict) -> dict:

@@ -138,6 +138,91 @@ class HandArtifactDensityTests(unittest.TestCase):
         self.assertEqual(result["raw_sources"], [])
         self.assertEqual(result["raw_items"], [])
 
+    def test_density_gap_caught_for_missing_raw_items(self):
+        """Artifact with used resources but < 5 raw_items triggers density gap."""
+        art = {
+            "metadata": {
+                "confidence": 0.8,
+                "key_claims": ["c1", "c2", "c3"],
+                "source_notes": [
+                    {"source": "fred", "tier": "A", "freshness": "today", "note": ""},
+                    {"source": "finnhub", "tier": "B", "freshness": "today", "note": ""},
+                    {"source": "reuters-rss", "tier": "C", "freshness": "today", "note": ""},
+                ],
+                "gaps": [],
+            },
+            "narrative": "test",
+            "sections": [
+                {"id": "summary", "title": "S", "summary": "s", "bullets": ["a", "b", "c"]},
+                {"id": "evidence", "title": "E", "summary": "e", "bullets": ["a", "b", "c"]},
+                {"id": "analysis", "title": "A", "summary": "a", "bullets": ["a", "b", "c"]},
+                {"id": "gaps", "title": "G", "summary": "g", "bullets": ["a", "b", "c"]},
+            ],
+            "evidence": [
+                {"claim": f"c{i}", "support": "s", "source": "fred",
+                 "source_tier": "A", "freshness": "today", "confidence": 0.8}
+                for i in range(5)
+            ],
+            "raw_items": [],
+        }
+        gaps = BaseHand._artifact_density_gaps(
+            art,
+            used_resources=["fred", "finnhub"],
+            shown_resources=["fred", "finnhub"],
+        )
+        self.assertTrue(any("raw_items" in g for g in gaps))
+
+    def test_density_no_gap_with_sufficient_raw_items(self):
+        """Artifact with >= 5 raw_items does not trigger raw_items density gap."""
+        art = {
+            "metadata": {
+                "confidence": 0.8,
+                "key_claims": ["c1", "c2", "c3"],
+                "source_notes": [
+                    {"source": "fred", "tier": "A", "freshness": "today", "note": ""},
+                    {"source": "finnhub", "tier": "B", "freshness": "today", "note": ""},
+                    {"source": "reuters-rss", "tier": "C", "freshness": "today", "note": ""},
+                ],
+                "gaps": [],
+            },
+            "narrative": "test",
+            "sections": [
+                {"id": "summary", "title": "S", "summary": "s", "bullets": ["a", "b", "c"]},
+                {"id": "evidence", "title": "E", "summary": "e", "bullets": ["a", "b", "c"]},
+                {"id": "analysis", "title": "A", "summary": "a", "bullets": ["a", "b", "c"]},
+                {"id": "gaps", "title": "G", "summary": "g", "bullets": ["a", "b", "c"]},
+            ],
+            "evidence": [
+                {"claim": f"c{i}", "support": "s", "source": "fred",
+                 "source_tier": "A", "freshness": "today", "confidence": 0.8}
+                for i in range(5)
+            ],
+            "raw_items": [
+                {"item_type": "news", "title": f"News {i}", "source": "reuters-rss",
+                 "tier": "C", "published_at": "2026-06-11", "summary": "s", "relevance": "r"}
+                for i in range(5)
+            ],
+        }
+        gaps = BaseHand._artifact_density_gaps(
+            art,
+            used_resources=["fred", "finnhub"],
+            shown_resources=["fred", "finnhub"],
+        )
+        self.assertFalse(any("raw_items" in g for g in gaps))
+
+    def test_summarize_raw_truncates_long_json(self):
+        """_summarize_raw truncates content > 200 chars and appends ellipsis."""
+        data = {"key": "x" * 300}
+        result = BaseHand._summarize_raw(data)
+        self.assertLessEqual(len(result), 204)
+        self.assertTrue(result.endswith("…"))
+
+    def test_summarize_raw_short_passthrough(self):
+        """_summarize_raw returns full content when <= 200 chars."""
+        data = {"key": "short"}
+        result = BaseHand._summarize_raw(data)
+        self.assertNotIn("…", result)
+
 
 if __name__ == "__main__":
     unittest.main()
