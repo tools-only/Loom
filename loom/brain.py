@@ -19,9 +19,17 @@ import asyncio
 import datetime
 import html
 import json
+import sys
 import time
 import urllib.parse
 from pathlib import Path
+
+_LOOM_DIR = Path(__file__).resolve().parent
+if str(_LOOM_DIR) not in sys.path:
+    sys.path.insert(0, str(_LOOM_DIR))
+_bridge_module = sys.modules.get("bridge")
+if _bridge_module is not None and not hasattr(_bridge_module, "patch_webview"):
+    del sys.modules["bridge"]
 
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
@@ -37,7 +45,6 @@ from hands.target import TargetHand
 from hands.position import PositionHand
 
 # --- Loom Core in-process runtime ---
-import sys
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))

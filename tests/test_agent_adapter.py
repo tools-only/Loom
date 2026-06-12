@@ -174,13 +174,16 @@ class HttpOpenAITests(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("401", errors[0]["message"])
 
-    def test_missing_artifact_yields_run_error(self):
+    def test_missing_artifact_wraps_plain_text_as_narrative_artifact(self):
         content = "Sorry, I cannot help with that."
         adapter = self._adapter(self._chatcompletion(content))
         events = asyncio.run(self._collect(adapter))
         errors = [e for e in events if e["type"] == "run.error"]
-        self.assertEqual(len(errors), 1)
-        self.assertIn("run.artifact", errors[0]["message"])
+        artifacts = [e for e in events if e["type"] == "run.artifact"]
+        self.assertEqual([], errors)
+        self.assertEqual(len(artifacts), 1)
+        self.assertEqual("Sorry, I cannot help with that.", artifacts[0]["artifact"]["narrative"])
+        self.assertIn("hand agent did not return structured JSON", artifacts[0]["artifact"]["metadata"]["gaps"])
 
     def test_system_prompt_sent_in_messages(self):
         captured: dict = {}
@@ -202,8 +205,32 @@ class HttpOpenAITests(unittest.TestCase):
         )
         asyncio.run(self._collect(adapter))
         messages = captured["body"]["messages"]
-        self.assertEqual(messages[0]["role"], "system")
-        self.assertEqual(messages[0]["content"], "custom-prompt")
+        self.assertEqual(1, len(messages))
+        self.assertEqual(messages[0]["role"], "user")
+        self.assertTrue(messages[0]["content"].startswith("custom-prompt\n\n"))
+
+    def test_per_call_system_prompt_overrides_bound_prompt(self):
+        captured: dict = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["body"] = json.loads(request.content)
+            artifact_line = json.dumps({"type": "run.artifact", "artifact": {}})
+            return httpx.Response(200, content=json.dumps({
+                "choices": [{"message": {"content": artifact_line}}]
+            }).encode())
+
+        adapter = AgentAdapter(
+            adapter_id="test-sp-override",
+            transport="http",
+            protocol="openai",
+            endpoint="https://x.example.com/v1/chat/completions",
+            system_prompt="bound-prompt",
+            _transport=httpx.MockTransport(handler=handler),
+        )
+        asyncio.run(self._collect(adapter, task_overrides={"system_prompt": "runtime-prompt"}))
+        content = captured["body"]["messages"][0]["content"]
+        self.assertTrue(content.startswith("runtime-prompt\n\n"))
+        self.assertNotIn("bound-prompt", content)
 
     def test_bearer_token_sent(self):
         captured: dict = {}
@@ -247,9 +274,12 @@ class HttpOpenAITests(unittest.TestCase):
             self.assertTrue(wiki_file.exists())
             self.assertEqual(wiki_file.read_text(), "hello")
 
-    async def _collect(self, adapter, hand_id="market"):
+    async def _collect(self, adapter, hand_id="market", task_overrides=None):
         events = []
-        async for e in adapter.invoke({"task": "test", "hand_id": hand_id}):
+        task = {"task": "test", "hand_id": hand_id}
+        if task_overrides:
+            task.update(task_overrides)
+        async for e in adapter.invoke(task):
             events.append(e)
         return events
 

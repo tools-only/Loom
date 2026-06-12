@@ -31,10 +31,10 @@ class HandArtifactDensityTests(unittest.TestCase):
             shown_resources=["market-feed", "rates-feed"],
         )
 
-        self.assertTrue(any("key_claims" in gap for gap in gaps))
-        self.assertTrue(any("source_notes" in gap for gap in gaps))
-        self.assertTrue(any("drill-down sections" in gap for gap in gaps))
-        self.assertTrue(any("evidence rows" in gap for gap in gaps))
+        self.assertTrue(any("L3" in gap and "key_claims" in gap for gap in gaps))
+        self.assertTrue(any("L2" in gap and "source_notes" in gap for gap in gaps))
+        self.assertTrue(any("L2" in gap and "sections" in gap for gap in gaps))
+        self.assertTrue(any("L1" in gap and "evidence" in gap for gap in gaps))
 
     def test_dense_artifact_has_no_density_gaps(self):
         dense = {
@@ -60,6 +60,12 @@ class HandArtifactDensityTests(unittest.TestCase):
                 {"claim": "c3", "support": "s", "source": "rates-feed", "source_tier": "A", "freshness": "today", "confidence": 0.8},
                 {"claim": "c4", "support": "s", "source": "rates-feed", "source_tier": "A", "freshness": "today", "confidence": 0.8},
                 {"claim": "c5", "support": "s", "source": "market-feed", "source_tier": "A", "freshness": "today", "confidence": 0.8},
+            ],
+            "raw_items": [
+                {"item_type": "news", "title": f"News {i}", "source": "reuters-rss",
+                 "tier": "C", "published_at": "2026-06-11", "summary": "s", "relevance": "r",
+                 "url": f"https://example.com/news/{i}"}
+                for i in range(5)
             ],
         }
 
@@ -170,7 +176,7 @@ class HandArtifactDensityTests(unittest.TestCase):
             used_resources=["fred", "finnhub"],
             shown_resources=["fred", "finnhub"],
         )
-        self.assertTrue(any("raw_items" in g for g in gaps))
+        self.assertTrue(any("L0" in g and "raw items" in g for g in gaps))
 
     def test_density_no_gap_with_sufficient_raw_items(self):
         """Artifact with >= 5 raw_items does not trigger raw_items density gap."""
@@ -199,7 +205,8 @@ class HandArtifactDensityTests(unittest.TestCase):
             ],
             "raw_items": [
                 {"item_type": "news", "title": f"News {i}", "source": "reuters-rss",
-                 "tier": "C", "published_at": "2026-06-11", "summary": "s", "relevance": "r"}
+                 "tier": "C", "published_at": "2026-06-11", "summary": "s", "relevance": "r",
+                 "url": f"https://example.com/news/{i}"}
                 for i in range(5)
             ],
         }
