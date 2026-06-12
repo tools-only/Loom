@@ -1,16 +1,13 @@
-"""WorkflowResolver — domain-aware hand dispatch strategy.
+"""WorkflowResolver - domain-aware state scope and executor discovery.
 
-Priority order for domain resolution:
-  1. context["domain_hint"]  — caller-provided, skips all inference
-  2. Keyword match           — cheap regex scan over workflows
-  3. LLM classification      — one cheap LLM call as fallback
+The resolver deliberately does not decide the task breakdown. It identifies a
+broad domain, state scope, and executor shells available to Brain's planner.
+Brain then derives dimensions/rubrics/tasks from state.
 """
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
-
 
 
 class WorkflowResolver:
@@ -37,52 +34,23 @@ class WorkflowResolver:
         return {**self._builtin, **self._load_user_overrides()}
 
     def _materialize(self, domain: str, cfg: dict, rationale: str) -> dict:
-        mode = cfg.get("mode", "dynamic")
-        if mode == "full_fanout":
-            hands = cfg.get("hands") or [
-                hid for hid, info in self._registry.items()
-                if domain in info.get("domains", [])
-            ]
-        else:
-            hands = cfg.get("hands_pool") or list(self._registry.keys())
         return {
             "domain": domain,
-            "mode": mode,
-            "hands": [h for h in hands if h in self._registry],
+            "mode": cfg.get("mode", "state_driven"),
+            "state_scope": cfg.get("state_scope", [domain]),
             "rationale": rationale,
         }
 
     async def resolve(self, question: str, context: dict) -> dict:
-        """Return {domain, mode, hands, rationale}."""
+        """Return {domain, mode, state_scope, rationale}."""
         merged = self._merged()
 
-        # 1. Explicit hint
         hint = context.get("domain_hint", "")
         if hint and hint in merged:
             return self._materialize(hint, merged[hint], rationale=f"caller domain_hint={hint!r}")
 
-        # 2. Keyword match
-        for domain, cfg in merged.items():
-            for kw in cfg.get("trigger_keywords", []):
-                if re.search(kw, question, re.IGNORECASE):
-                    return self._materialize(
-                        domain, cfg, rationale=f"keyword match: {kw!r}"
-                    )
-
-        # 3. Explicit hand list in context
-        if context.get("hands"):
-            hands = [h for h in context["hands"] if h in self._registry]
-            if hands:
-                return {
-                    "domain": "explicit",
-                    "mode": "explicit",
-                    "hands": hands,
-                    "rationale": "caller-provided hand list",
-                }
-
-        # 4. LLM classification
         domain = await self._classify_llm(question, list(merged.keys()))
-        cfg = merged.get(domain, merged.get("general", {"mode": "dynamic"}))
+        cfg = merged.get(domain, merged.get("general", {"mode": "state_driven"}))
         return self._materialize(domain, cfg, rationale="LLM domain classification")
 
     async def _classify_llm(self, question: str, domains: list[str]) -> str:
@@ -91,7 +59,7 @@ class WorkflowResolver:
             model=self._model,
             max_tokens=16,
             system=(
-                "You classify user questions into task domains. "
+                "You classify user questions into broad state domains. "
                 f"Valid domains: {domains_str}. "
                 "Reply with ONLY the domain name, nothing else."
             ),
