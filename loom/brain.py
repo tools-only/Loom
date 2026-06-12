@@ -121,7 +121,7 @@ from brain_harness.flywheel import FlywheelRecord, FlywheelWriter
 from loom_core.agents.core_agent import LoomCoreAgent
 
 _brain_harness = BrainHarness(_ROOT)
-_brain_client, _brain_model = get_client_for_brain()
+# _brain_client / _brain_model were initialized above for brain-inline adapter
 _brain_resolver = WorkflowResolver(_ROOT, REGISTRY, _brain_client, _brain_model)
 _brain_distiller = ResourceDistiller(_ROOT, _brain_client, _brain_model)
 _intent_stream = IntentStream(_ROOT / "brain" / "context" / "intent-stream.jsonl")

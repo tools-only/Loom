@@ -122,6 +122,7 @@ def create_brain_inline_provider(
             model=model,
             max_tokens=max_tokens,
             system=sys_prompt,
+            tools=[],
             messages=[{"role": "user", "content": user_msg}],
         )
 
