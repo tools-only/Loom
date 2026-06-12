@@ -72,12 +72,14 @@ class AgentAdapter:
         hands_root: Path | None = None,
         system_prompt: str | None = None,
         capabilities: list[str] | None = None,
+        hw_capabilities: dict[str, bool] | None = None,
         _transport: Any = None,
     ) -> None:
         if not adapter_id:
             raise ValueError("adapter_id must be non-empty")
         self.id = adapter_id
         self.capabilities = capabilities or []
+        self.hw_capabilities: dict[str, bool] = hw_capabilities or {}
         self._transport_kind = transport
         self._protocol = protocol
         self._command = list(command or [])
@@ -209,9 +211,14 @@ class AgentAdapter:
             },
             ensure_ascii=False,
         )
+        # Per-call system_prompt from envelope overrides the adapter's bound
+        # default (LOOM_HAND_CONTRACT or constructor-supplied). This lets Brain
+        # inject a freshly-synthesized hand spec per AtomicTask while keeping
+        # mounted adapters backward-compatible when the envelope omits the key.
+        system_prompt = task.get("system_prompt") or self._system_prompt
         # Merge system prompt + task into one user message — many OAI-compat
         # agents (DeepSeek, nanobot) reject system role or multi-message.
-        merged = f"{self._system_prompt}\n\n{user_content}"
+        merged = f"{system_prompt}\n\n{user_content}"
         body: dict[str, Any] = {
             "messages": [{"role": "user", "content": merged}],
             "stream": False,
@@ -316,7 +323,7 @@ class AgentAdapter:
             except (KeyError, AttributeError):
                 pass
 
-        return {
+        snapshot: dict[str, Any] = {
             "task": task.get("task", ""),
             "context": task.get("context", {}),
             "hand_id": hand_id,
@@ -325,6 +332,13 @@ class AgentAdapter:
             "feedback_recent": feedback_recent,
             "resources": resources,
         }
+        # Per-call system_prompt overrides the adapter's bound default. Only
+        # included when explicitly provided in the envelope so that mounted
+        # adapters continue producing byte-identical snapshots otherwise.
+        envelope_system_prompt = task.get("system_prompt")
+        if envelope_system_prompt:
+            snapshot["system_prompt"] = envelope_system_prompt
+        return snapshot
 
     def _read_cloud_json(self, hand_dir: Path | None) -> dict:
         if hand_dir is None:
