@@ -20,6 +20,7 @@ import datetime
 import html
 import json
 import time
+import urllib.parse
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -119,6 +120,7 @@ from brain_harness.intent_wiki import IntentWiki
 from brain_harness.goal_context import GoalContextStore
 from brain_harness.flywheel import FlywheelRecord, FlywheelWriter
 from loom_core.agents.core_agent import LoomCoreAgent
+from brain_portfolio import PortfolioDataHub
 
 _brain_harness = BrainHarness(_ROOT)
 # _brain_client / _brain_model were initialized above for brain-inline adapter
@@ -132,10 +134,86 @@ _brain_harness._intent_stream = _intent_stream  # inject stream into harness pro
 
 _goal_store = GoalContextStore(_ROOT)
 _flywheel = FlywheelWriter(_ROOT)
+_portfolio_hub = PortfolioDataHub(_ROOT)
+
+
+def _with_brain_portfolio_context(hand_id: str, context: dict) -> dict:
+    """Attach Brain-owned, redacted portfolio context for portfolio-capable hands.
+
+    Capability-based check: a hand receives portfolio context when its
+    ``agentic_hand_spec`` declares ``portfolio`` in ``capabilities`` (or sets
+    ``needs_portfolio: true``). The literal ``hand_id == "position"`` fallback
+    is kept for backward compatibility during the runtime-hand transition.
+    """
+    spec = (context or {}).get("agentic_hand_spec", {}) or {}
+    needs_portfolio = (
+        "portfolio" in (spec.get("capabilities") or [])
+        or bool(spec.get("needs_portfolio"))
+        or hand_id == "position"  # backward compat during transition
+    )
+    if not needs_portfolio:
+        return context
+    payload = _portfolio_hub.build_hand_payload()
+    if not payload.get("portfolio_summary", {}).get("position_count"):
+        return context
+    next_context = dict(context or {})
+    next_context["portfolio_data"] = payload
+    next_context["position_data"] = json.dumps(payload, ensure_ascii=False)
+    next_context["data_policy"] = {
+        "owner": "brain",
+        "hand_visibility": "redacted_summary_only",
+        "raw_user_data": "not_shared",
+        "credentials": "not_shared",
+    }
+    tags = list(next_context.get("tags", []) or [])
+    if "portfolio" not in tags:
+        tags.append("portfolio")
+    next_context["tags"] = tags
+    return next_context
 
 
 async def _brain_hand_runner(hand_id: str, task: str, ctx: dict) -> dict:
-    """Run a single hand for Brain's /analyze — reuses sdk path."""
+    """Run a single hand for Brain's /analyze — reuses sdk path.
+
+    Routing precedence:
+      1. ``hand_id in REGISTRY`` → existing SDK / mounted-adapter path
+      2. ``hand_id in _mounted`` → existing mounted-adapter path
+      3. Otherwise (Brain-generated runtime hand) → route to ``brain-inline``
+         adapter using the spec's ``system_prompt`` (synthesized from the
+         declared dimension when absent).
+    """
+    ctx = _with_brain_portfolio_context(hand_id, ctx)
+
+    # Runtime-generated hand: not registered statically and not mounted.
+    if hand_id not in REGISTRY and hand_id not in _mounted:
+        spec = (ctx or {}).get("agentic_hand_spec", {}) or {}
+        system_prompt = spec.get("system_prompt", "") or ""
+        if not system_prompt:
+            dimension = spec.get("dimension", "general") or "general"
+            system_prompt = (
+                f"You are a Brain-generated analysis agent for dimension: {dimension}. "
+                "Produce a run.artifact JSON with narrative and metadata."
+            )
+        adapter = _adapter_registry.find_by_id("brain-inline")
+        if adapter is None:
+            raise RuntimeError("brain-inline adapter not registered")
+        envelope = {
+            "task": task,
+            "context": ctx,
+            "hand_id": hand_id,
+            "system_prompt": system_prompt,
+            "resource_api": "http://127.0.0.1:3001/resources",
+        }
+        artifact = None
+        async for event in adapter.invoke(envelope):
+            if event.get("type") == "run.artifact":
+                artifact = event.get("artifact")
+            elif event.get("type") == "run.error":
+                raise RuntimeError(event.get("message", "adapter error"))
+        if artifact is None:
+            raise RuntimeError(f"hand {hand_id} returned no artifact")
+        return artifact
+
     info = REGISTRY.get(hand_id, {})
     runtime = _mounted.get(hand_id) or info.get("runtime", "sdk")
     if runtime == "sdk":
@@ -461,7 +539,7 @@ def _render_state_engine(state_engine: dict) -> str:
 
 
 def _render_raw_sources(artifact: dict) -> str:
-    """Render raw_sources as an L2 detail section. Returns '' when empty."""
+    """Render raw_sources as a raw detail section. Returns '' when empty."""
     sources = artifact.get("raw_sources") or []
     if not sources:
         return ""
@@ -471,10 +549,20 @@ def _render_raw_sources(artifact: dict) -> str:
         ts = html.escape(str(s.get("fetched_at", "")))
         ct = html.escape(str(s.get("content_type", "")))
         summary = html.escape(str(s.get("summary", "")))
+        url = s.get("url", "")
+        query = s.get("query", "")
+        url_html = ""
+        if url:
+            url_str = html.escape(str(url))
+            url_html = f'<br><a href="{url_str}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent-iris)">🔗 {url_str}</a>'
+        if query:
+            query_str = html.escape(str(query))
+            url_html += f'<br><span style="font-size:11px;color:var(--ink-muted)">搜索词: {query_str}</span>'
         parts.append(
             f'<div class="anc-source-row" data-layer-type="raw_source">'
             f'<strong>{rid}</strong>'
             f'<span style="font-size:11px;color:var(--ink-muted)"> [{ct}] {ts}</span>'
+            f'{url_html}'
             f'<p style="margin:2px 0 0">{summary}</p>'
             f'</div>'
         )
@@ -487,7 +575,7 @@ def _render_raw_sources(artifact: dict) -> str:
 
 
 def _render_raw_items(artifact: dict) -> str:
-    """Render raw_items as an L2 detail section. Returns '' when empty."""
+    """Render raw_items as a raw detail section. Returns '' when empty."""
     items = artifact.get("raw_items") or []
     if not items:
         return ""
@@ -501,9 +589,14 @@ def _render_raw_items(artifact: dict) -> str:
             source = html.escape(str(item.get("source", "")))
             pub = html.escape(str(item.get("published_at", "")))
             summary = html.escape(str(item.get("summary", "")))
+            item_url = item.get("url", "")
+            title_html = (
+                f'<a href="{html.escape(item_url)}" target="_blank" rel="noopener">{title_text}</a>'
+                if item_url else f'<strong>{title_text}</strong>'
+            )
             parts.append(
                 f'<div class="anc-raw-item" data-layer-type="raw_item" data-item-type="news">'
-                f'<strong>{title_text}</strong>'
+                f'{title_html}'
                 f'<span class="anc-pill anc-pill--review" style="font-size:10px">Tier {tier}</span>'
                 f'<span style="font-size:11px;color:var(--ink-muted)"> {source} · {pub}</span>'
                 f'<p style="margin:2px 0 0">{summary}</p>'
@@ -525,10 +618,17 @@ def _render_raw_items(artifact: dict) -> str:
             )
         else:
             text = html.escape(str(item.get("title", item.get("label", ""))))
+            item_url = item.get("url", "")
+            item_summary = html.escape(str(item.get("summary", item.get("text", ""))))
+            title_html = (
+                f'<a href="{html.escape(item_url)}" target="_blank" rel="noopener">{text}</a>'
+                if item_url else f'<span>{text}</span>'
+            )
             parts.append(
                 f'<div class="anc-raw-item" data-layer-type="raw_item">'
-                f'<span>{text}</span>'
+                f'{title_html}'
                 f'<span class="anc-pill anc-pill--review" style="font-size:10px">Tier {tier}</span>'
+                f'{("<p style=\"margin:2px 0 0;font-size:12px\">" + item_summary + "</p>") if item_summary else ""}'
                 f'<p style="font-size:11px;color:var(--accent-iris)">{relevance}</p>'
                 f'</div>'
             )
@@ -656,6 +756,35 @@ class RunRequest(BaseModel):
     runtime: str = ""
 
 
+class PortfolioSourceRequest(BaseModel):
+    id: str = ""
+    type: str = "local_file"
+    name: str = ""
+    api_token: str = ""
+    oauth_token: str = ""
+    access_token: str = ""
+    document_id: str = ""
+    sheet_name: str = ""
+    database_id: str = ""
+    page_id: str = ""
+    sync_mode: str = "manual"
+    file_name: str = ""
+    mime_type: str = ""
+    label: str = ""
+
+
+class PortfolioImportTextRequest(BaseModel):
+    text: str
+    source_id: str = "manual"
+
+
+class PortfolioImportFileRequest(BaseModel):
+    file_name: str
+    mime_type: str = ""
+    content_base64: str
+    source_id: str = "local-upload"
+
+
 class TimingRequest(BaseModel):
     timing: dict
 
@@ -709,6 +838,191 @@ async def intent_capture(req: IntentCaptureRequest):
         req.input_type, req.raw_input, req.extra_context, req.session_id, anchor_context
     ))
     return {"ok": True}
+
+
+@app.get("/portfolio/sources")
+async def portfolio_sources():
+    return {"ok": True, "sources": _portfolio_hub.list_sources()}
+
+
+@app.post("/portfolio/sources")
+async def portfolio_source_upsert(req: PortfolioSourceRequest):
+    source = _portfolio_hub.upsert_source(req.model_dump())
+    return {"ok": True, "source": source, "sources": _portfolio_hub.list_sources()}
+
+
+@app.get("/portfolio/snapshot")
+async def portfolio_snapshot():
+    return {"ok": True, "snapshot": _portfolio_hub.get_snapshot()}
+
+
+@app.post("/portfolio/import-text")
+async def portfolio_import_text(req: PortfolioImportTextRequest):
+    snapshot = _portfolio_hub.import_position_text(req.text, source_id=req.source_id)
+    return {"ok": True, "snapshot": snapshot, "hand_payload": _portfolio_hub.build_hand_payload()}
+
+
+@app.post("/portfolio/import-file")
+async def portfolio_import_file(req: PortfolioImportFileRequest):
+    snapshot = _portfolio_hub.import_file(req.model_dump())
+    return {"ok": True, "snapshot": snapshot, "hand_payload": _portfolio_hub.build_hand_payload()}
+
+
+@app.get("/portfolio/hand-payload")
+async def portfolio_hand_payload():
+    return {"ok": True, "payload": _portfolio_hub.build_hand_payload()}
+
+
+# ── OAuth 2.0 ─────────────────────────────────────────────────────────────────
+
+_OAUTH_CLIENTS_PATH = _ROOT / "brain" / "oauth_clients.json"
+
+
+def _load_oauth_clients() -> dict:
+    try:
+        return json.loads(_OAUTH_CLIENTS_PATH.read_text())
+    except Exception:
+        return {}
+
+
+def _save_oauth_clients(data: dict) -> None:
+    _OAUTH_CLIENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _OAUTH_CLIENTS_PATH.write_text(json.dumps(data, indent=2))
+
+
+def _oauth_done_page(provider: str, source_id: str, ok: bool, error: str = "") -> str:
+    safe_prov = html.escape(provider.title())
+    msg_js = json.dumps({"ok": ok, "source_id": source_id, "provider": provider})
+    if ok:
+        return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>授权完成</title>
+<style>body{{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc}}
+.card{{background:#fff;border-radius:16px;padding:40px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:320px}}
+.icon{{font-size:48px;margin-bottom:16px}}h2{{margin:0 0 8px;color:#1a1a2e}}p{{color:#666;font-size:14px}}</style>
+</head><body><div class="card"><div class="icon">✅</div><h2>授权成功</h2>
+<p>已连接到 {safe_prov}，此窗口将自动关闭。</p></div>
+<script>if(window.opener){{window.opener.postMessage({msg_js},'*')}}setTimeout(()=>window.close(),1500)</script>
+</body></html>"""
+    safe_err = html.escape(error)
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>授权失败</title>
+<style>body{{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc}}
+.card{{background:#fff;border-radius:16px;padding:40px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:320px}}
+.icon{{font-size:48px;margin-bottom:16px}}h2{{margin:0 0 8px;color:#1a1a2e}}p{{color:#e53e3e;font-size:14px}}
+button{{margin-top:16px;padding:8px 20px;border-radius:8px;border:1px solid #ddd;cursor:pointer}}</style>
+</head><body><div class="card"><div class="icon">❌</div><h2>授权失败</h2>
+<p>{safe_err}</p><button onclick="window.close()">关闭</button></div>
+</body></html>"""
+
+
+class OAuthClientRequest(BaseModel):
+    provider: str
+    client_id: str
+    client_secret: str
+
+
+@app.get("/oauth/clients")
+async def oauth_clients_get():
+    data = _load_oauth_clients()
+    return {"ok": True, "clients": {p: {"configured": bool(cfg.get("client_id"))} for p, cfg in data.items()}}
+
+
+@app.post("/oauth/clients")
+async def oauth_clients_post(req: OAuthClientRequest):
+    data = _load_oauth_clients()
+    data[req.provider] = {"client_id": req.client_id, "client_secret": req.client_secret}
+    _save_oauth_clients(data)
+    return {"ok": True}
+
+
+@app.get("/oauth/google/start")
+async def oauth_google_start(source_id: str = ""):
+    from fastapi.responses import RedirectResponse
+    cfg = _load_oauth_clients().get("google", {})
+    if not cfg.get("client_id"):
+        return {"ok": False, "error": "Google OAuth not configured — POST /oauth/clients first"}
+    qs = urllib.parse.urlencode({
+        "client_id": cfg["client_id"],
+        "redirect_uri": "http://localhost:3002/oauth/google/callback",
+        "response_type": "code",
+        "scope": "https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly",
+        "access_type": "offline",
+        "prompt": "consent",
+        "state": source_id,
+    })
+    return RedirectResponse(f"https://accounts.google.com/o/oauth2/auth?{qs}")
+
+
+@app.get("/oauth/google/callback")
+async def oauth_google_callback(code: str = "", state: str = "", error: str = ""):
+    from fastapi.responses import HTMLResponse
+    if error or not code:
+        return HTMLResponse(_oauth_done_page("google", state, ok=False, error=error or "authorization denied"))
+    cfg = _load_oauth_clients().get("google", {})
+    try:
+        import httpx as _httpx
+        async with _httpx.AsyncClient() as client:
+            r = await client.post("https://oauth2.googleapis.com/token", data={
+                "code": code,
+                "client_id": cfg["client_id"],
+                "client_secret": cfg["client_secret"],
+                "redirect_uri": "http://localhost:3002/oauth/google/callback",
+                "grant_type": "authorization_code",
+            })
+        token = r.json()
+    except Exception as exc:
+        return HTMLResponse(_oauth_done_page("google", state, ok=False, error=str(exc)))
+    if "access_token" not in token:
+        return HTMLResponse(_oauth_done_page("google", state, ok=False, error=token.get("error_description", token.get("error", "token exchange failed"))))
+    _portfolio_hub.upsert_source({
+        "id": state, "type": "google_docs", "name": state,
+        "access_token": token.get("access_token", ""),
+        "oauth_token": token.get("refresh_token", ""),
+    })
+    return HTMLResponse(_oauth_done_page("google", state, ok=True))
+
+
+@app.get("/oauth/notion/start")
+async def oauth_notion_start(source_id: str = ""):
+    from fastapi.responses import RedirectResponse
+    cfg = _load_oauth_clients().get("notion", {})
+    if not cfg.get("client_id"):
+        return {"ok": False, "error": "Notion OAuth not configured — POST /oauth/clients first"}
+    qs = urllib.parse.urlencode({
+        "client_id": cfg["client_id"],
+        "redirect_uri": "http://localhost:3002/oauth/notion/callback",
+        "response_type": "code",
+        "owner": "user",
+        "state": source_id,
+    })
+    return RedirectResponse(f"https://api.notion.com/v1/oauth/authorize?{qs}")
+
+
+@app.get("/oauth/notion/callback")
+async def oauth_notion_callback(code: str = "", state: str = "", error: str = ""):
+    from fastapi.responses import HTMLResponse
+    if error or not code:
+        return HTMLResponse(_oauth_done_page("notion", state, ok=False, error=error or "authorization denied"))
+    cfg = _load_oauth_clients().get("notion", {})
+    try:
+        import httpx as _httpx
+        import base64 as _b64
+        creds = _b64.b64encode(f'{cfg["client_id"]}:{cfg["client_secret"]}'.encode()).decode()
+        async with _httpx.AsyncClient() as client:
+            r = await client.post(
+                "https://api.notion.com/v1/oauth/token",
+                headers={"Authorization": f"Basic {creds}", "Content-Type": "application/json"},
+                json={"grant_type": "authorization_code", "code": code,
+                      "redirect_uri": "http://localhost:3002/oauth/notion/callback"},
+            )
+        token = r.json()
+    except Exception as exc:
+        return HTMLResponse(_oauth_done_page("notion", state, ok=False, error=str(exc)))
+    if "access_token" not in token:
+        return HTMLResponse(_oauth_done_page("notion", state, ok=False, error=token.get("message", "token exchange failed")))
+    _portfolio_hub.upsert_source({
+        "id": state, "type": "notion", "name": state,
+        "access_token": token.get("access_token", ""),
+    })
+    return HTMLResponse(_oauth_done_page("notion", state, ok=True))
 
 
 @app.post("/analyze")
@@ -1539,6 +1853,7 @@ _INTENT_STREAM_PAGE = """<!DOCTYPE html>
 @app.post("/run")
 async def run(req: RunRequest):
     info = REGISTRY.get(req.hand_id, {})
+    context = _with_brain_portfolio_context(req.hand_id, req.context)
     # Mounted external agent takes priority over registry default
     runtime = req.runtime or _mounted.get(req.hand_id) or info.get("runtime", "sdk")
     print(f"[brain] /run hand={req.hand_id} runtime={runtime} task={req.task[:60]!r}", flush=True)
@@ -1548,9 +1863,9 @@ async def run(req: RunRequest):
         hand = HANDS.get(req.hand_id)
         if not hand:
             return {"ok": False, "error": f"unknown hand: {req.hand_id}"}
-        resource_menu = get_menu_for_hand(req.hand_id, req.context.get("tags", []))
+        resource_menu = get_menu_for_hand(req.hand_id, context.get("tags", []))
         try:
-            artifact = await hand.run(req.task, req.context, resource_menu)
+            artifact = await hand.run(req.task, context, resource_menu)
         except Exception as e:
             return {"ok": False, "error": str(e)}
     else:
@@ -1562,7 +1877,7 @@ async def run(req: RunRequest):
         hand_dir = str(Path(wiki_dir).parent) if wiki_dir else ""
         personal = _read_personal_context(req.hand_id)
         # Inject into context so http×loom _build_snapshot forwards it to cloud agents.
-        context_with_personal = {**req.context}
+        context_with_personal = {**context}
         if personal:
             context_with_personal["__personal__"] = personal
         envelope = {
@@ -1597,7 +1912,7 @@ async def run(req: RunRequest):
     append_signal(
         req.hand_id,
         req.task,
-        req.context.get("tags", []),
+        context.get("tags", []),
         meta.get("resources_shown", []),
         meta.get("resources_used", []),
     )
@@ -1777,9 +2092,10 @@ def _render_artifact_sections(artifact: dict, fallback_narrative: str, fallback_
             summary = _html_text(layer.get("summary") or "")
             items = layer.get("items") if isinstance(layer.get("items"), list) else []
             provenance = layer.get("provenance") if isinstance(layer.get("provenance"), list) else []
+            lt = _html_text(layer.get("layer_type", "analysis"))
             rendered_layers.append(
                 f'<section class="anc-detail-section anc-detail-section--content" '
-                f'data-detail-section="{lid}" data-detail-label="{title}">'
+                f'data-detail-section="{lid}" data-detail-label="{title}" data-layer-type="{lt}">'
                 f'<h3>{title}</h3>'
                 f'{("<p>" + summary + "</p>") if summary else ""}'
                 f'{("<ul>" + _list_html(items) + "</ul>") if items else ""}'
@@ -1793,13 +2109,14 @@ def _render_artifact_sections(artifact: dict, fallback_narrative: str, fallback_
     if not isinstance(sections, list) or not sections:
         return (
             '<section class="anc-detail-section anc-detail-section--content" '
-            'data-detail-section="content" data-detail-label="Full Detail">'
+            'data-detail-section="content" data-detail-label="Full Detail" data-layer-type="analysis">'
             '<h3>Full Detail</h3>'
             f'<p>{_html_text(fallback_narrative)}</p>'
             f'{("<h4>Key Claims</h4><ul>" + fallback_claims_html + "</ul>") if fallback_claims_html else ""}'
             '</section>'
         )
 
+    _SID_TO_LT = {"summary": "summary", "evidence": "evidence", "analysis": "analysis", "gaps": "gaps"}
     rendered = []
     for idx, sec in enumerate(sections[:8]):
         if not isinstance(sec, dict):
@@ -1808,9 +2125,10 @@ def _render_artifact_sections(artifact: dict, fallback_narrative: str, fallback_
         title = _html_text(sec.get("title") or sec.get("id") or f"Section {idx + 1}")
         summary = _html_text(sec.get("summary") or "")
         bullets = sec.get("bullets") if isinstance(sec.get("bullets"), list) else []
+        lt = _SID_TO_LT.get(str(sec.get("id", "")).lower(), "analysis")
         rendered.append(
             f'<section class="anc-detail-section anc-detail-section--content" '
-            f'data-detail-section="{sid}" data-detail-label="{title}">'
+            f'data-detail-section="{sid}" data-detail-label="{title}" data-layer-type="{lt}">'
             f'<h3>{title}</h3>'
             f'{("<p>" + summary + "</p>") if summary else ""}'
             f'{("<ul>" + _list_html(bullets) + "</ul>") if bullets else ""}'
@@ -1838,10 +2156,10 @@ def _presentation_artifact_for_hand(presentation: dict, hand_id: str, fallback: 
     return {
         "metadata": {
             "confidence": card.get("confidence", fallback_meta.get("confidence", 0.0)),
-            "key_claims": [],
+            "key_claims": panel.get("key_claims", fallback_meta.get("key_claims", [])),
             "source_notes": panel.get("source_notes", fallback_meta.get("source_notes", [])),
-            "gaps": [],
-            "resources_used": [],
+            "gaps": panel.get("gaps", fallback_meta.get("gaps", [])),
+            "resources_used": panel.get("resources_used", fallback_meta.get("resources_used", [])),
             "brain_requirements": panel.get("brain_requirements", {}),
             "overview_only": True,
             **({"error": error} if error else {}),
@@ -1850,6 +2168,8 @@ def _presentation_artifact_for_hand(presentation: dict, hand_id: str, fallback: 
         "sections": panel.get("sections", fallback.get("sections", []) if isinstance(fallback, dict) else []),
         "layers": panel.get("layers", []),
         "evidence": panel.get("evidence", fallback.get("evidence", []) if isinstance(fallback, dict) else []),
+        "raw_sources": fallback.get("raw_sources", []) if isinstance(fallback, dict) else [],
+        "raw_items": fallback.get("raw_items", []) if isinstance(fallback, dict) else [],
     }
 
 
@@ -1882,7 +2202,7 @@ def _render_evidence_section(artifact: dict) -> str:
         return ""
     return (
         '<section class="anc-detail-section anc-detail-section--sources" '
-        'data-detail-section="evidence" data-detail-label="Evidence">'
+        'data-detail-section="evidence" data-detail-label="Evidence" data-layer-type="evidence">'
         '<h3>Evidence</h3>'
         '<table class="anc-detail-kv"><thead><tr>'
         '<th>Claim</th><th>Support</th><th>Source</th><th>Tier</th><th>Freshness</th>'
@@ -2069,11 +2389,11 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
     {raw_items_html}
     {detail_sections_html}
     {evidence_html}
-    <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources">
+    <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources" data-layer-type="analysis">
       <h3>Sources</h3>
       {source_notes_html}
     </section>
-    <section class="anc-detail-section anc-detail-section--hand-eval" data-detail-section="hand-eval" data-detail-label="Hand Eval">
+    <section class="anc-detail-section anc-detail-section--hand-eval" data-detail-section="hand-eval" data-detail-label="Hand Eval" data-layer-type="analysis">
       <h3>Hand Eval</h3>
       <div class="anc-eval-block"><div class="anc-eval-label">Authority</div>{authority_label}</div>
       <div class="anc-eval-block"><div class="anc-eval-label">Coverage gaps</div><ul>{gaps_html}</ul></div>
@@ -2097,11 +2417,11 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
     {raw_items_html}
     {detail_sections_html}
     {evidence_html}
-    <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources">
+    <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources" data-layer-type="analysis">
       <h3>Sources</h3>
       {source_notes_html}
     </section>
-    <section class="anc-detail-section anc-detail-section--hand-eval" data-detail-section="hand-eval" data-detail-label="Hand Eval">
+    <section class="anc-detail-section anc-detail-section--hand-eval" data-detail-section="hand-eval" data-detail-label="Hand Eval" data-layer-type="analysis">
       <h3>Hand Eval</h3>
       <div class="anc-eval-block"><div class="anc-eval-label">Authority</div>{authority_label}</div>
       <div class="anc-eval-block"><div class="anc-eval-label">Coverage gaps</div><ul>{gaps_html}</ul></div>
@@ -2153,11 +2473,18 @@ async def get_mount(hand_id: str):
 
 @app.get("/health")
 def health():
+    adapters_info = [
+        {
+            "id": a.id,
+            "hw_capabilities": getattr(a, "hw_capabilities", {}),
+        }
+        for a in _adapter_registry.list()
+    ]
     return {
         "ok": True,
         "service": "loom-brain",
         "hands": list(HANDS.keys()),
-        "adapters": [a.id for a in _adapter_registry.list()],
+        "adapters": adapters_info,
         "mounted": dict(_mounted),
     }
 
