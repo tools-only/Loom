@@ -90,6 +90,18 @@ for _hid, _hand in HANDS.items():
     except ValueError:
         pass
 
+# Register brain-inline adapter (default executor for Brain-generated runtime
+# hands). Uses the brain's own Anthropic client and model; the per-call
+# system_prompt comes from Brain's AtomicTask spec via the envelope.
+from loom_core.agent_adapters.providers.sdk_legacy import create_brain_inline_provider
+
+_brain_client, _brain_model = get_client_for_brain()
+_brain_inline_prov = create_brain_inline_provider(
+    client=_brain_client,
+    model=_brain_model,
+)
+_adapter_registry.upsert(_brain_inline_prov["instance"])
+
 from loom_core.agent_adapters.cloud_bootstrap import register_cloud_adapters
 register_cloud_adapters(_adapter_registry, _core, _ROOT)
 
