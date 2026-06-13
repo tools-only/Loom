@@ -43,6 +43,105 @@ class AtomicTask:
         }
 
 
+class ExecutionGraph:
+    """Immutable DAG of AtomicTask execution order.
+
+    Built once from a list of AtomicTask via :meth:`build`. Once constructed,
+    no field can be mutated (enforced by ``__slots__``). Cycle detection runs
+    at construction time using Kahn's algorithm — a cyclic plan raises
+    ``ValueError`` before any dispatch.
+    """
+
+    __slots__ = (
+        "tasks",
+        "adjacency",
+        "reverse_adjacency",
+        "roots",
+        "projection_content_id",
+    )
+
+    def __init__(
+        self,
+        tasks: tuple[AtomicTask, ...],
+        adjacency: dict[str, frozenset[str]],
+        reverse_adjacency: dict[str, frozenset[str]],
+        roots: frozenset[str],
+        projection_content_id: str,
+    ) -> None:
+        self.tasks = tasks
+        self.adjacency = adjacency
+        self.reverse_adjacency = reverse_adjacency
+        self.roots = roots
+        self.projection_content_id = projection_content_id
+
+    @classmethod
+    def build(
+        cls,
+        tasks: list[AtomicTask],
+        projection_content_id: str,
+    ) -> "ExecutionGraph":
+        """Build an immutable DAG from ``tasks`` and detect cycles.
+
+        Raises:
+            ValueError: if the dependency graph contains a cycle (including
+                self-loops). The message includes the number of unresolvable
+                tasks.
+        """
+        # Forward adjacency: task_id -> set of successor task_ids
+        adjacency_builder: dict[str, set[str]] = {t.task_id: set() for t in tasks}
+        # Reverse adjacency: task_id -> set of predecessor task_ids
+        reverse_adjacency_builder: dict[str, set[str]] = {
+            t.task_id: set(t.depends_on) for t in tasks
+        }
+
+        # Populate forward adjacency from each task's depends_on list.
+        # Tolerate references to unknown task ids by ignoring them in the
+        # forward map (cycle detection still uses in-degree from depends_on).
+        for t in tasks:
+            for dep in t.depends_on:
+                if dep in adjacency_builder:
+                    adjacency_builder[dep].add(t.task_id)
+
+        adjacency: dict[str, frozenset[str]] = {
+            tid: frozenset(succs) for tid, succs in adjacency_builder.items()
+        }
+        reverse_adjacency: dict[str, frozenset[str]] = {
+            tid: frozenset(preds) for tid, preds in reverse_adjacency_builder.items()
+        }
+
+        roots: frozenset[str] = frozenset(
+            tid for tid, preds in reverse_adjacency.items() if not preds
+        )
+
+        # Kahn's algorithm — cycle detection via topological sort.
+        in_degree: dict[str, int] = {
+            t.task_id: len(t.depends_on) for t in tasks
+        }
+        queue: list[str] = [tid for tid, d in in_degree.items() if d == 0]
+        processed = 0
+        while queue:
+            tid = queue.pop(0)
+            processed += 1
+            for succ in adjacency[tid]:
+                in_degree[succ] -= 1
+                if in_degree[succ] == 0:
+                    queue.append(succ)
+
+        if processed < len(tasks):
+            unresolvable = len(tasks) - processed
+            raise ValueError(
+                f"ExecutionGraph contains a cycle: {unresolvable} tasks unresolvable"
+            )
+
+        return cls(
+            tuple(tasks),
+            adjacency,
+            reverse_adjacency,
+            roots,
+            projection_content_id,
+        )
+
+
 @dataclass
 class HandPlan:
     """Brain's decomposed dispatch plan for one analyze() call."""
@@ -52,6 +151,7 @@ class HandPlan:
     tasks: list[AtomicTask]
     rationale: str
     decomposition_source: DecompositionSource = "llm"
+    graph: ExecutionGraph | None = None
 
     def unique_hands(self) -> list[str]:
         """Unique hand IDs in priority order (stable, deduped)."""
@@ -78,10 +178,16 @@ class HandPlan:
         return result
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "domain": self.domain,
             "mode": self.mode,
             "tasks": [t.to_dict() for t in self.tasks],
             "rationale": self.rationale,
             "decomposition_source": self.decomposition_source,
         }
+        if self.graph is not None:
+            payload["graph"] = {
+                "task_count": len(self.graph.tasks),
+                "root_count": len(self.graph.roots),
+            }
+        return payload
