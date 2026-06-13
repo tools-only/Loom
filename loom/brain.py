@@ -19,6 +19,7 @@ import asyncio
 import datetime
 import html
 import json
+import os
 import sys
 import time
 import urllib.parse
@@ -109,6 +110,19 @@ _brain_inline_prov = create_brain_inline_provider(
     model=_brain_model,
 )
 _adapter_registry.upsert(_brain_inline_prov["instance"])
+
+# Register runtime-hand adapter (default executor for Brain-generated hands).
+# Falls back to brain-inline if claude is not in PATH.
+import shutil as _shutil
+from loom_core.agent_adapters.providers.runtime_hand import create_runtime_hand_provider as _rh_create
+
+_rh_cmd = os.environ.get("LOOM_RUNTIME_HAND_COMMAND", "claude -p").split()
+_use_runtime_hand = _shutil.which(_rh_cmd[0]) is not None
+if _use_runtime_hand:
+    _rh_prov = _rh_create(base_command=_rh_cmd)
+    _adapter_registry.upsert(_rh_prov["instance"])
+    _adapter_registry.set_default_runtime_adapter("runtime-hand")
+# else: default stays "brain-inline" (set in AgentAdapterRegistry.__init__)
 
 from loom_core.agent_adapters.cloud_bootstrap import register_cloud_adapters
 register_cloud_adapters(_adapter_registry, _core, _ROOT)
@@ -201,7 +215,11 @@ async def _brain_hand_runner(hand_id: str, task: str, ctx: dict) -> dict:
                 f"You are a Brain-generated analysis agent for dimension: {dimension}. "
                 "Produce a run.artifact JSON with narrative and metadata."
             )
-        adapter = _adapter_registry.find_by_id("brain-inline")
+        _executor_id = spec.get("executor_id") or "brain-inline"
+        _resolved_id = _adapter_registry.resolve_runtime_adapter(_executor_id)
+        adapter = _adapter_registry.find_by_id(_resolved_id)
+        if adapter is None:
+            adapter = _adapter_registry.find_by_id("brain-inline")  # fallback
         if adapter is None:
             raise RuntimeError("brain-inline adapter not registered")
         envelope = {
@@ -2168,6 +2186,7 @@ def _presentation_artifact_for_hand(presentation: dict, hand_id: str, fallback: 
             "gaps": panel.get("gaps", fallback_meta.get("gaps", [])),
             "resources_used": panel.get("resources_used", fallback_meta.get("resources_used", [])),
             "brain_requirements": panel.get("brain_requirements", {}),
+            "agents": panel.get("agents", fallback_meta.get("agents", [])),
             "overview_only": True,
             **({"error": error} if error else {}),
         },
@@ -2178,6 +2197,76 @@ def _presentation_artifact_for_hand(presentation: dict, hand_id: str, fallback: 
         "raw_sources": fallback.get("raw_sources", []) if isinstance(fallback, dict) else [],
         "raw_items": fallback.get("raw_items", []) if isinstance(fallback, dict) else [],
     }
+
+
+def _agent_responsibility_from_prompt(system_prompt: str, fallback: str) -> str:
+    text = (system_prompt or "").strip()
+    if not text:
+        return fallback
+    for prefix in ("You are an ", "You are a ", "You are "):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+            break
+    if text.startswith("You "):
+        text = text[len("You "):]
+    text = text[:1].upper() + text[1:] if text else fallback
+    return text.split("\n", 1)[0].strip() or fallback
+
+
+def _artifact_agents(artifact: dict, hand_id: str) -> list[dict]:
+    meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
+    agents = meta.get("agents") or meta.get("hand_agents")
+    if isinstance(agents, list) and agents:
+        return [a for a in agents if isinstance(a, dict)]
+    info = REGISTRY.get(hand_id, {})
+    actual_hand = meta.get("hand_id") or hand_id
+    executor = meta.get("executor_id") or hand_id
+    dimension = meta.get("dimension") or info.get("label") or actual_hand
+    fallback = (
+        info.get("description")
+        or (f"Cover the {dimension} dimension." if dimension else "Provide focused supporting analysis for this card.")
+    )
+    return [{
+        "hand_id": actual_hand,
+        "executor_id": executor,
+        "task_id": meta.get("task_id", ""),
+        "dimension": dimension,
+        "capabilities": list(meta.get("capabilities") or []),
+        "responsibility": _agent_responsibility_from_prompt(str(meta.get("system_prompt") or ""), fallback),
+    }]
+
+
+def _render_agent_section(artifact: dict, hand_id: str) -> str:
+    agents = _artifact_agents(artifact, hand_id)
+    if not agents:
+        return ""
+    rows = []
+    for agent in agents[:6]:
+        caps = agent.get("capabilities") or []
+        cap_html = ""
+        if isinstance(caps, list) and caps:
+            cap_html = " ".join(f'<span class="anc-pill anc-pill--review">{_html_text(str(c))}</span>' for c in caps[:4])
+        dimension = agent.get("dimension") or ""
+        executor = agent.get("executor_id") or ""
+        task_id = agent.get("task_id") or ""
+        meta_bits = " / ".join(_html_text(str(x)) for x in [executor, task_id, dimension] if x)
+        rows.append(
+            '<li>'
+            f'<strong>{_html_text(str(agent.get("hand_id", "")))}</strong>'
+            f'{("<small>" + meta_bits + "</small>") if meta_bits else ""}'
+            f'<p>{_html_text(str(agent.get("responsibility", "")))}</p>'
+            f'{("<div class=\"anc-pill-row\">" + cap_html + "</div>") if cap_html else ""}'
+            '</li>'
+        )
+    return (
+        '<section class="anc-detail-section anc-detail-section--hand-eval" '
+        'data-detail-section="agents" data-detail-label="Agent" data-layer-type="analysis">'
+        '<h3>Agent</h3>'
+        '<p>Current card processing hand agents and their compact responsibilities.</p>'
+        '<ul class="anc-source-list">'
+        + "".join(rows) +
+        '</ul></section>'
+    )
 
 
 def _render_evidence_section(artifact: dict) -> str:
@@ -2381,6 +2470,7 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
     source_notes_html = _render_source_notes(meta, sources_html)
     raw_sources_html = _render_raw_sources(artifact)
     raw_items_html = _render_raw_items(artifact)
+    agent_section_html = _render_agent_section(artifact, hand_id)
 
     if overview_only:
         # True summary: pill + title + narrative only visible; detail in aside
@@ -2396,6 +2486,7 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
     {raw_items_html}
     {detail_sections_html}
     {evidence_html}
+    {agent_section_html}
     <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources" data-layer-type="analysis">
       <h3>Sources</h3>
       {source_notes_html}
@@ -2424,6 +2515,7 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
     {raw_items_html}
     {detail_sections_html}
     {evidence_html}
+    {agent_section_html}
     <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources" data-layer-type="analysis">
       <h3>Sources</h3>
       {source_notes_html}

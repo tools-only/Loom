@@ -8,6 +8,16 @@ from .base import AgentAdapter
 class AgentAdapterRegistry:
     def __init__(self) -> None:
         self._adapters: list[AgentAdapter] = []
+        self._default_runtime_adapter_id: str = "brain-inline"
+
+    def set_default_runtime_adapter(self, adapter_id: str) -> None:
+        self._default_runtime_adapter_id = adapter_id
+
+    def resolve_runtime_adapter(self, executor_id: str) -> str:
+        """If executor_id == 'brain-inline', substitute with the registered default."""
+        if executor_id == "brain-inline":
+            return self._default_runtime_adapter_id
+        return executor_id
 
     def register(self, adapter: AgentAdapter) -> None:
         if any(existing.id == adapter.id for existing in self._adapters):
