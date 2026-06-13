@@ -167,7 +167,7 @@ class HandPlan:
         """Unique hand IDs in priority order (stable, deduped)."""
         seen: set[str] = set()
         result: list[str] = []
-        for task in sorted(self.tasks, key=lambda t: t.priority):
+        for task in sorted(self.tasks, key=lambda t: t.priority, reverse=True):
             if task.hand_id not in seen:
                 seen.add(task.hand_id)
                 result.append(task.hand_id)
@@ -180,7 +180,7 @@ class HandPlan:
         """Unique executor shell IDs in priority order (stable, deduped)."""
         seen: set[str] = set()
         result: list[str] = []
-        for task in sorted(self.tasks, key=lambda t: t.priority):
+        for task in sorted(self.tasks, key=lambda t: t.priority, reverse=True):
             executor_id = task.executor_id or task.hand_id
             if executor_id not in seen:
                 seen.add(executor_id)
