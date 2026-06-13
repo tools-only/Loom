@@ -23,7 +23,7 @@ class AtomicTask:
     executor_id: str = ""                             # existing hand/adapter shell
     dimension: str = ""                               # Brain-generated rubric/dimension label
     rubrics: list[dict] = field(default_factory=list)
-    priority: int = 0                                  # lower = higher priority; same = parallel
+    priority: int = 0                                  # higher = higher priority; same = parallel
     depends_on: list[str] = field(default_factory=list)
     system_prompt: str = ""                           # Brain-generated role contract for the hand agent
     capabilities: list[str] = field(default_factory=list)  # Brain-declared capability tags (e.g. ["portfolio"])
@@ -58,6 +58,8 @@ class ExecutionGraph:
         "reverse_adjacency",
         "roots",
         "projection_content_id",
+        "projection_state_version",
+        "projection_schema_version",
     )
 
     def __init__(
@@ -67,18 +69,24 @@ class ExecutionGraph:
         reverse_adjacency: dict[str, frozenset[str]],
         roots: frozenset[str],
         projection_content_id: str,
+        projection_state_version: int = 0,
+        projection_schema_version: str = "",
     ) -> None:
         self.tasks = tasks
         self.adjacency = adjacency
         self.reverse_adjacency = reverse_adjacency
         self.roots = roots
         self.projection_content_id = projection_content_id
+        self.projection_state_version = projection_state_version
+        self.projection_schema_version = projection_schema_version
 
     @classmethod
     def build(
         cls,
         tasks: list[AtomicTask],
         projection_content_id: str,
+        projection_state_version: int = 0,
+        projection_schema_version: str = "",
     ) -> "ExecutionGraph":
         """Build an immutable DAG from ``tasks`` and detect cycles.
 
@@ -139,6 +147,8 @@ class ExecutionGraph:
             reverse_adjacency,
             roots,
             projection_content_id,
+            projection_state_version,
+            projection_schema_version,
         )
 
 
@@ -189,5 +199,10 @@ class HandPlan:
             payload["graph"] = {
                 "task_count": len(self.graph.tasks),
                 "root_count": len(self.graph.roots),
+            }
+            payload["projection"] = {
+                "content_id": self.graph.projection_content_id,
+                "state_version": self.graph.projection_state_version,
+                "schema_version": self.graph.projection_schema_version,
             }
         return payload

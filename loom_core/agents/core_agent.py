@@ -10,6 +10,8 @@ Responsibilities:
 from __future__ import annotations
 
 import asyncio
+import heapq
+import inspect
 import json
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
@@ -21,12 +23,16 @@ try:
     from brain_harness.workflow_episode import WorkflowEpisode
     from brain_harness.budget_governor import BudgetGovernor, BudgetExceeded
     from brain_harness.task_decomposer import TaskDecomposer
+    from brain_harness.hand_plan import ExecutionGraph
+    from brain_harness.projection import build_projection
     _EPISODE_TRACKING = True
 except ImportError:
     try:
         from loom.brain_harness.workflow_episode import WorkflowEpisode
         from loom.brain_harness.budget_governor import BudgetGovernor, BudgetExceeded
         from loom.brain_harness.task_decomposer import TaskDecomposer
+        from loom.brain_harness.hand_plan import ExecutionGraph
+        from loom.brain_harness.projection import build_projection
         _EPISODE_TRACKING = True
     except ImportError:
         _EPISODE_TRACKING = False
@@ -80,13 +86,35 @@ class LoomCoreAgent:
             cold = self._harness.cold_start()
             wf = await self._dispatcher.resolve(question, context)
 
+            projection = None
+            domain = wf.get("domain", "general")
+            if _EPISODE_TRACKING and hasattr(self._harness, "state"):
+                try:
+                    projection = build_projection(
+                        self._harness,
+                        domain=domain,
+                        question=question,
+                    )
+                except Exception as exc:
+                    _ep("projection.build_error", {"message": str(exc)})
+
             state_context = {}
             if hasattr(self._harness, "select_state_context"):
-                state_context = self._harness.select_state_context(
-                    domain=wf.get("domain", "general"),
-                    question=question,
-                    context=context,
-                )
+                if projection is not None and self._accepts_kwarg(
+                    self._harness.select_state_context, "projection"
+                ):
+                    state_context = self._harness.select_state_context(
+                        domain=domain,
+                        question=question,
+                        context=context,
+                        projection=projection,
+                    )
+                else:
+                    state_context = self._harness.select_state_context(
+                        domain=domain,
+                        question=question,
+                        context=context,
+                    )
             presentation_spec = self._build_presentation_spec(question, wf, state_context)
 
             # ── Phase 1: Plan — Brain writes rubrics ─────────────────────────
@@ -94,12 +122,21 @@ class LoomCoreAgent:
             if ep is not None and root is not None:
                 ep.transition(root, "Planning")
 
-            analysis_plan = await self._harness.plan(
-                question=question,
-                workflow_decision=wf,
-                client=self._client,
-                model=self._model,
-            )
+            plan_kwargs = {
+                "question": question,
+                "workflow_decision": wf,
+                "client": self._client,
+                "model": self._model,
+            }
+            if projection is not None and self._accepts_kwarg(self._harness.plan, "projection"):
+                plan_kwargs["projection"] = projection
+                _ep("projection-binding", {
+                    "fn": "plan",
+                    "state_version": projection.state_version,
+                    "schema_version": projection.schema_version,
+                    "content_id": projection.content_id,
+                })
+            analysis_plan = await self._harness.plan(**plan_kwargs)
             rubrics = analysis_plan.get("rubrics", [])
             excluded = set(analysis_plan.get("excluded_hands", []) or [])
             registered_shells = list(
@@ -124,13 +161,29 @@ class LoomCoreAgent:
             if _EPISODE_TRACKING:
                 try:
                     decomposer = TaskDecomposer(self._client, self._model)
-                    hand_plan = await decomposer.decompose(
-                        goal=question,
-                        domain=wf.get("domain", "general"),
-                        state_context=state_context,
-                        registered_shells=selected_shells,
-                        analysis_plan=analysis_plan,
-                    )
+                    decompose_kwargs = {
+                        "goal": question,
+                        "domain": wf.get("domain", "general"),
+                        "state_context": state_context,
+                        "registered_shells": selected_shells,
+                        "analysis_plan": analysis_plan,
+                    }
+                    if projection is not None:
+                        decompose_kwargs["projection"] = projection
+                        _ep("projection-binding", {
+                            "fn": "decompose",
+                            "state_version": projection.state_version,
+                            "schema_version": projection.schema_version,
+                            "content_id": projection.content_id,
+                        })
+                    hand_plan = await decomposer.decompose(**decompose_kwargs)
+                    if projection is not None:
+                        hand_plan.graph = ExecutionGraph.build(
+                            hand_plan.tasks,
+                            projection.content_id,
+                            projection.state_version,
+                            projection.schema_version,
+                        )
                     _ep("plan.tasks_decomposed", {
                         "task_count": len(hand_plan.tasks),
                         "decomposition_source": hand_plan.decomposition_source,
@@ -161,6 +214,7 @@ class LoomCoreAgent:
                 dimension: str | None = None,
                 system_prompt: str = "",
                 capabilities: list[str] | None = None,
+                task_id: str | None = None,
             ) -> tuple[str, dict]:
                 try:
                     run_executor_id = executor_id or hand_id
@@ -172,6 +226,7 @@ class LoomCoreAgent:
                         "agentic_hand_spec": {
                             "hand_id": hand_id,
                             "executor_id": run_executor_id,
+                            "task_id": task_id or "",
                             "dimension": dimension or "",
                             "task": atomic_task_str or question,
                             "lifecycle": "runtime",
@@ -238,6 +293,7 @@ class LoomCoreAgent:
                                 dimension=dimension,
                                 system_prompt=system_prompt,
                                 capabilities=capabilities,
+                                task_id=task_id,
                             )
                         else:
                             _ep("dispatch.repair_failed", {"hand_id": hand_id, "issues": issues})
@@ -271,30 +327,112 @@ class LoomCoreAgent:
                     governor.check_wall_clock()
 
                 if hand_plan is not None and _EPISODE_TRACKING:
-                    # Wave 1: dispatch per AtomicTask with LLM-generated task strings.
-                    # Multiple generated hands may use the same executor shell.
-                    # Key artifacts by task_id; inject generated hand/task metadata.
-                    raw_pairs = list(await asyncio.gather(*[
-                        _run_one(
-                            t.hand_id,
-                            atomic_task_str=t.task,
-                            executor_id=t.executor_id,
-                            dimension=t.dimension,
-                            system_prompt=t.system_prompt,
-                            capabilities=t.capabilities,
+                    # Wave 1: dispatch per AtomicTask with dependency and priority ordering.
+                    if hand_plan.graph is None:
+                        binding = state_context.get("projection", {})
+                        hand_plan.graph = ExecutionGraph.build(
+                            hand_plan.tasks,
+                            binding.get("content_id", "sha256:unknown"),
+                            int(binding.get("state_version", 0) or 0),
+                            binding.get("schema_version", ""),
                         )
-                        for t in hand_plan.tasks
-                    ]))
-                    for atom_task, (_, artifact) in zip(hand_plan.tasks, raw_pairs):
-                        if isinstance(artifact, dict):
-                            meta = artifact.get("metadata")
-                            if not isinstance(meta, dict):
-                                artifact["metadata"] = meta = {}
-                            meta["hand_id"] = atom_task.hand_id
-                            meta["executor_id"] = atom_task.executor_id
-                            meta["task_id"] = atom_task.task_id
-                            meta["dimension"] = atom_task.dimension
-                        hand_artifacts[atom_task.task_id] = artifact
+
+                    tasks_by_id = {t.task_id: t for t in hand_plan.graph.tasks}
+                    pending_deps = {
+                        t.task_id: set(t.depends_on) for t in hand_plan.graph.tasks
+                    }
+                    completed: set[str] = set()
+                    skipped: set[str] = set()
+                    ready: list[tuple[int, str]] = [
+                        (-tasks_by_id[tid].priority, tid)
+                        for tid in hand_plan.graph.roots
+                    ]
+                    heapq.heapify(ready)
+
+                    def _annotate_artifact(atom_task, artifact: dict) -> dict:
+                        if not isinstance(artifact, dict):
+                            artifact = {"metadata": {}, "narrative": "", "sections": [], "evidence": []}
+                        meta = artifact.get("metadata")
+                        if not isinstance(meta, dict):
+                            artifact["metadata"] = meta = {}
+                        meta["hand_id"] = atom_task.hand_id
+                        meta["executor_id"] = atom_task.executor_id
+                        meta["task_id"] = atom_task.task_id
+                        meta["dimension"] = atom_task.dimension
+                        meta["system_prompt"] = atom_task.system_prompt
+                        meta["capabilities"] = atom_task.capabilities
+                        return artifact
+
+                    def _skipped_artifact(atom_task, cause: str) -> dict:
+                        return _annotate_artifact(atom_task, {
+                            "metadata": {
+                                "key_claims": [],
+                                "confidence": 0.0,
+                                "gaps": [],
+                                "status": "skipped",
+                                "cause": cause,
+                            },
+                            "narrative": "",
+                            "sections": [],
+                            "evidence": [],
+                        })
+
+                    def _descendants(task_id: str) -> set[str]:
+                        seen: set[str] = set()
+                        stack = list(hand_plan.graph.adjacency.get(task_id, frozenset()))
+                        while stack:
+                            child = stack.pop()
+                            if child in seen:
+                                continue
+                            seen.add(child)
+                            stack.extend(hand_plan.graph.adjacency.get(child, frozenset()))
+                        return seen
+
+                    while ready:
+                        priority_key, task_id = heapq.heappop(ready)
+                        batch = [task_id]
+                        while ready and ready[0][0] == priority_key:
+                            batch.append(heapq.heappop(ready)[1])
+                        _ep("dispatch.batch", {"task_ids": batch, "priority": -priority_key})
+
+                        raw_pairs = list(await asyncio.gather(*[
+                            _run_one(
+                                tasks_by_id[tid].hand_id,
+                                atomic_task_str=tasks_by_id[tid].task,
+                                executor_id=tasks_by_id[tid].executor_id,
+                                dimension=tasks_by_id[tid].dimension,
+                                system_prompt=tasks_by_id[tid].system_prompt,
+                                capabilities=tasks_by_id[tid].capabilities,
+                                task_id=tasks_by_id[tid].task_id,
+                            )
+                            for tid in batch
+                            if tid not in skipped
+                        ]))
+
+                        for tid, (_, artifact) in zip(
+                            [tid for tid in batch if tid not in skipped],
+                            raw_pairs,
+                        ):
+                            atom_task = tasks_by_id[tid]
+                            artifact = _annotate_artifact(atom_task, artifact)
+                            hand_artifacts[tid] = artifact
+                            meta = artifact.get("metadata", {})
+                            failed = bool(meta.get("error")) or meta.get("status") == "failed"
+                            if failed:
+                                for desc_id in _descendants(tid):
+                                    if desc_id in completed or desc_id in skipped:
+                                        continue
+                                    skipped.add(desc_id)
+                                    hand_artifacts[desc_id] = _skipped_artifact(tasks_by_id[desc_id], tid)
+                                    _ep("dispatch.skipped", {"task_id": desc_id, "cause": tid})
+                            else:
+                                completed.add(tid)
+                                for child in sorted(hand_plan.graph.adjacency.get(tid, frozenset())):
+                                    if child in skipped:
+                                        continue
+                                    pending_deps[child].discard(tid)
+                                    if not pending_deps[child]:
+                                        heapq.heappush(ready, (-tasks_by_id[child].priority, child))
                 else:
                     results: list[tuple[str, dict]] = list(
                         await asyncio.gather(*[
@@ -437,6 +575,17 @@ class LoomCoreAgent:
     def suggest(self, query: str) -> Any:
         """Legacy stub — prefer analyze() for new callers."""
         return None
+
+    @staticmethod
+    def _accepts_kwarg(fn: Callable[..., Any], name: str) -> bool:
+        try:
+            signature = inspect.signature(fn)
+        except (TypeError, ValueError):
+            return False
+        return any(
+            param.kind == inspect.Parameter.VAR_KEYWORD or param_name == name
+            for param_name, param in signature.parameters.items()
+        )
 
     @staticmethod
     def _validate_artifact(artifact: Any) -> list[str]:

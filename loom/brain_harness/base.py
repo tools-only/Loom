@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 from .state import BrainState
 from .intent_wiki import IntentWiki
 from .intent_harness import RewardedIntentHarness
+from .projection import Projection, build_projection
 
 
 def _parse_json(text: str) -> dict | None:
@@ -79,13 +80,20 @@ class BrainHarness:
         hand_claims: dict[str, list[str]],
     ) -> str:
         """Build prompt with full hand context for framework variable-overlap gate."""
-        return self._assemble_prompt(domain=domain, question=question, hand_claims=hand_claims)
+        projection = build_projection(
+            self,
+            domain=domain,
+            question=question,
+            hand_claims=hand_claims,
+        )
+        return self._prompt_from_projection(projection, domain=domain)
 
     def _assemble_prompt(
         self,
         domain: str = "general",
         question: str = "",
         hand_claims: dict[str, list[str]] | None = None,
+        projection: Projection | None = None,
     ) -> str:
         """Build synthesis system prompt.
 
@@ -93,6 +101,15 @@ class BrainHarness:
         Dynamic layers (strategy rules, frameworks, learned notes) are selected
         programmatically by BrainState before reaching the LLM.
         """
+        if projection is None:
+            projection = build_projection(
+                self,
+                domain=domain,
+                question=question,
+                hand_claims=hand_claims,
+            )
+        return self._prompt_from_projection(projection, domain=domain)
+
         parts: list[str] = []
 
         # ── Static: role contract (identity, not data) ─────────────────────
@@ -187,6 +204,41 @@ class BrainHarness:
 
     # ── State helpers ──────────────────────────────────────────────────────────
 
+    def _prompt_from_projection(self, projection: Projection, domain: str = "general") -> str:
+        """Format a content-addressed Projection as the Brain system prompt."""
+        sections = projection.sections
+        parts: list[str] = []
+        brain_md = sections.get("brain_md", "")
+        if brain_md:
+            parts.append(str(brain_md))
+
+        ordered_sections = [
+            ("strategy_rules", f"Strategy rules (domain={domain}, selected by Brain process)"),
+            ("frameworks", f"Analytical frameworks (domain={domain}, distilled)"),
+            ("intent_stream", "Recent intent stream (what the user is actually working toward)"),
+            ("intent_wiki", "Active long-lived user intents (Intent Wiki)"),
+            ("policy_plan", "Selected intent policies (Rewarded Intent Harness)"),
+            ("learned_notes", f"Learned notes (domain={domain}, recent)"),
+            ("last_synthesis", "Last synthesis (< 24h)"),
+        ]
+        for key, title in ordered_sections:
+            value = sections.get(key)
+            if not value:
+                continue
+            if isinstance(value, str):
+                text = value
+            else:
+                text = json.dumps(value, ensure_ascii=False, indent=2)
+            parts.append(f"\n\n---\n\n## {title}\n\n{text}")
+
+        parts.append(
+            "\n\n---\n\n## Projection binding\n\n"
+            f"content_id: {projection.content_id}\n"
+            f"state_version: {projection.state_version}\n"
+            f"schema_version: {projection.schema_version}"
+        )
+        return "".join(parts)
+
     def cold_start(self) -> bool:
         """True when Brain.state has no strategy rules — drives UI cold-start notice."""
         self.state._reload()
@@ -197,8 +249,32 @@ class BrainHarness:
         domain: str,
         question: str,
         context: dict | None = None,
+        projection: Projection | None = None,
     ) -> dict:
         """Programmatically select Brain-side state before hand dispatch."""
+        if projection is None:
+            projection = build_projection(self, domain=domain, question=question)
+        sections = projection.sections
+        return {
+            "domain": domain,
+            "projection": {
+                "content_id": projection.content_id,
+                "state_version": projection.state_version,
+                "schema_version": projection.schema_version,
+            },
+            "brain_md": sections.get("brain_md", ""),
+            "strategy_rules": sections.get("strategy_rules", []),
+            "frameworks": sections.get("frameworks", []),
+            "intent_stream": sections.get("intent_stream", ""),
+            "intent_wiki": sections.get("intent_wiki", ""),
+            "policy_plan": sections.get("policy_plan", ""),
+            "learned_notes": sections.get("learned_notes", []),
+            "last_synthesis": sections.get("last_synthesis", ""),
+            "intent_context": sections.get("intent_context", {}),
+            "recent_intents": sections.get("recent_intents", []),
+            "request_context": context or {},
+        }
+
         self.state._reload()
         rules = self.state.query_rules(domain, question)
         frameworks = self.state.query_frameworks(domain, hand_claims=None, min_confidence="medium")
@@ -232,15 +308,29 @@ class BrainHarness:
         detail_panels: dict[str, dict] = {}
         quality_gaps: list[str] = []
 
-        for hand_id in workflow_decision.get("hands", list(hand_artifacts.keys())):
-            artifact = hand_artifacts.get(hand_id, {})
+        # Wave 1: workflow_decision may contain `tasks` (task_id-keyed artifacts).
+        # Fall back to `hands` (hand_id-keyed) for backward compatibility.
+        task_list = workflow_decision.get("tasks", [])
+        if task_list:
+            card_keys = [t["task_id"] for t in task_list]
+        else:
+            card_keys = workflow_decision.get("hands", list(hand_artifacts.keys()))
+
+        for key in card_keys:
+            artifact = hand_artifacts.get(key, {})
             meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
-            hand_spec = presentation_spec.get("hand_specs", {}).get(hand_id, {})
+            # Resolve the actual hand_id (may differ from key when keyed by task_id)
+            hand_id = meta.get("hand_id", key)
+            hand_spec = (
+                presentation_spec.get("hand_specs", {}).get(key)
+                or presentation_spec.get("hand_specs", {}).get(hand_id, {})
+            )
             claims = list(meta.get("key_claims", []) or [])
             gaps = list(meta.get("gaps", []) or [])
             sections = self._normalize_sections(artifact, claims, gaps)
             evidence = list(artifact.get("evidence", []) or []) if isinstance(artifact, dict) else []
             source_notes = list(meta.get("source_notes", []) or [])
+            agents = self._compose_agent_details(meta, hand_id, hand_spec)
             layers = self._compose_detail_layers(
                 schema=presentation_spec.get("ui_contract", {})
                 .get("detail_layer", {})
@@ -262,22 +352,26 @@ class BrainHarness:
                 quality_gaps.append(f"{hand_id}: claims exist but evidence rows are missing")
 
             cards.append({
-                "hand_id": hand_id,
-                "title": self._hand_title(hand_id),
+                "hand_id": key,             # task_id (Wave 1) or hand_id (legacy)
+                "title": self._hand_title(hand_id),  # human-readable from actual hand_id
                 "visible_role": hand_spec.get("visible_role", ""),
                 "visible_summary": artifact.get("narrative", "") if isinstance(artifact, dict) else "",
                 "confidence": meta.get("confidence", 0.0),
-                "detail_ref": hand_id,
+                "detail_ref": key,
             })
-            detail_panels[hand_id] = {
-                "hand_id": hand_id,
+            detail_panels[key] = {
+                "hand_id": hand_id,         # actual hand (for rendering + title lookup)
+                "task_id": key,             # card identifier (task_id or hand_id)
                 "title": self._hand_title(hand_id),
                 "sections": sections,
                 "layers": layers,
                 "evidence": evidence,
                 "source_notes": source_notes,
                 "gaps": gaps,
+                "key_claims": claims,
+                "resources_used": list(meta.get("resources_used", []) or []),
                 "brain_requirements": hand_spec,
+                "agents": agents,
             }
 
         overview = {
@@ -317,6 +411,8 @@ class BrainHarness:
             f"**Reversal:** {synthesis.get('reversal_condition')}\n",
             encoding="utf-8",
         )
+        if hasattr(self.state, "bump_state_version"):
+            self.state.bump_state_version()
 
     @staticmethod
     def _serialize(value):
@@ -336,6 +432,40 @@ class BrainHarness:
             "target": "Targets",
             "position": "Position",
         }.get(hand_id, hand_id.title())
+
+    @staticmethod
+    def _brief_responsibility(meta: dict, hand_spec: dict) -> str:
+        prompt = str(meta.get("system_prompt") or "").strip()
+        if prompt:
+            text = prompt
+            for prefix in ("You are an ", "You are a ", "You are "):
+                if text.startswith(prefix):
+                    text = text[len(prefix):]
+                    break
+            if text.startswith("You "):
+                text = text[len("You "):]
+            text = text[:1].upper() + text[1:] if text else ""
+            return text.split("\n", 1)[0].strip()
+        visible_role = str(hand_spec.get("visible_role") or "").strip()
+        if visible_role:
+            return visible_role[:1].upper() + visible_role[1:]
+        dimension = str(meta.get("dimension") or "").strip()
+        if dimension:
+            return f"Cover the {dimension} dimension."
+        return "Provide focused supporting analysis for this card."
+
+    def _compose_agent_details(self, meta: dict, hand_id: str, hand_spec: dict) -> list[dict]:
+        agents = meta.get("hand_agents")
+        if isinstance(agents, list) and agents:
+            return [a for a in agents if isinstance(a, dict)]
+        return [{
+            "hand_id": meta.get("hand_id") or hand_id,
+            "executor_id": meta.get("executor_id") or hand_id,
+            "task_id": meta.get("task_id", ""),
+            "dimension": meta.get("dimension", ""),
+            "capabilities": list(meta.get("capabilities") or []),
+            "responsibility": self._brief_responsibility(meta, hand_spec),
+        }]
 
     @staticmethod
     def _normalize_sections(artifact: dict, claims: list[str], gaps: list[str]) -> list[dict]:
@@ -582,6 +712,89 @@ class BrainHarness:
             })
         return provenance
 
+    # ── B-planning: analysis plan before dispatch ─────────────────────────────
+
+    async def plan(
+        self,
+        question: str,
+        workflow_decision: dict,
+        client,
+        model: str,
+        projection: Projection | None = None,
+    ) -> dict:
+        """Brain writes analysis rubrics — dimensions to cover, not per-hand assignments."""
+        domain = workflow_decision.get("domain", "general")
+        system = self._assemble_prompt(domain=domain, question=question, projection=projection)
+        available_hands = workflow_decision.get("hands", [])
+        user_msg = (
+            f"User question: {question}\n\n"
+            f"Available hands: {json.dumps(available_hands, ensure_ascii=False)}\n\n"
+            "Output an analysis plan as JSON.\n"
+            "Define rubrics (analysis dimensions) — do NOT assign per-hand tasks:\n"
+            '{"analysis_plan":{'
+            '"sub_questions":["sub-q1","sub-q2"],'
+            '"rubrics":[{"dimension":"宏观面","requirements":"利率、通胀、就业数据"},{"dimension":"资金面","requirements":"机构持仓"}],'
+            '"excluded_hands":["hand_id_not_needed"],'
+            '"coverage_target":"what the combined analysis must cover"}}'
+        )
+        resp = await client.messages.create(
+            model=model, max_tokens=1024, system=system,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        text = "".join(b.text for b in resp.content if hasattr(b, "text")).strip()
+        parsed = _parse_json(text) or {}
+        plan_data = parsed.get("analysis_plan") if isinstance(parsed, dict) else {}
+        if not isinstance(plan_data, dict) or not plan_data.get("rubrics"):
+            # Fallback: generic rubric based on question
+            plan_data = {
+                "sub_questions": [question],
+                "rubrics": [{"dimension": "综合分析", "requirements": question}],
+                "excluded_hands": [],
+                "coverage_target": "",
+            }
+        return plan_data
+
+    # ── B-review: gap analysis after first round ──────────────────────────────
+
+    async def review(
+        self,
+        question: str,
+        analysis_plan: dict,
+        hand_artifacts: dict[str, dict],
+        client,
+        model: str,
+    ) -> dict:
+        """Brain reviews first-round hand outputs: rubric coverage + gaps."""
+        domain = analysis_plan.get("domain", "general")
+        system = self._assemble_prompt(domain=domain, question=question)
+        rubrics = analysis_plan.get("rubrics", [])
+        lines = [f"User question: {question}\n", f"Analysis rubrics: {json.dumps(rubrics, ensure_ascii=False)}\n"]
+        for hand_id, art in hand_artifacts.items():
+            meta = art.get("metadata", {}) if isinstance(art, dict) else {}
+            claims = meta.get("key_claims", []) or []
+            n_sections = len(art.get("sections", []) if isinstance(art, dict) else [])
+            gaps = meta.get("gaps", []) or []
+            lines.append(f"[{hand_id}] confidence={meta.get('confidence','?')}, {n_sections} sections, {len(gaps)} gaps")
+            for c in (claims or [])[:3]:
+                ct = c.get("claim", c) if isinstance(c, dict) else c
+                rubric = c.get("rubric", "") if isinstance(c, dict) else ""
+                lines.append(f"  - [{rubric}] {ct}" if rubric else f"  - {ct}")
+        user_msg = (
+            "\n".join(lines) + "\n\n"
+            "Output review as JSON. Check RUBRIC COVERAGE (not individual hand quality):\n"
+            '{"rubric_coverage":{"宏观面":"covered|partial|missing","资金面":"covered|partial|missing"},'
+            '"confidence_gaps":["gap desc"],'
+            '"follow_up_needed":false,'
+            '"follow_up_tasks":[{"hand_id":"market","task":"specific task"}]}'
+        )
+        resp = await client.messages.create(
+            model=model, max_tokens=1024, system=system,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        text = "".join(b.text for b in resp.content if hasattr(b, "text")).strip()
+        parsed = _parse_json(text) or {}
+        return parsed if isinstance(parsed, dict) else {}
+
     # ── B-business synthesis ───────────────────────────────────────────────────
 
     async def synthesize(
@@ -591,6 +804,8 @@ class BrainHarness:
         workflow_decision: dict,
         client,
         model: str,
+        analysis_plan: dict | None = None,
+        review_result: dict | None = None,
     ) -> dict:
         """One LLM call: key_claims × pre-selected strategy rules → synthesis."""
         domain = workflow_decision.get("domain", "general")
@@ -605,7 +820,7 @@ class BrainHarness:
         # (framework variable-overlap gate now has real claim tokens to match against)
         system = self._assemble_prompt_with_claims(domain, question, hand_claims_map)
 
-        # Hand summary: key_claims only (not full narrative)
+        # Hand summary: key_claims + narrative snippet + coverage stats
         blocks: list[str] = []
         for hand_id, art in hand_artifacts.items():
             meta = art.get("metadata", {})
@@ -616,6 +831,13 @@ class BrainHarness:
                 claims = meta.get("key_claims", [])
                 confidence = meta.get("confidence", "?")
                 sources = meta.get("resources_used", [])
+                narrative = (art.get("narrative", "") or "")[:200]
+                n_evidence = len(art.get("evidence", []) or [])
+                gaps = meta.get("gaps", [])
+                n_sections = len(art.get("sections", []) or [])
+                raw_srcs = art.get("raw_sources", []) or []
+                n_web = sum(1 for s in raw_srcs if isinstance(s, dict) and s.get("resource_id") == "web_search")
+                n_fetch = sum(1 for s in raw_srcs if isinstance(s, dict) and s.get("resource_id") == "fetch_url")
                 def _claim_text(item):
                     if isinstance(item, str):
                         return item
@@ -628,19 +850,50 @@ class BrainHarness:
                 blocks.append(
                     f"### [{hand_id}] confidence={confidence}\n"
                     f"sources: {sources}\n"
+                    f"narrative: {narrative}\n"
+                    f"coverage: {n_sections} sections, {n_evidence} evidence rows, {len(gaps)} gaps, "
+                    f"{len(raw_srcs)} raw_sources ({n_web} web_search, {n_fetch} fetch_url)\n"
                     f"key_claims:\n{claims_text}"
                 )
 
         hands_text = "\n\n".join(blocks) if blocks else "(no hand outputs — cold run)"
 
+        plan_text = ""
+        if analysis_plan:
+            sub_qs = analysis_plan.get("sub_questions", [])
+            rubrics = analysis_plan.get("rubrics", [])
+            parts = []
+            if sub_qs:
+                parts.append("Analysis plan sub-questions to cover:\n" + "\n".join(f"  - {q}" for q in sub_qs))
+            if rubrics:
+                parts.append("Analysis rubrics (organize key_drivers by these):\n" + "\n".join(
+                    f"  - {r['dimension']}: {r['requirements']}" for r in rubrics if isinstance(r, dict)))
+            plan_text = "\n".join(parts) + "\n" if parts else ""
+        review_text = ""
+        if review_result and isinstance(review_result, dict):
+            uncovered = review_result.get("uncovered_sub_questions", [])
+            gaps = review_result.get("confidence_gaps", [])
+            if uncovered or gaps:
+                review_text = (
+                    "Review gaps to address:\n"
+                    + "\n".join(f"  - UNCOVERED: {q}" for q in (uncovered or []))
+                    + "\n"
+                    + "\n".join(f"  - LOW CONFIDENCE: {g}" for g in (gaps or []))
+                    + "\n"
+                )
+
         user_msg = (
             f"User question: {question}\n\n"
             f"Workflow decision: {json.dumps(workflow_decision, ensure_ascii=False)}\n\n"
             f"Hand summaries:\n\n{hands_text}\n\n"
+            f"{plan_text}"
+            f"{review_text}"
+            "Organize key_drivers by rubric dimension when possible. Optionally include rubric_coverage to show which dimensions are addressed.\n"
             "Output ONLY a single JSON object (no other text):\n"
             '{"stance":"buy|hold|reduce|n/a",'
             '"confidence":0.0,'
-            '"key_drivers":[{"rule":"<strategy rule id or text>","hand":"<hand_id>","claim":"<specific claim>"}],'
+            '"key_drivers":[{"rule":"...","hand":"<hand_id>","claim":"<specific claim>","rubric":"<rubric dimension>"}],'
+            '"rubric_coverage":{"宏观面":"covered|partial|missing","资金面":"..."},'
             '"reversal_condition":"...",'
             '"strategy_refs":["rule-id-1"],'
             '"clarifying_question":null,'

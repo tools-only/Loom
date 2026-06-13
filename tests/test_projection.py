@@ -15,6 +15,7 @@ from loom.brain_harness.projection import (
     canonical_serialize,
     content_id,
 )
+from loom.brain_harness.state import BrainState
 
 
 class TestCanonicalSerialize(unittest.TestCase):
@@ -180,6 +181,40 @@ class TestBuildProjection(unittest.TestCase):
         assert result.sections["intent_stream"] == ""
         assert result.sections["intent_context"] == {}
         assert result.sections["recent_intents"] == []
+
+
+class TestBrainStateVersion(unittest.TestCase):
+    def test_append_note_increments_state_version(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state = BrainState(Path(tmp))
+            before = state.get_state_version()
+
+            state.append_note("general", "prefer source-backed detail")
+
+            self.assertEqual(before + 1, state.get_state_version())
+
+    def test_append_framework_increments_state_version(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            state = BrainState(Path(tmp))
+            before = state.get_state_version()
+
+            state.append_framework({
+                "framework_id": "fw-1",
+                "name": "Framework",
+                "key_variables": [],
+                "decision_logic": "Use evidence.",
+                "weight_hints": {},
+                "failure_conditions": [],
+                "confidence": "medium",
+                "tags": [],
+                "distilled_at": "2026-06-13T00:00:00",
+            })
+
+            self.assertEqual(before + 1, state.get_state_version())
 
 
 if __name__ == "__main__":

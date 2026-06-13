@@ -61,6 +61,7 @@ class TaskDecomposer:
         state_context: dict,
         registered_shells: list[str] | None = None,
         analysis_plan: dict | None = None,
+        projection: Any | None = None,
     ) -> HandPlan:
         """Decompose goal into atomic tasks.
 
@@ -72,7 +73,7 @@ class TaskDecomposer:
         shells = list(registered_shells or [])
         try:
             return await self._llm_decompose(
-                goal, domain, state_context, shells, analysis_plan
+                goal, domain, state_context, shells, analysis_plan, projection
             )
         except Exception:
             return self._fallback_plan(goal, domain)
@@ -84,6 +85,7 @@ class TaskDecomposer:
         state_context: dict,
         available_executors: list[str],
         analysis_plan: dict | None,
+        projection: Any | None,
     ) -> HandPlan:
         rubrics = (analysis_plan or {}).get("rubrics", [])
         rubric_text = (
@@ -94,7 +96,7 @@ class TaskDecomposer:
             if rubrics
             else "  (none yet - derive dimensions from goal and state)"
         )
-        state_summary = self._summarize_state_context(state_context)
+        state_summary = self._summarize_state_context(state_context, projection=projection)
         shells_text = (
             ", ".join(available_executors)
             if available_executors
@@ -120,7 +122,8 @@ class TaskDecomposer:
             "thermal headroom, and reliability risks. Cite measurements where available.\").\n"
             "- capabilities: list of short capability tags the hand needs, e.g. [\"portfolio\"],\n"
             "  [\"market_data\"], [\"filings\"]. Empty list [] is fine if no special capability is needed.\n"
-            "- Same priority tasks run in parallel; use depends_on only for true dependencies.\n\n"
+            "- Higher priority numbers dispatch first; same priority tasks run in parallel. "
+            "Use depends_on only for true dependencies.\n\n"
             "Output ONLY valid JSON, no explanation:\n"
             '{"rationale":"why this decomposition fits the goal/state","tasks":['
             '{"task_id":"t1","hand_id":"runtime-generated-agent",'
@@ -188,14 +191,33 @@ class TaskDecomposer:
         )
 
     @staticmethod
-    def _summarize_state_context(state_context: dict) -> str:
+    def _summarize_state_context(state_context: dict, projection: Any | None = None) -> str:
         if not state_context:
             return "(no selected state)"
         parts: list[str] = []
+        binding = state_context.get("projection")
+        if binding:
+            parts.append(f"projection: {json.dumps(binding, ensure_ascii=False)}")
+
+        if projection is not None:
+            parts.append(
+                "projection_binding: "
+                + json.dumps({
+                    "content_id": getattr(projection, "content_id", ""),
+                    "state_version": getattr(projection, "state_version", 0),
+                    "schema_version": getattr(projection, "schema_version", ""),
+                }, ensure_ascii=False)
+            )
+
         for key in (
+            "brain_md",
             "strategy_rules",
             "frameworks",
+            "intent_stream",
+            "intent_wiki",
+            "policy_plan",
             "learned_notes",
+            "last_synthesis",
             "intent_context",
             "recent_intents",
         ):

@@ -46,13 +46,16 @@ class AnalyticalFramework:
 CONFIDENCE_RANK: dict[str, int] = {"high": 3, "medium": 2, "low": 1, "untested": 0}
 
 
-def _extract_variable_tokens(hand_claims: dict[str, list[str]]) -> set[str]:
-    """Extract variable-like tokens from hand key_claims for framework matching."""
+def _extract_variable_tokens(hand_claims: dict) -> set[str]:
+    """Extract variable-like tokens from hand key_claims for framework matching.
+    Accepts both string[] and {claim:str}[] formats.
+    """
     tokens: set[str] = set()
     for claims in hand_claims.values():
         for claim in claims:
+            text = claim if isinstance(claim, str) else (claim.get("claim", "") if isinstance(claim, dict) else "")
             # Uppercase abbreviations (VIX, M2, RRP, TGA, CPI) + snake_case vars
-            tokens |= set(re.findall(r"[A-Z]{2,}|[a-z][a-z_]{2,}", claim.lower()))
+            tokens |= set(re.findall(r"[A-Z]{2,}|[a-z][a-z_]{2,}", text.lower()))
     return tokens
 
 
@@ -150,7 +153,15 @@ class BrainState:
         self._rules: list[StrategyRule] = []
         self._notes: list[LearnedNote] = []
         self._frameworks: list[AnalyticalFramework] = []
+        self._state_version: int = 0
         self._reload()
+
+    def get_state_version(self) -> int:
+        return self._state_version
+
+    def bump_state_version(self) -> int:
+        self._state_version += 1
+        return self._state_version
 
     # ── Loading ────────────────────────────────────────────────────────────────
 
@@ -292,6 +303,7 @@ class BrainState:
     def append_framework(self, fw_dict: dict) -> None:
         """Persist an accepted framework to frameworks.json and reload in-memory."""
         path = self.root / "brain" / "personal" / "frameworks.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
         existing: list[dict] = []
         if path.exists():
             try:
@@ -304,10 +316,12 @@ class BrainState:
         existing.append(fw_dict)
         path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
         self._load_frameworks()
+        self.bump_state_version()
 
     def append_note(self, domain: str, note: str, tags: list[str] | None = None) -> None:
         """Append a structured note to learned-notes.json."""
         path = self.root / "brain" / "personal" / "learned-notes.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
         existing: list[dict] = []
         if path.exists():
             try:
@@ -322,6 +336,7 @@ class BrainState:
         })
         path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
         self._load_notes()
+        self.bump_state_version()
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

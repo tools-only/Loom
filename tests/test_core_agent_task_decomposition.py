@@ -96,6 +96,18 @@ class _AgenticHarness(_FakeHarness):
         }
 
 
+class _ProjectionAwareHarness(_AgenticHarness):
+    def __init__(self):
+        super().__init__()
+        self.root = None
+        self.state = None
+        self.projection_seen_by_plan = None
+
+    async def plan(self, question, workflow_decision, client, model, projection=None):
+        self.projection_seen_by_plan = projection
+        return await super().plan(question, workflow_decision, client, model)
+
+
 
 class CoreAgentTaskDecompositionTests(unittest.TestCase):
     def test_analyze_injects_brain_presentation_spec_and_returns_presentation(self):
@@ -314,6 +326,130 @@ class CoreAgentTaskDecompositionTests(unittest.TestCase):
         self.assertEqual("You are a runtime risk analyzer. Focus on failure modes.", spec["system_prompt"])
         self.assertEqual(["portfolio"], spec["capabilities"])
         self.assertEqual("Risk agent result.", result["hand_artifacts"]["t1"]["narrative"])
+
+    def test_plan_and_decompose_share_projection_binding(self):
+        import tempfile
+        from pathlib import Path
+
+        seen = {}
+
+        class ProjectionHarness(_ProjectionAwareHarness):
+            def __init__(self, root):
+                super().__init__()
+                from loom.brain_harness.state import BrainState
+                from loom.brain_harness.intent_wiki import IntentWiki
+                from loom.brain_harness.intent_harness import RewardedIntentHarness
+
+                self.root = Path(root)
+                self.state = BrainState(self.root)
+                self._intent_stream = None
+                self.intent_wiki = IntentWiki(self.root)
+                self.rewarded_intent_harness = RewardedIntentHarness(self.root)
+                self._last_intent_activation = None
+                self._last_policy_plan = None
+
+            def cold_start(self):
+                return False
+
+            def select_state_context(self, domain, question, context, projection=None):
+                seen["projection_seen_by_state_context"] = projection
+                return super().select_state_context(domain, question, context)
+
+        async def hand_runner(hand_id, task, context):
+            return {
+                "metadata": {"confidence": 0.7, "key_claims": ["claim"], "gaps": []},
+                "narrative": "Runtime result.",
+                "sections": [],
+                "evidence": [],
+            }
+
+        client = _MessageClient(
+            '{"rationale":"one task","tasks":['
+            '{"task_id":"t1","hand_id":"runtime-evidence-agent","executor_id":"brain-inline",'
+            '"dimension":"evidence","task":"Collect evidence",'
+            '"system_prompt":"You are an evidence specialist.",'
+            '"capabilities":[],"rubrics":[],"priority":0,"depends_on":[]}'
+            ']}'
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            harness = ProjectionHarness(tmp)
+            agent = LoomCoreAgent(harness, _FakeDispatcher(), hand_runner, client=client, model="fake")
+            result = asyncio.run(agent.analyze("check projection", {}))
+
+        projection = harness.projection_seen_by_plan
+        self.assertIsNotNone(projection)
+        self.assertIs(seen["projection_seen_by_state_context"], projection)
+        self.assertEqual(projection.content_id, result["hand_plan"]["projection"]["content_id"])
+        self.assertEqual(projection.state_version, result["hand_plan"]["projection"]["state_version"])
+
+    def test_task_dependencies_wait_for_predecessor_completion(self):
+        events = []
+
+        async def hand_runner(hand_id, task, context):
+            runtime_hand = context["agentic_hand_spec"]["hand_id"]
+            events.append(("start", runtime_hand))
+            if runtime_hand == "runtime-first":
+                await asyncio.sleep(0.01)
+            events.append(("end", runtime_hand))
+            return {
+                "metadata": {"confidence": 0.8, "key_claims": [runtime_hand], "gaps": []},
+                "narrative": f"{runtime_hand} done.",
+                "sections": [],
+                "evidence": [],
+            }
+
+        client = _MessageClient(
+            '{"rationale":"second depends on first","tasks":['
+            '{"task_id":"t1","hand_id":"runtime-first","executor_id":"brain-inline",'
+            '"dimension":"first","task":"First task",'
+            '"system_prompt":"You are first.","capabilities":[],"rubrics":[],'
+            '"priority":0,"depends_on":[]},'
+            '{"task_id":"t2","hand_id":"runtime-second","executor_id":"brain-inline",'
+            '"dimension":"second","task":"Second task",'
+            '"system_prompt":"You are second.","capabilities":[],"rubrics":[],'
+            '"priority":0,"depends_on":["t1"]}'
+            ']}'
+        )
+        agent = LoomCoreAgent(_AgenticHarness(), _FakeDispatcher(), hand_runner, client=client, model="fake")
+
+        asyncio.run(agent.analyze("run in order", {}))
+
+        self.assertLess(
+            events.index(("end", "runtime-first")),
+            events.index(("start", "runtime-second")),
+        )
+
+    def test_ready_tasks_dispatch_by_priority_then_task_id(self):
+        events = []
+
+        async def hand_runner(hand_id, task, context):
+            runtime_hand = context["agentic_hand_spec"]["hand_id"]
+            events.append(runtime_hand)
+            return {
+                "metadata": {"confidence": 0.8, "key_claims": [runtime_hand], "gaps": []},
+                "narrative": f"{runtime_hand} done.",
+                "sections": [],
+                "evidence": [],
+            }
+
+        client = _MessageClient(
+            '{"rationale":"priority order","tasks":['
+            '{"task_id":"b","hand_id":"runtime-low","executor_id":"brain-inline",'
+            '"dimension":"low","task":"Low priority task",'
+            '"system_prompt":"You are low.","capabilities":[],"rubrics":[],'
+            '"priority":1,"depends_on":[]},'
+            '{"task_id":"a","hand_id":"runtime-high","executor_id":"brain-inline",'
+            '"dimension":"high","task":"High priority task",'
+            '"system_prompt":"You are high.","capabilities":[],"rubrics":[],'
+            '"priority":5,"depends_on":[]}'
+            ']}'
+        )
+        agent = LoomCoreAgent(_AgenticHarness(), _FakeDispatcher(), hand_runner, client=client, model="fake")
+
+        asyncio.run(agent.analyze("run by priority", {}))
+
+        self.assertEqual(["runtime-high", "runtime-low"], events)
 
 
 if __name__ == "__main__":
