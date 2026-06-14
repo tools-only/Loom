@@ -160,6 +160,35 @@ class RawRenderingTests(unittest.TestCase):
         self.assertIn('data-layer-type="raw_item"', html)
         self.assertIn("regime signal", html)
 
+    def test_render_artifact_includes_agent_detail_section(self):
+        from loom.brain import _render_artifact
+
+        artifact = {
+            "metadata": {
+                "hand_id": "runtime-risk-agent-0",
+                "executor_id": "brain-inline",
+                "task_id": "t1",
+                "dimension": "Risk synthesis",
+                "system_prompt": "You are a runtime risk analyzer. Focus on failure modes.",
+                "capabilities": ["portfolio"],
+                "confidence": 0.8,
+                "key_claims": ["Risk is concentrated"],
+                "gaps": [],
+            },
+            "narrative": "Risk agent result.",
+            "sections": [],
+            "evidence": [],
+        }
+
+        html = _render_artifact(artifact, "t1")
+
+        self.assertIn('data-detail-section="agents"', html)
+        self.assertIn('data-detail-label="Agent"', html)
+        self.assertIn("runtime-risk-agent-0", html)
+        self.assertIn("brain-inline", html)
+        self.assertIn("Risk synthesis", html)
+        self.assertIn("runtime risk analyzer", html.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

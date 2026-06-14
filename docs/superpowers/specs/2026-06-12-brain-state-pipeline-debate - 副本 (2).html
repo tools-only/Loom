@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brain 编排架构 · 渐进式说明</title>
+<style>
+:root {
+  --bg: #f7f5ef;
+  --ink: #15161b;
+  --ink-soft: #2a2d36;
+  --muted: #6a6f7a;
+  --line: rgba(21, 22, 27, 0.10);
+  --line-strong: rgba(21, 22, 27, 0.22);
+  --panel: #ffffff;
+  --panel-soft: #faf8f3;
+  --violet: #6f4ff2;
+  --blue: #1267b3;
+  --green: #087a5b;
+  --amber: #a66b00;
+  --rose: #b43d63;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.65;
+}
+.page {
+  width: min(960px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 40px 0 80px;
+}
+.hero {
+  margin-bottom: 24px;
+}
+.eyebrow {
+  display: inline-flex;
+  padding: 5px 11px;
+  border: 1px solid rgba(111, 79, 242, 0.25);
+  border-radius: 999px;
+  color: var(--violet);
+  background: rgba(111, 79, 242, 0.08);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+h1 {
+  margin: 16px 0 10px;
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.lede {
+  max-width: 720px;
+  color: var(--muted);
+  font-size: 16.5px;
+}
+
+/* Level navigation */
+.levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 22px 0 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.level-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid var(--line);
+}
+.level-chip strong {
+  color: var(--ink);
+}
+.level-chip:hover {
+  background: rgba(111, 79, 242, 0.06);
+  border-color: rgba(111, 79, 242, 0.25);
+}
+
+/* Sections */
+section.level {
+  margin: 28px 0;
+  padding: 26px 28px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(20, 21, 28, 0.04);
+}
+.level-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.level-tag {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--violet);
+  text-transform: uppercase;
+}
+h2 {
+  margin: 0 0 10px;
+  font-size: 22px;
+  letter-spacing: -0.005em;
+}
+h3 {
+  margin: 18px 0 6px;
+  font-size: 15px;
+  color: var(--ink);
+}
+.tldr {
+  margin: 4px 0 14px;
+  padding: 10px 14px;
+  background: var(--panel-soft);
+  border-left: 3px solid var(--violet);
+  border-radius: 6px;
+  font-size: 14.5px;
+  color: var(--ink-soft);
+}
+p { margin: 0 0 10px; color: var(--ink-soft); }
+ul, ol { margin: 6px 0 0 20px; padding: 0; color: var(--ink-soft); }
+li { margin: 4px 0; }
+code {
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 12.5px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(111, 79, 242, 0.09);
+  color: #5037bd;
+}
+
+/* Tiny diagrams */
+.diag {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0 8px;
+  padding: 18px;
+  background: var(--panel-soft);
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+}
+.box {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 110px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: center;
+}
+.box small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.box.brain { border-color: var(--violet); color: var(--violet); }
+.box.hand { border-color: var(--blue); color: var(--blue); }
+.box.state { border-color: var(--green); color: var(--green); }
+.box.adapter { border-color: var(--amber); color: var(--amber); }
+.box.governor { border-color: var(--rose); color: var(--rose); }
+.arrow {
+  font-size: 22px;
+  color: var(--muted);
+  user-select: none;
+}
+
+/* Concept cards */
+.concept {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.concept h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.concept h4 .tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+.tag.def { background: rgba(111, 79, 242, 0.12); color: var(--violet); }
+.tag.why { background: rgba(166, 107, 0, 0.12); color: var(--amber); }
+.tag.has { background: rgba(8, 122, 91, 0.12); color: var(--green); }
+.tag.gap { background: rgba(180, 61, 99, 0.12); color: var(--rose); }
+.concept p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+/* State dimension grid */
+.dim-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+.dim {
+  padding: 12px 14px;
+  background: var(--panel-soft);
+  border-left: 3px solid var(--violet);
+  border-radius: 6px;
+  font-size: 13.5px;
+}
+.dim strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: 13.5px;
+}
+.dim small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.dim.core { border-left-color: var(--violet); }
+.dim.opt { border-left-color: var(--blue); }
+.dim.long { border-left-color: var(--green); }
+
+/* Spec list */
+.spec-list {
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+.spec-list li {
+  padding: 8px 12px;
+  margin: 4px 0;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+.spec-list li strong {
+  color: var(--ink);
+}
+
+/* Matrix table */
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 12px 0;
+  background: var(--panel);
+}
+.matrix th, .matrix td {
+  border: 1px solid var(--line);
+  padding: 9px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.matrix th {
+  background: var(--panel-soft);
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.matrix tr td:first-child { font-weight: 600; color: var(--ink); width: 22%; }
+
+/* Notes */
+.note {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--blue);
+  background: rgba(18, 103, 179, 0.05);
+  border-radius: 6px;
+  font-size: 13.5px;
+  color: #1a3b58;
+}
+.note.warn {
+  border-left-color: var(--rose);
+  background: rgba(180, 61, 99, 0.05);
+  color: #5e2b40;
+}
+
+@media (max-width: 720px) {
+  .dim-grid { grid-template-columns: 1fr; }
+  .diag { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+
+  <header class="hero">
+    <span class="eyebrow">Loom Brain · 渐进式架构</span>
+    <h1>从三个盒子讲起：Brain 怎么编排 Hand 完成任务</h1>
+    <p class="lede">
+      把方案展开成 <strong>7 个递进的 Level</strong>。每一层只新增 1–2 个概念，每个概念先一句话定义、再说它解决什么问题、最后列出它的能力或维度。
+      读者读到任何一层都能停下来，因为下一层不会推翻前一层。
+    </p>
+    <nav class="levels">
+      <a class="level-chip" href="#l0"><strong>L0</strong> 一句话</a>
+      <a class="level-chip" href="#l1"><strong>L1</strong> 最小骨架</a>
+      <a class="level-chip" href="#l2"><strong>L2</strong> 一次任务</a>
+      <a class="level-chip" href="#l3"><strong>L3</strong> State 维度</a>
+      <a class="level-chip" href="#l4"><strong>L4</strong> Adapter</a>
+      <a class="level-chip" href="#l5"><strong>L5</strong> 治理与修复</a>
+      <a class="level-chip" href="#l6"><strong>L6</strong> 复用与对外</a>
+      <a class="level-chip" href="#l7"><strong>L7</strong> 审计与重放</a>
+      <a class="level-chip" href="#l8"><strong>L8</strong> 反馈回流</a>
+      <a class="level-chip" href="#l9"><strong>L9</strong> 资源与 Wiki</a>
+      <a class="level-chip" href="#l10"><strong>L10</strong> Hand 原子化</a>
+      <a class="level-chip" href="#l11"><strong>L11</strong> IntentWiki=Meta 策略</a>
+      <a class="level-chip" href="#l12"><strong>L12</strong> Brain 是策略中心</a>
+      <a class="level-chip" href="#l13"><strong>L13</strong> NanoRLM 对照</a>
+    </nav>
+  </header>
+
+  <!-- L0 -->
+  <section class="level" id="l0">
+    <div class="level-head"><span class="level-tag">Level 0 · 一句话</span></div>
+    <h2>这个系统到底在干什么？</h2>
+    <div class="tldr">
+      <strong>Brain</strong> 接到一个用户问题 → 拆成几个小任务交给 <strong>Hand</strong> 去做 → 把 Hand 的结果合成一份带证据的判断返回。
+      所有"跑过什么"的痕迹都住在 <strong>State</strong> 里，下一次还能用。
+    </div>
+    <p>
+      接下来每一层都只在这张图上加一点东西，不替换它。
+    </p>
+  </section>
+
+  <!-- L1 -->
+  <section class="level" id="l1">
+    <div class="level-head"><span class="level-tag">Level 1 · 最小骨架</span></div>
+    <h2>三个盒子：Brain、Hand、State</h2>
+
+    <div class="diag">
+      <div class="box brain">Brain<small>编排者</small></div>
+      <span class="arrow">→</span>
+      <div class="box hand">Hand × N<small>执行者</small></div>
+      <span class="arrow">↻</span>
+      <div class="box state">State<small>共享档案</small></div>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">是什么</span> Brain</h4>
+      <p>项目经理。读问题、定计划、挑人、收成果、写综述。<strong>不直接干活</strong>。</p>
+    </div>
+    <div class="concept">
+      <h4><span class="tag def">是什么</span> Hand</h4>
+      <p>具体执行者，一个 <strong>原子任务</strong> 的执行壳。Hand 不按 domain 划分（"市场"不是 hand 颗粒度），而是按"能独立交付一个明确子问题"为单位。
+      例：<em>"取过去 5 天 VIX 序列并判断趋势"</em>、<em>"读这家公司最新 8-K 找重大事件"</em>、<em>"比较 SOX 行业当前 PE 在 5 年分位中的位置"</em>。
+      <strong>不做全局综合判断</strong>——综合归 Brain。<br/>
+      <span class="tag gap">原方案缺口</span> 当前 <code>loom/hands/{market,sentiment,target,position}.py</code> 太粗，
+      "market hand" 实际包揽了宏观、流动性、广度、轮动、催化五件事。L10 会拆开它。</p>
+    </div>
+    <div class="concept">
+      <h4><span class="tag def">是什么</span> State</h4>
+      <p>共享档案室。所有跨次数、跨任务可复用的信息住在这里：规则、框架、过往结论、用户偏好。Brain 写完综述把 state 更新一下，下次开局就能用。</p>
+    </div>
+
+    <p style="margin-top:14px">
+      代码里已经存在的对应物：<code>LoomCoreAgent</code>（Brain）、<code>loom/hands/</code>（Hand）、<code>BrainState + GoalContext + IntentWiki + Flywheel</code>（State 的多张面孔）。
+    </p>
+  </section>
+
+  <!-- L2 -->
+  <section class="level" id="l2">
+    <div class="level-head"><span class="level-tag">Level 2 · 一次任务</span></div>
+    <h2>"跑一次任务"具体经历什么</h2>
+    <div class="tldr">
+      一次任务的全部经历 = <strong>一个 Episode</strong>。它是 Brain 处理某个问题的完整记录，从问题进来到结论出去。
+    </div>
+
+    <div class="diag">
+      <div class="box brain">① 计划</div>
+      <span class="arrow">→</span>
+      <div class="box hand">② 派活</div>
+      <span class="arrow">→</span>
+      <div class="box brain">③ 验收</div>
+      <span class="arrow">→</span>
+      <div class="box brain">④ 综合</div>
+      <span class="arrow">→</span>
+      <div class="box state">⑤ 存档</div>
+    </div>
+
+    <h3>四个主流程（Brain 已经具备的雏形）</h3>
+    <ol>
+      <li><strong>计划 Plan</strong>：Brain 读问题，写下"这次要看哪些维度"（rubrics）。</li>
+      <li><strong>派活 Dispatch</strong>：Brain 选 N 个 Hand，把任务和验收维度一起交出去；Hand 并行执行。</li>
+      <li><strong>验收 Review</strong>：Brain 收回 hand artifacts，按 rubric 检查覆盖度；缺的派"修复 Hand"。</li>
+      <li><strong>综合 Synthesize</strong>：Brain 写出最终结论（stance / confidence / reversal / watch）。</li>
+    </ol>
+
+    <div class="concept">
+      <h4><span class="tag def">新增概念</span> Episode（一次任务记录）</h4>
+      <p>把上面五步之中发生的<strong>所有事件</strong>串成一条只追加的事件日志，存为一个文件：<code>brain/episodes/&lt;episode_id&gt;.jsonl</code>。
+      事件类型包括 <code>phase.start / dispatch.sent / dispatch.artifact / review.flag / synthesis.partial / state.checkpoint</code> 等。
+      <strong>Episode 让任务变成可暂停、可恢复、可回放的对象</strong>，而不是一次性函数调用。</p>
+    </div>
+
+    <div class="note">
+      ① ② ③ ④ ⑤ 之间不是严格线性。比如 ③ 发现缺口可以回到 ②；用户在任何点都可以中断。
+      所以底层用<strong>事件驱动的状态机</strong>实现，外层呈现成五个步骤只是为了讲清楚。
+    </div>
+  </section>
+
+  <!-- L3 -->
+  <section class="level" id="l3">
+    <div class="level-head"><span class="level-tag">Level 3 · State 维度</span></div>
+    <h2>State 里都装些什么？</h2>
+    <div class="tldr">
+      把"跑一次任务的所有变量"分成三圈：<strong>核心圈</strong>（每个 Episode 必有）、<strong>增强圈</strong>（让方案更稳健）、<strong>长期圈</strong>（跨 Episode 累积）。
+      原 spec 只覆盖了核心圈的一半，本节把缺的补齐。
+    </div>
+
+    <h3>核心圈 · 没有它跑不起来（6 项）</h3>
+    <div class="dim-grid">
+      <div class="dim core"><strong>目标 Goal</strong>用户到底想要什么；包括 success_criteria、deadline、优先级。<small>用例：判断什么时候算"做完了"。</small></div>
+      <div class="dim core"><strong>验收维度 Rubrics</strong>这次要看的几个面（如"宏观、估值、催化"），每个面有 requirements / acceptance。<small>用例：让 Hand 知道要交什么样的料；让 Brain 知道验什么。</small></div>
+      <div class="dim core"><strong>Hand 派单 Hand Spec</strong>本次具体派哪些<strong>原子任务</strong>、每个 Hand 拿到的精确子问题、绑定的 Adapter、只暴露给它的 <strong>state 切片</strong>（不全暴露）。<small>用例：替代粗粒度的"domain → 固定 4 个 Hand"映射。</small></div>
+      <div class="dim core"><strong>执行轨迹 Trace</strong>事件日志：每个阶段什么时候开始结束、哪个 dispatch 发了什么、收到什么。<small>用例：失败恢复、debug、replay。</small></div>
+      <div class="dim core"><strong>缺口 Quality Gaps</strong>Review 时发现的覆盖不全、证据陈旧、置信偏低、互相冲突的地方。<small>用例：触发修复 Hand；告知用户哪里不确定。</small></div>
+      <div class="dim core"><strong>输出 Synthesis + Data Product</strong>最终结论 + 一个版本化、可被外部消费的结构化数据负载。<small>用例：UI 渲染、自动化下游消费。</small></div>
+    </div>
+
+    <h3>增强圈 · 让方案稳健的关键 4 项</h3>
+    <div class="dim-grid">
+      <div class="dim opt"><strong>能力清单 Capability Inventory</strong>规划时刻快照：哪些 Adapter 可用、各自模型/工具/上下文上限/单调成本/p50 延时/信任档位。<small>用例：HandPlanner 选 Hand 时按能力匹配，而不是按 domain 表。</small></div>
+      <div class="dim opt"><strong>预算 Budget</strong>token / 成本 / 墙钟 / 截止时间；可分到 per-dispatch、per-phase。<small>用例：防止单个 Hand 把整个 Episode 吃光；触线即提前转 Synthesizing。</small></div>
+      <div class="dim opt"><strong>上下文 Context Packet</strong>这次注入给每个 agent 的内容指针：rule_ids / framework_ids / 最近 intent / 上次综述哈希。<small>用例：用最小注入达到最大效果；预算压力下知道丢什么。</small></div>
+      <div class="dim opt"><strong>证据信任 Evidence &amp; Trust</strong>每条 claim 的 source / source_tier / freshness / confidence / hand_id / rubric。<small>用例：跨 Hand 互证、冲突识别、信任分级。</small></div>
+    </div>
+
+    <h3>长期圈 · 跨 Episode 累积的 3 项</h3>
+    <div class="dim-grid">
+      <div class="dim long"><strong>世界快照 World State</strong>规划时刻冻结的市场时钟、连接器健康、数据源新鲜度。<small>用例：保证 replay 可复现；区分"信息错"和"世界变了"。</small></div>
+      <div class="dim long"><strong>用户介入 User Interventions</strong>用户的编辑、锁定、拒绝、纠正；以及 Brain 主动求决的位置。<small>用例：喂给 CorrectionDetector；持久 Hand 晋升的否决权。</small></div>
+      <div class="dim long"><strong>分支 Branch</strong>同一 goal 下的 what-if、A/B framework；先预留字段不启用。<small>用例：未来支持探索性分析不破坏 schema。</small></div>
+    </div>
+
+    <div class="note">
+      <strong>读法：</strong>L4 之后所有"加层"动作，都对应给上面 13 项中的某一项加内容。所以读到这里就已经看到方案的全部 state 面貌了；后面只是给它们加机制。
+    </div>
+  </section>
+
+  <!-- L4 -->
+  <section class="level" id="l4">
+    <div class="level-head"><span class="level-tag">Level 4 · Adapter</span></div>
+    <h2>Hand 是异构的：用 Adapter 屏蔽差异</h2>
+
+    <div class="tldr">
+      Brain 不应该关心"这个 Hand 是 Claude 还是 GPT 还是本地 Llama"。中间加一层 <strong>Adapter</strong>，所有 Hand 长成同一个样子。
+      这是让方案"通用"的核心机制。
+    </div>
+
+    <div class="diag">
+      <div class="box brain">Brain</div>
+      <span class="arrow">→</span>
+      <div class="box adapter">Adapter<small>统一接口</small></div>
+      <span class="arrow">→</span>
+      <div class="box hand">Hand A<small>Claude API</small></div>
+      <div class="box hand">Hand B<small>SDK 循环</small></div>
+      <div class="box hand">Hand C<small>本地 Llama</small></div>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">是什么</span> Adapter</h4>
+      <p>"中介公司"。Brain 不直接联系员工（LLM），而是把任务交给中介，中介负责跑通底层差异。
+      Adapter 暴露的接口固定：<code>invoke(envelope) → AsyncIterator[event]</code>。无论后面挂的是闭源 API、SDK 循环、还是开源模型，对 Brain 来说看到的都是同一种事件流。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag why">为什么需要</span> 通用性 = 协议 + 能力位</h4>
+      <p>三类 Hand 能力天然不同：闭源 API 没办法做 bit-精确重放；开源模型可以。
+      Adapter 的方案是：<strong>所有 Adapter 实现同一个接口</strong>，但额外声明一个 <code>capabilities</code> 字典，告诉 Brain "我支持什么"。
+      Brain 优先用强能力，缺时优雅降级。</p>
+    </div>
+
+    <h3>Adapter 在仓库里已经存在的雏形</h3>
+    <p>翻代码：<code>loom_core/agent_adapters/providers/</code> 下已经有 6 个 provider：
+    <code>cc / codex / herms / opencode / openclaw / sdk_legacy</code>。
+    <code>sdk_legacy.py::InProcessAdapter.invoke()</code> 就是上面所说的契约。所以这一层<strong>不是新建，是规范化和补全能力声明</strong>。</p>
+
+    <h3>三类 Adapter 的能力差异</h3>
+    <table class="matrix">
+      <thead>
+        <tr><th>类别</th><th>看得到</th><th>看不到</th><th>能力位</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>闭源 API<br/>（Claude / GPT / Gemini）</td>
+          <td>消息进出、tool 定义、流式 token</td>
+          <td>内部草稿、确定性 seed、生成中状态注入</td>
+          <td><code>supports_tool_call_loop</code><br/><code>supports_streaming</code></td>
+        </tr>
+        <tr>
+          <td>SDK 工具循环<br/>（Anthropic / OpenAI SDK）</td>
+          <td>闭源 API 全部 + 工具调用流的细粒度</td>
+          <td>同上</td>
+          <td>+ <code>supports_partial_events</code></td>
+        </tr>
+        <tr>
+          <td>开源自托管<br/>（vLLM / Ollama / llama.cpp）</td>
+          <td>一切：token 级、logprobs、seed、KV cache</td>
+          <td>—</td>
+          <td>+ <code>supports_seed</code><br/>+ <code>supports_logprobs</code><br/>+ <code>supports_constrained_decoding</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      关键结论：<strong>Brain 只面向 Adapter 协议和事件流编程</strong>。新增任何一类 agent（包括未来某个新 SDK 或某个新开源模型）都不需要触碰 Brain。
+    </div>
+  </section>
+
+  <!-- L5 -->
+  <section class="level" id="l5">
+    <div class="level-head"><span class="level-tag">Level 5 · 治理与修复</span></div>
+    <h2>把"会失控的循环"治住</h2>
+
+    <div class="tldr">
+      没有治理的话，Brain 可能调用 Hand 直到把 token 烧光；Hand 可能返回 schema 不对的垃圾还被采用；Repair 可能死循环。
+      在 dispatch 周围加 <strong>三个闸门</strong>。
+    </div>
+
+    <div class="diag">
+      <div class="box brain">Brain</div>
+      <span class="arrow">→</span>
+      <div class="box governor">① 预算闸<small>Budget Governor</small></div>
+      <span class="arrow">→</span>
+      <div class="box adapter">Adapter</div>
+      <span class="arrow">→</span>
+      <div class="box governor">② Schema 闸<small>jsonschema 校验</small></div>
+      <span class="arrow">→</span>
+      <div class="box brain">Brain（收）</div>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">闸 ①</span> Budget Governor</h4>
+      <p>监听事件流的 <code>token_delta / completed</code>，按 episode / phase / dispatch 三级累加。
+      超阈值即抛 <code>BudgetExceeded</code>，Brain 收到后<strong>提前进入 Synthesize</strong>，把缺口写入 <code>quality_gaps</code>，不要让用户什么都看不到。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">闸 ②</span> Schema 校验</h4>
+      <p>每个 <code>run.artifact</code> 必须先通过 <code>jsonschema</code> 校验才允许写入 state。
+      不通过的话，触发一个<strong>修复 dispatch</strong>，把违规细节当作 feedback 回传，而不是 raw retry。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">闸 ③</span> Repair Termination</h4>
+      <p>修复 dispatch 也吃 budget，并受最大迭代次数限制。<code>repair_budget_remaining = 0</code> 时停止修复，
+      把残留缺口落到 <code>quality_gaps</code> 让用户看见。<strong>放弃修复也是合规结果</strong>，不是隐式失败。</p>
+    </div>
+  </section>
+
+  <!-- L6 -->
+  <section class="level" id="l6">
+    <div class="level-head"><span class="level-tag">Level 6 · 复用与对外</span></div>
+    <h2>把"反复用得到的东西"沉淀出来</h2>
+
+    <div class="tldr">
+      Hand 有两种生命周期：<strong>Runtime</strong>（一次性，跟 episode 走）和 <strong>Persistent</strong>（沉淀到磁盘、给固定任务复用）。
+      此外，把对内对外的两种调用路径分开。
+    </div>
+
+    <h3>Hand 生命周期</h3>
+    <ul class="spec-list">
+      <li><strong>Runtime Hand</strong>：日常通用任务的默认路径。每次 Brain 为子任务临时生成 spec，绑定到已有 Adapter，跑完只留事件日志，不写长期目录。</li>
+      <li><strong>Persistent Hand</strong>：固定任务域（如 <code>loom-fin</code> 市场研判、仓位管理）才允许。<strong>需要过晋升门</strong>才能落盘到 <code>brain/hand_specs/&lt;domain&gt;/&lt;hand_id&gt;.json</code>。</li>
+    </ul>
+
+    <div class="concept">
+      <h4><span class="tag def">是什么</span> 持久 Hand Spec 的字段</h4>
+      <p><code>hand_id / base_hand_id / version / owner_domain / task_template / capabilities / rubrics_default / acceptance_default / created_from_episode / created_at / last_eval_ts / eval_score / deprecation_status</code></p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">是什么</span> 晋升门（runtime → persistent 的四个条件）</h4>
+      <p>(a) domain 主权认领；(b) 持出测试集 eval 达标；(c) 创建 episode 的 <code>user_interventions</code> 未否决该 artifact；(d) 成本和延时在预算内。
+      四条不全则不允许落盘。</p>
+    </div>
+
+    <h3>两种对外路径</h3>
+    <table class="matrix">
+      <thead>
+        <tr><th>路径</th><th>用户</th><th>返回</th><th>用途</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>POST /analyze</code></td>
+          <td>UI（webview）</td>
+          <td>带 presentation 的渲染包</td>
+          <td>正常交互，看得见的卡片、drill-down</td>
+        </tr>
+        <tr>
+          <td><code>POST /brain/runs</code><br/><code>GET /brain/runs/{id}</code></td>
+          <td>脚本、定时任务、移动端</td>
+          <td>纯 JSON <code>data_product.v1</code></td>
+          <td>固定任务、headless 自动化</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>两条路径共享同一个 <code>LoomCoreAgent</code> pipeline，避免出现双轨逻辑。</p>
+
+    <div class="concept">
+      <h4><span class="tag def">是什么</span> <code>brain.data_product.v1</code> schema</h4>
+      <p>放在 <code>brain/schemas/brain.data_product.v1.json</code>。字段：
+      <code>version / episode_id / goal_id / synthesis / evidence[] / quality_gaps[] / watch_conditions[] / regime_relevance / produced_at / expires_at</code>。
+      Headless API 返回前必须先过 schema。UI 渲染就变成"读 data_product 渲染卡片"的纯函数。</p>
+    </div>
+  </section>
+
+  <!-- L7 -->
+  <section class="level" id="l7">
+    <div class="level-head"><span class="level-tag">Level 7 · 审计与重放</span></div>
+    <h2>所有事都可以倒回去</h2>
+
+    <div class="tldr">
+      事件日志是只追加的；把日志重新喂回 orchestrator（但不调真实 Adapter）就能<strong>重放任意一次 episode</strong>。
+      闭源 / SDK 退化到"input-equal"重放，开源支持 bit-exact 重放（多存了 seed）。
+    </div>
+
+    <h3>能用 Replay 干什么</h3>
+    <ul>
+      <li><strong>Debug</strong>：定位某次综述里某条 claim 是从哪来的。</li>
+      <li><strong>回归测试</strong>：方案修改后跑历史 episode，看综述是否退化。</li>
+      <li><strong>微调数据</strong>：高质量 episode 直接当训练样本（带 reversal/watch 的对比标签）。</li>
+      <li><strong>Eval</strong>：晋升门用的 eval 数据集就是过往合格 episode 的子集。</li>
+    </ul>
+
+    <h3>并发与崩溃恢复</h3>
+    <ul>
+      <li>同一 <code>goal_id</code> 写 <code>GoalContext.synthesis_history</code> 时一把写锁；不同 goal 自由并发。</li>
+      <li>事件日志只追加；最近的 <code>state.checkpoint</code> 是恢复点。</li>
+      <li>进程重启：扫描 <code>brain/episodes/</code>，对最后事件不是 <code>Persisted | Failed</code> 的 episode 走恢复或标 <code>Failed</code>。</li>
+    </ul>
+  </section>
+
+  <!-- L8 -->
+  <section class="level" id="l8">
+    <div class="level-head"><span class="level-tag">Level 8 · 反馈回流</span></div>
+    <h2>跑完之后，反馈会回写到 state 的哪里？</h2>
+
+    <div class="tldr">
+      Episode 跑完不是终点。<strong>反馈信号</strong>会从 episode 里抽出来，回写到长期 state，下一次跑就用得上。
+      所以这一层回答：<em>哪种反馈 → 影响哪个 state 维度 → 改变后续什么行为</em>。
+    </div>
+
+    <h3>两种 rollout 路径产生的反馈不同</h3>
+    <table class="matrix">
+      <thead>
+        <tr><th>路径</th><th>典型场景</th><th>反馈源</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Automatic Harness Rollout<br/><code>/brain/runs</code></td>
+          <td>定时跑批、固定任务（如每日盘前研判）、外部脚本调用</td>
+          <td>事后客观验证：预测 vs 实际、缺口比例、连接器健康、成本/延时</td>
+        </tr>
+        <tr>
+          <td>Human-Agent 协作 Rollout<br/><code>/analyze</code> + UI</td>
+          <td>用户在 webview 里 refine / lock / branch / 编辑卡片</td>
+          <td>主观信号：用户接受/拒绝、纠正内容、停留时长、二次提问</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>五类反馈信号 · 各自回写到哪</h3>
+
+    <div class="concept">
+      <h4><span class="tag def">信号 ①</span> 预测 vs 实际</h4>
+      <p>来源：automatic rollout 的事后比对（如 reversal 条件命中、watch 条件触发、置信度校准）。<br/>
+      <strong>回写：</strong>
+      <code>persistent_hand_spec.eval_score</code>（影响晋升门）+
+      <code>BrainState.frameworks[].confidence</code>（高/中/低/未检验四档）+
+      <code>RewardedIntentHarness.reward_report</code>（喂飞轮）。<br/>
+      <strong>后续影响：</strong>低分 hand 自动降级，不再被 HandPlanner 优先挑选；低 confidence 框架在 prompt 里降权或剔除。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">信号 ②</span> 用户纠正与拒绝</h4>
+      <p>来源：human-agent 协作中的 edit / reject / lock / annotate 事件。<br/>
+      <strong>回写：</strong>
+      <code>episode.user_interventions[]</code>（即时）→
+      <code>IntentWiki.activation_history</code>（汇总意图模式）→
+      <code>CorrectionDetector</code> 产出的 turn-pair（喂训练 / 微调数据）。<br/>
+      <strong>后续影响：</strong>同类问题再来时，IntentWiki 注入"用户上次拒绝过 X、偏好 Y"；持久 Hand 晋升门一票否决。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">信号 ③</span> 矛盾与冲突</h4>
+      <p>来源：Review 阶段发现的 hand 间冲突、或后续 episode 推翻前次结论。<br/>
+      <strong>回写：</strong>
+      <code>GoalContext.contradiction_log</code>（持久于 goal 维度）+
+      <code>BrainState.notes</code>（在 domain 维度生成 learned_note，标注冲突来源）。<br/>
+      <strong>后续影响：</strong>规划阶段读到同 goal 有未解冲突时，主动加 rubric 维度去验证；冲突未解的综述自动降置信度。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">信号 ④</span> 覆盖率 / 缺口模式</h4>
+      <p>来源：跨 episode 聚合的 <code>quality_gaps</code> 统计（"过去 10 次都缺 catalyst 维度"）。<br/>
+      <strong>回写：</strong>
+      domain 默认 <code>rubrics_template</code> 加新维度 +
+      <code>connector quality registry</code> 标记哪些源经常缺/过期。<br/>
+      <strong>后续影响：</strong>下一次同 domain 任务默认就带这个 rubric；HandPlanner 选源时降权问题连接器。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">信号 ⑤</span> 性能与成本观测</h4>
+      <p>来源：所有 episode 的 <code>budget</code>、<code>p50_latency_ms</code>、<code>cost_per_call</code> 实测。<br/>
+      <strong>回写：</strong>
+      <code>capability_inventory.adapters[*]</code> 的实测档位（覆盖配置档位）。<br/>
+      <strong>后续影响：</strong>HandPlanner 在两种 adapter 等效时，按实测成本/延时挑选；预算闸的阈值随实测分布调整。</p>
+    </div>
+
+    <div class="diag">
+      <div class="box brain">Episode</div>
+      <span class="arrow">→</span>
+      <div class="box governor">Feedback Extractor<small>5 类信号</small></div>
+      <span class="arrow">→</span>
+      <div class="box state">长期 State<small>BrainState / IntentWiki<br/>Flywheel / GoalContext<br/>hand_specs / inventory</small></div>
+      <span class="arrow">↻</span>
+      <div class="box brain">下一次 Episode</div>
+    </div>
+
+    <div class="note">
+      <strong>读法：</strong>L8 不是新增 state 维度，而是回答"L3 的 13 维之中哪些会被反馈更新、被什么样的反馈更新"。
+      所以"automatic rollout 与 human collab rollout"的差别其实是<strong>哪类信号被生成出来</strong>的差别——回写机制本身是统一的。
+    </div>
+  </section>
+
+  <!-- L9 -->
+  <section class="level" id="l9">
+    <div class="level-head"><span class="level-tag">Level 9 · 资源与 Wiki</span></div>
+    <h2>用户每天塞进来的资源、wiki 住在框架的哪一部分？</h2>
+
+    <div class="tldr">
+      用户传入的信息分三种来源：<strong>连接器 Connector</strong>（自动拉的 RSS/API）、<strong>Inbox</strong>（用户手动塞的条目）、
+      <strong>Wiki</strong>（用户长期沉淀的偏好和规则）。它们在框架中各自占据一个位置，彼此分工清楚。
+    </div>
+
+    <h3>三种来源 · 三种角色</h3>
+    <div class="dim-grid">
+      <div class="dim core">
+        <strong>Connector</strong>
+        自动连接外部数据源（RSS / SEC EDGAR / FRED / Finnhub / KOL feed）。
+        <small>代码：<code>loom/bridge.py::get_connector_data()</code>、<code>mcp/connectors/</code></small>
+      </div>
+      <div class="dim opt">
+        <strong>Inbox</strong>
+        用户手动塞进系统的东西：新闻链接、截图、文档、临时观察。
+        <small>代码：<code>mcp__anchor__anchor_inbox_*</code></small>
+      </div>
+      <div class="dim long">
+        <strong>Wiki / Intent</strong>
+        用户长期沉淀：偏好（如"我只关心半导体"）、自定义规则、个人 framework。
+        <small>代码：<code>BrainState.rules / frameworks / notes</code>、<code>IntentWiki</code>、<code>intent_stream.jsonl</code></small>
+      </div>
+    </div>
+
+    <h3>它们怎么参与到一次 Episode</h3>
+
+    <div class="concept">
+      <h4><span class="tag def">入口 ①</span> 规划阶段：进入 Capability Inventory + World State</h4>
+      <p>Connector 在<strong>规划时刻被枚举</strong>，每个 connector 的健康度、最近一次拉取时间、tier 档位写入
+      <code>capability_inventory.resources[]</code> 和 <code>world_state.connector_health</code>。<br/>
+      用例：HandPlanner 选 Hand 时知道"finnhub 现在响应 5 秒、Tier B"，会调整 rubric 验收策略。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">入口 ②</span> 派发阶段：进入 Context Packet</h4>
+      <p>Inbox 中和当前问题相关的条目（按域过滤）<strong>注入到 hand context</strong>：<code>context_packet[hand_id].inbox_refs[]</code>。
+      Hand 在执行时可以 <code>fetch_resource</code> 取详情。<br/>
+      用例：用户中午塞了一篇 SEC 8-K，下午做研判时这个文档会出现在 target hand 的 context 里。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">入口 ③</span> 派发阶段：进入 Prompt 注入</h4>
+      <p>Wiki / IntentWiki 是<strong>结构化注入</strong>而非全量加载（既有 <code>BrainHarness._assemble_prompt</code> 已经实现：
+      <code>query_rules(domain) / query_frameworks(domain) / intent_stream.tail(5) / query_notes(domain)</code>）。<br/>
+      用例：用户长期偏好"先看流动性再看估值"被解析成一条 rule，规划阶段只有该 rule 命中 domain 时才入 prompt。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">入口 ④</span> 证据阶段：进入 Evidence 出处</h4>
+      <p>当 Hand 引用一个 connector 或 inbox 条目作为支撑，<code>evidence[].source</code> 记录其 <code>resource_id</code>，
+      <code>source_tier</code> 来自连接器配置，<code>freshness</code> 来自 world_state 里那时刻的快照。<br/>
+      用例：每条 claim 都能反查"来自哪条 RSS、当天几点拉的"。</p>
+    </div>
+
+    <h3>用户更新 Wiki 的反向流程</h3>
+    <ol>
+      <li><strong>显式</strong>：用户在 webview 写 rule / 加 framework → 直接落 <code>BrainState</code> 文件（带 frontmatter）。</li>
+      <li><strong>隐式</strong>：用户的 inbox push 累积成 <code>intent_stream.jsonl</code> → <code>IntentWiki</code> 识别成意图 →
+      <code>RewardedIntentHarness</code> 提炼出 PolicyPlan → <code>distiller.py</code> 把高反复出现的意图蒸馏成 framework / note。</li>
+    </ol>
+    <p>所以 Wiki <strong>不是一个新模块</strong>，而是"L3 的长期圈那三项 + 既有 BrainState/IntentWiki 文件"的统一称呼。</p>
+
+    <div class="diag">
+      <div class="box state">Connector<small>资源目录</small></div>
+      <div class="box state">Inbox<small>临时塞入</small></div>
+      <div class="box state">Wiki<small>长期偏好</small></div>
+      <span class="arrow">→</span>
+      <div class="box brain">Plan + Dispatch<br/>注入</div>
+      <span class="arrow">→</span>
+      <div class="box hand">Hand 引用</div>
+      <span class="arrow">→</span>
+      <div class="box state">Evidence 出处</div>
+    </div>
+
+    <div class="note">
+      <strong>分工原则：</strong>Connector 是<strong>规划时的能力</strong>（"我能拉什么"），Inbox 是<strong>派发时的上下文</strong>（"刚刚发生了什么"），
+      Wiki 是<strong>规则与偏好</strong>（"我是谁、我怎么想"）。三者用同一组 state 字段承载，但生命周期不同。
+    </div>
+  </section>
+
+  <!-- L10 -->
+  <section class="level" id="l10">
+    <div class="level-head"><span class="level-tag">Level 10 · Hand 原子化</span></div>
+    <h2>把 "market hand" 拆成它真正的样子</h2>
+
+    <div class="tldr">
+      当前一个 <code>MarketHand</code> 包揽宏观、流动性、广度、轮动、催化五件事——这意味着 Brain 没真正的投研策略，只是把问题丢给 LLM 自由发挥。
+      正确的形态：<strong>Brain 持有投研策略，按 state 把任务拆成原子 hand task</strong>，每个 Hand 是一个"明确小问题 + 明确数据切片 + 明确产出 schema"。
+    </div>
+
+    <h3>原子 Hand Task 的四要素</h3>
+    <ol>
+      <li><strong>一个精确的子问题</strong>（一句话能讲清，可独立判断对错）。</li>
+      <li><strong>一份 state 切片需求</strong>（只暴露这个 task 真正用得到的连接器/inbox/wiki 项）。</li>
+      <li><strong>一个工具子集</strong>（不暴露全部资源菜单）。</li>
+      <li><strong>一个小 JSON 产出 schema</strong>（不要长 narrative）。</li>
+    </ol>
+
+    <h3>以 "market 研判" 为例：拆成的原子任务族</h3>
+    <table class="matrix">
+      <thead>
+        <tr><th>原子任务</th><th>精确子问题</th><th>需要的 state 切片</th><th>典型执行 Hand</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>macro_rates</code></td>
+          <td>当前真实利率水平？通胀方向？过去一个月名义利率/实际利率变化？</td>
+          <td>FRED 连接器（DFF / DGS10 / T10YIE / CPI）</td>
+          <td>数据型轻 LLM（取数 + 一段判断）</td>
+        </tr>
+        <tr>
+          <td><code>liquidity</code></td>
+          <td>美元流动性环境怎么样（净 = M2 - RRP - TGA 方向）？</td>
+          <td>FRED（WM2NS / RRPONTSYD / WTREGEN）</td>
+          <td>数据型轻 LLM</td>
+        </tr>
+        <tr>
+          <td><code>breadth</code></td>
+          <td>市场广度 / 参与度怎么样（NH-NL、A/D Line、% above 50dMA）？</td>
+          <td>finnhub / yahoo 派生</td>
+          <td>数据型轻 LLM</td>
+        </tr>
+        <tr>
+          <td><code>sector_rotation</code></td>
+          <td>过去 1 / 5 / 20 天主要行业 ETF 相对 SPY 谁强谁弱？</td>
+          <td>行业 ETF 价格序列（XL* 系列）</td>
+          <td>推理型中等模型</td>
+        </tr>
+        <tr>
+          <td><code>earnings_revision</code></td>
+          <td>S&amp;P 500 / NDX 各行业 forward EPS 修正方向（上 / 平 / 下）？</td>
+          <td>finnhub estimates / 第三方共识</td>
+          <td>数据型轻 LLM</td>
+        </tr>
+        <tr>
+          <td><code>valuation</code></td>
+          <td>当前指数 PE / shiller PE / EY-RFR 在 5/10 年分位？</td>
+          <td>指数价格 + EPS + FRED 收益率</td>
+          <td>推理型中等模型（看分位+对比历史区制）</td>
+        </tr>
+        <tr>
+          <td><code>catalyst</code></td>
+          <td>本周已知 macro 事件（CPI/FOMC/NFP）与企业财报日历？</td>
+          <td>FOMC 日历 / 财报日历连接器</td>
+          <td>综合型（含 web_search）</td>
+        </tr>
+        <tr>
+          <td><code>positioning</code></td>
+          <td>CFTC COT、SOFR 期权、AAII、NAAIM 综合定位极端度？</td>
+          <td>CFTC / AAII / NAAIM / 期权流</td>
+          <td>数据型轻 LLM</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Brain 在 plan 阶段做什么</h3>
+    <ol>
+      <li>读 goal + intent + meta 策略 spec（见 L11）。</li>
+      <li>从原子任务库挑出本次需要的子集（不一定全派；按 budget 与 rubric 取舍）。</li>
+      <li>给每个原子任务绑定一个 base_hand_id（数据型/推理型/综合型），由 <strong>Skill Recommender</strong>（L12）决定。</li>
+      <li>为每个原子任务计算 <strong>state 切片</strong> 与 <strong>工具子集</strong>，最小化注入。</li>
+      <li>计算依赖图（如 <code>valuation</code> 依赖 <code>macro_rates</code> 的实际利率结论），串并行 dispatch。</li>
+    </ol>
+
+    <div class="concept">
+      <h4><span class="tag def">新增对象</span> 原子任务库 Atomic Task Library</h4>
+      <p>放在 <code>brain/atomic_tasks/&lt;domain&gt;/&lt;task_id&gt;.yaml</code>。每个文件描述：
+      <code>task_id / domain / sub_question / state_slice_template / tool_subset / output_schema /
+      recommended_skill_class</code>。Brain 不再凭空想象任务拆分，而是从这个库里组合。</p>
+    </div>
+
+    <div class="note warn">
+      <strong>为什么这件事最关键：</strong>没有原子化，Brain 的"策略"全部塞给 LLM 当自由发挥。
+      原子化之后，Brain 的策略变成"<strong>选哪些原子任务 + 怎么排依赖 + 怎么暴露 state</strong>"——
+      这正是可以学习、可以蒸馏、可以版本化的真正智能。
+    </div>
+  </section>
+
+  <!-- L11 -->
+  <section class="level" id="l11">
+    <div class="level-head"><span class="level-tag">Level 11 · IntentWiki = Meta 策略</span></div>
+    <h2>IntentWiki 的真实形态：从 KOL 推文蒸馏出的投研策略</h2>
+
+    <div class="tldr">
+      用户长期看某 KOL 的推文（如 Lyn Alden、Howard Marks）不是"偏好"——是用户在<strong>给 Brain 灌输某套投研思路</strong>。
+      IntentWiki 的正确产出，是把这些数据蒸馏成 <strong>high-level 的策略 spec</strong>：rubric 模板、原子任务拆解套路、framework 调用顺序。
+      只有 high-level + spec 化，才能在 Brain 的 agentic 行为中发挥作用。
+    </div>
+
+    <h3>三层蒸馏</h3>
+    <div class="dim-grid">
+      <div class="dim core">
+        <strong>L0 行为信号 · Raw</strong>
+        用户的原始动作：inbox push（KOL 推文截图、SEC 文档、新闻）、KOL feed 订阅、reject / accept / lock 卡片、停留时长。
+        <small>载体：<code>brain/context/intent-stream.jsonl</code> + <code>brain/inbox/</code></small>
+      </div>
+      <div class="dim opt">
+        <strong>L1 意图激活 · Activation</strong>
+        从 raw 信号识别出"用户最近关心半导体周期"、"用户偏好低估值高股息"、"用户对宏观因子敏感"等模式。
+        <small>载体：<code>brain/intent_wiki/intents.json</code> + <code>evidence.jsonl</code></small>
+      </div>
+      <div class="dim long">
+        <strong>L2 Meta 策略 Spec · Strategy</strong>
+        从大量 L0 + L1 数据蒸馏出的 <strong>投研策略 spec</strong>。
+        例：从 Lyn Alden 推文蒸馏出"先看真实利率 → 再看美元 → 再看新兴市场反应"的<strong>调用顺序</strong>，
+        以及"什么时候启用这套思路"的<strong>触发条件</strong>。
+        <small>载体（新）：<code>brain/strategy_library/&lt;strategy_id&gt;.yaml</code></small>
+      </div>
+    </div>
+
+    <h3>Meta 策略 Spec 的字段（新结构）</h3>
+    <ul class="spec-list">
+      <li><strong><code>strategy_id</code></strong>：唯一标识，如 <code>lynalden-real-rates-em</code>。</li>
+      <li><strong><code>source</code></strong>：<code>{kind: kol|self_correction|repeated_pattern, ref: 'lynalden.com/...', distilled_from: [evidence_ids]}</code>。</li>
+      <li><strong><code>domain</code></strong>：适用域（macro / equity / commodity / fx / fixed_income）。</li>
+      <li><strong><code>triggering_conditions</code></strong>：什么样的 goal / 当前 state 命中此策略（如 "domain=macro AND state.regime contains 'rate_cycle'"）。</li>
+      <li><strong><code>rubric_template</code></strong>：转化为本次 rubric 的模板（dimension + requirements + acceptance）。</li>
+      <li><strong><code>atomic_task_decomposition</code></strong>：把高级问题拆成哪些原子 hand task（指 L10 库里的 task_id）+ 依赖顺序。</li>
+      <li><strong><code>framework_refs</code></strong>：本策略调用的分析框架 id（指 <code>BrainState.frameworks</code> 中已存在的项）。</li>
+      <li><strong><code>state_disclosure_policy</code></strong>：执行此策略时允许把 state 的哪些切片暴露给 hand。</li>
+      <li><strong><code>confidence / last_updated / version / supersedes</code></strong>：版本与生命周期。</li>
+    </ul>
+
+    <h3>从 KOL 数据如何蒸馏出 Meta 策略（一个完整例子）</h3>
+    <ol>
+      <li><strong>输入</strong>：用户过去 3 个月推送了 47 篇 Lyn Alden 的宏观推文 + 12 个 reject、3 个 lock 行为。</li>
+      <li><strong>L0 → L1</strong>：<code>distiller.py</code> 识别出主题聚类——"真实利率"、"美元周期"、"新兴市场流动性"反复出现。</li>
+      <li><strong>L1 → L2</strong>：进一步识别<strong>调用顺序</strong>——Lyn 总是按 "real_rates → USD → EM" 推理。
+      蒸馏出 <code>strategy_id: lynalden-real-rates-em</code>，写入 <code>brain/strategy_library/</code>。</li>
+      <li><strong>使用</strong>：用户问"半导体最近能不能买"，Brain plan 阶段命中 <code>triggering_conditions</code>（domain=equity 但 state.regime 涉及 rates）。
+      调用此策略 → 生成 rubric（"必须包含真实利率维度"）+ 原子任务拆分（先派 <code>macro_rates</code> 与 <code>liquidity</code>，再派 <code>sector_rotation</code>，最后 <code>valuation</code>）。</li>
+      <li><strong>反馈</strong>：本次 episode 结束后，用户接受/拒绝该综述会进一步更新此策略的 <code>confidence</code>。</li>
+    </ol>
+
+    <div class="diag">
+      <div class="box state">Raw 信号<small>inbox / KOL feed</small></div>
+      <span class="arrow">→</span>
+      <div class="box state">Intent 激活<small>主题聚类</small></div>
+      <span class="arrow">→</span>
+      <div class="box state">Meta 策略 Spec<small>rubric+拆解+顺序</small></div>
+      <span class="arrow">→</span>
+      <div class="box brain">Plan 阶段调用</div>
+    </div>
+
+    <div class="note">
+      <strong>关键区别：</strong>原方案 IntentWiki 的产出是"用户偏好 hint"——只能用来在 prompt 末尾加一句"用户更关心 X"。
+      新形态产出 <strong>结构化的策略 spec</strong>——直接驱动 rubric / 任务拆分 / 框架选择，是<strong>可执行</strong>的智能资产。
+    </div>
+  </section>
+
+  <!-- L12 -->
+  <section class="level" id="l12">
+    <div class="level-head"><span class="level-tag">Level 12 · Brain 是策略中心</span></div>
+    <h2>能力沉淀在 Brain 侧：Hand 是薄壳</h2>
+
+    <div class="tldr">
+      Hand 不应该是"自己想怎么干就怎么干的小 agent"。Hand = <strong>接 envelope、按 schema 出 artifact 的薄壳</strong>。
+      <strong>所有可学习、可蒸馏、可版本化的能力都沉淀在 Brain 侧</strong>，作为 Brain 的"策略库 + 教练能力"。
+    </div>
+
+    <h3>Brain 侧 Harness 应包含的 7 项能力</h3>
+
+    <div class="concept">
+      <h4><span class="tag def">能力 ①</span> Goal Templating</h4>
+      <p>把模糊用户问题归类成 GoalTemplate（如 <code>market_research</code> / <code>position_review</code> / <code>target_tracking</code>），
+      每种 template 带默认 success_criteria 与 acceptance_policy。
+      <strong>载体：</strong><code>brain/goal_templates/&lt;goal_type&gt;.yaml</code>。
+      用例：用户随口问"市场怎么看"会被映射到 <code>market_research</code> template。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">能力 ②</span> Rubric Library + Composer</h4>
+      <p>常用 rubric 维度的可组合库（不是每次现编）。Composer 把 GoalTemplate + Meta 策略 spec + 当前 state 合成本次的 rubric 集合。
+      <strong>载体：</strong><code>brain/rubrics/&lt;domain&gt;/*.yaml</code> + <code>brain_harness/rubric_composer.py</code>。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">能力 ③</span> Task Decomposition Policy</h4>
+      <p>把高级问题拆成 L10 的原子任务序列。Policy 不是硬编码——它从 Meta 策略 spec 的 <code>atomic_task_decomposition</code> 字段读取。
+      Brain 只负责选哪条策略、按依赖图编排。
+      <strong>载体：</strong><code>brain_harness/task_decomposer.py</code>。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">能力 ④</span> Hand Skill Registry + Recommender</h4>
+      <p>每个原子任务该用哪个 base_hand_id（数据型轻 LLM / 推理型中等 / 综合型工具循环 / 闭源 / 开源）由 Recommender 决定。
+      输入：原子任务的 <code>recommended_skill_class</code> + 当前 capability inventory + budget。
+      <strong>载体：</strong><code>brain/hand_skills/registry.yaml</code> + <code>brain_harness/skill_recommender.py</code>。
+      用例：<code>macro_rates</code> 任务在预算紧时挑 <code>haiku</code>，预算松时挑 <code>sonnet</code>。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">能力 ⑤</span> State Disclosure Policy（关键！）</h4>
+      <p>Hand 不应看到全部 state。Brain 根据原子任务的 <code>state_slice_template</code>，决定<strong>暴露哪一片</strong>给这个 hand。
+      例：<code>macro_rates</code> 只看到 FRED 相关连接器和宏观规则，看不到行业数据；<code>sector_rotation</code> 反之。
+      <strong>载体：</strong><code>brain_harness/disclosure.py</code>，与既有 <code>loom/resource_disclosure.py</code> 合并。
+      <strong>这是把"Brain 的策略"和"Hand 的执行"真正分开的物理隔离。</strong></p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">能力 ⑥</span> Acceptance &amp; Repair Policy</h4>
+      <p>Review 阶段的判定规则：什么样的 quality_gap 触发修复，最多修几次。Policy 也由 GoalTemplate 与 Meta 策略共同决定（不同策略容忍度不同）。
+      <strong>载体：</strong><code>brain_harness/acceptance_policy.py</code>。</p>
+    </div>
+
+    <div class="concept">
+      <h4><span class="tag def">能力 ⑦</span> Strategy Distillation（写回）</h4>
+      <p>成功的 episode → 蒸馏出新的 Meta 策略 spec 或更新已有策略。
+      失败的 episode → 在策略 spec 上 <code>confidence</code> 降级或 <code>supersedes</code> 标记替换。
+      <strong>载体：</strong>扩展既有 <code>loom/brain_harness/distiller.py</code>。
+      这条回路完成 L8 中"反馈 → 长期 state"的最大循环。</p>
+    </div>
+
+    <h3>Brain 与 Hand 的能力分布对照</h3>
+    <table class="matrix">
+      <thead>
+        <tr><th>能力</th><th>Brain 侧</th><th>Hand 侧</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>拆分任务</td><td>✓（按 Meta 策略 + 原子任务库）</td><td>—</td></tr>
+        <tr><td>设定 rubric</td><td>✓（Rubric Composer）</td><td>—</td></tr>
+        <tr><td>推荐 skill</td><td>✓（Skill Recommender）</td><td>—</td></tr>
+        <tr><td>决定看什么 state</td><td>✓（Disclosure Policy）</td><td>—（只看到 Brain 暴露的切片）</td></tr>
+        <tr><td>调用工具</td><td>—</td><td>✓（在 Brain 给的工具子集内）</td></tr>
+        <tr><td>取数与初步推理</td><td>—</td><td>✓</td></tr>
+        <tr><td>按 schema 出 artifact</td><td>—</td><td>✓</td></tr>
+        <tr><td>跨 hand 综合</td><td>✓（Synthesize 相）</td><td>—</td></tr>
+        <tr><td>判定接受 / 修复</td><td>✓（Acceptance Policy）</td><td>—</td></tr>
+        <tr><td>蒸馏新策略</td><td>✓（Strategy Distillation）</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>设计原则：</strong>Hand 永远不"创造能力"——它只"执行 Brain 给的设计"。这样能力才能在 Brain 一处沉淀、版本化、被替换。
+      Hand 的 LLM 选择、prompt 模板、工具集都由 Brain 在每次 dispatch 时<strong>显式注入</strong>，而不是 Hand 内部硬编码。
+    </div>
+
+    <div class="diag">
+      <div class="box brain">Brain Harness<small>策略 + 教练</small></div>
+      <span class="arrow">→</span>
+      <div class="box governor">注入：rubric + state 切片 + 工具子集 + schema</div>
+      <span class="arrow">→</span>
+      <div class="box hand">Hand<small>薄壳：跑 + 出 artifact</small></div>
+    </div>
+  </section>
+
+  <!-- L13 -->
+  <section class="level" id="l13">
+    <div class="level-head"><span class="level-tag">Level 13 · NanoRLM 对照</span></div>
+    <h2>把 NanoRLM 的 rollout/RL 训练范式映射到 Loom 的 harness</h2>
+    <p class="lede">
+      <strong>NanoRLM 是什么：</strong>一个最小可读的 agentic RL playground——单环境（MathEnv）、多轮自我修正、GRPO 组内相对优势、on-policy 更新模型权重。
+      它把"<strong>rollout 数据采集</strong>"和"<strong>权重更新</strong>"压缩到一个可读的代码库里（<code>nanorllm/{agents,rollout,core,algos,rewards,trainer}</code>）。
+    </p>
+
+    <h3>13.1 — Loom 与 NanoRLM 的核心定位差异</h3>
+    <table class="cap-table">
+      <thead><tr><th>维度</th><th>NanoRLM</th><th>Loom</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td>目的</td><td>产<strong>训练样本</strong>更新权重</td><td>产<strong>数据产品</strong>给人看 / 给业务用</td><td>Loom 是应用，NanoRLM 是训练台</td></tr>
+        <tr><td>奖励信号</td><td>显式 reward=1/0（MathEnv 判答）</td><td><strong>无标量 reward</strong>（用户行为 + rubric 覆盖率）</td><td>Loom 需要"奖励合成器"才能复用 RL 工具</td></tr>
+        <tr><td>权重更新</td><td>有（AdamW + GRPO）</td><td>无（agent 是黑盒）</td><td>Loom 是 off-policy 数据收集者</td></tr>
+        <tr><td>多采样</td><td><code>num_samples_per_task</code> 显式重复 N 次</td><td>单次 dispatch（无多采样）</td><td>Loom 缺"自一致性 / best-of-N"</td></tr>
+        <tr><td>Trajectory 粒度</td><td>step-level + token-level（<code>prompt_ids/response_ids/logprobs</code>）</td><td>phase-level（plan/dispatch/review/synth），无 token 级</td><td>Loom 暂时无法做 RL 微调</td></tr>
+        <tr><td>终止语义</td><td>硬 done（答对或 max_steps）+ <code>termination_reason</code></td><td>软 rubric 覆盖 + repair budget</td><td>NanoRLM 的 enum 化值得抄</td></tr>
+        <tr><td>分组方式</td><td>按 <code>task_id</code> 分组算相对优势</td><td>按 goal_id 聚合 findings</td><td>Loom 的"原子任务 id"（L10）可承担同样角色</td></tr>
+        <tr><td>多 agent 编排</td><td>单 agent 多轮</td><td>Brain 调度多 Hand</td><td>NanoRLM 没有；Loom 这块是自有</td></tr>
+        <tr><td>跨 episode 记忆</td><td>无（每 episode 独立）</td><td>BrainState / IntentWiki / GoalContext / Flywheel</td><td>NanoRLM 没有；Loom 这块也是自有</td></tr>
+      </tbody>
+    </table>
+
+    <h3>13.2 — Loom 应该借鉴的 7 件事</h3>
+
+    <h4>① 数据层分层：Trajectory（语义）/ RolloutView（token）/ Rollout（合一）</h4>
+    <p>NanoRLM 把同一次执行切成三层：
+      <code>Trajectory</code>（observation→action→feedback 语义流，给人看 / 用于评估）、
+      <code>StepRolloutView</code>（<code>prompt_ids + response_ids + response_logprobs</code>，给训练器用）、
+      <code>Rollout</code>（绑定两者 + metadata）。
+      这三层在 Loom 现在的 <strong>WorkflowEpisode</strong> 里没有清晰拆开——目前 phase 事件混杂了语义和原始 payload。</p>
+    <p><strong>落到 Loom：</strong>
+      <code>brain/episodes/&lt;id&gt;.jsonl</code> 之外，再开一个 <code>brain/rollouts/&lt;id&gt;.jsonl</code> 专门存 token 级数据；
+      adapter 的 <code>capabilities.supports_logprobs</code> 决定是否落盘。
+      关闭 logprobs 时 RolloutView 退化为 input/output 文本对，仍可用于 SFT-style 数据。</p>
+
+    <h4>② Multi-sample dispatch（best-of-N / 自一致性）</h4>
+    <p>NanoRLM 的 <code>execute_tasks(num_samples_per_task=N)</code> 对同一个 task 跑 N 次，因为 GRPO 需要组内方差。
+      <strong>即使 Loom 不训练模型</strong>，这件事也有三个直接收益：</p>
+    <ul>
+      <li><strong>分歧度即置信度</strong>——N 次结果一致 → high confidence；分裂 → low confidence。直接喂进 L3 的 trust_aggregate。</li>
+      <li><strong>Best-of-N 选优</strong>——按 rubric 评分挑最好一个返回，剩余存档供 replay。</li>
+      <li><strong>未来 RL 准备</strong>——当 Loom 切到开源 adapter 时，这批数据天然就是 GRPO 训练集。</li>
+    </ul>
+    <p><strong>落到 Loom：</strong>在 hand spec 加 <code>samples_per_dispatch: int = 1</code>；
+      <code>BrainOrchestrator</code> 拿到 N 份 artifact 后调 <code>SampleAggregator</code> 决定返回策略
+      （<code>best-of-rubric</code> / <code>majority-vote</code> / <code>all</code>）。</p>
+
+    <h4>③ Group-relative scoring（即使不训练也能用）</h4>
+    <p>GRPO 的核心数学是：<code>advantage = (reward - group_mean) / (group_std + eps)</code>。
+      Loom 即使没有 backprop，也能复用这个归一化逻辑给 <strong>每次 dispatch 的 hand artifact 打"相对分"</strong>：</p>
+    <ul>
+      <li>同一个原子任务（L10 的 <code>atomic_task_id</code>，例如 <code>market.macro_rates</code>）在历史 episode 里跑过 K 次。</li>
+      <li>给新 artifact 算 rubric 得分，与历史均值/方差对比，得到一个"相对优于历史"的分数。</li>
+      <li>这个分数直接进 L3 的 <code>trust_aggregate</code>，作为"这次 macro_rates 比平时好/差"的calibrated 信号。</li>
+    </ul>
+    <p><strong>落到 Loom：</strong>新建 <code>brain_harness/relative_scorer.py</code>，维护
+      <code>brain/scoring_history/&lt;atomic_task_id&gt;.jsonl</code>（reward 时间序列）；
+      <code>has_relative_signal()</code> 用来短路掉历史方差为 0 的情况（避免假信号）。</p>
+
+    <h4>④ Reward Synthesizer（把 L8 的反馈信号合成标量）</h4>
+    <p>NanoRLM 有干净的 <code>RewardOutput {reward, metadata, is_correct}</code>。Loom 没有 env 反馈，但有 L8 列的五类信号
+      （接受/拒绝/编辑/撤回/明确反馈）。把它们合成标量 reward 才能让上面 ③ 跑起来。</p>
+    <table class="cap-table">
+      <thead><tr><th>L8 信号</th><th>合成贡献</th></tr></thead>
+      <tbody>
+        <tr><td>用户 lock</td><td>+1.0</td></tr>
+        <tr><td>用户 edit</td><td>+0.3（部分接受）</td></tr>
+        <tr><td>用户 reject / 撤回</td><td>0.0</td></tr>
+        <tr><td>跨 hand 验证：被另一 hand 否证</td><td>−0.5</td></tr>
+        <tr><td>rubric 覆盖率</td><td>×<em>coverage</em></td></tr>
+        <tr><td>明确文字反馈（LLM-as-judge 解析）</td><td>±0.5</td></tr>
+        <tr><td>时间衰减：市场后验对错</td><td>滞后 +0.5/−0.5，按 watch_conditions 触发</td></tr>
+      </tbody>
+    </table>
+    <p><strong>落到 Loom：</strong>新建 <code>brain_harness/reward_synthesizer.py</code>，订阅 L8 那 5 类事件，
+      生成 <code>RewardRecord {episode_id, hand_id, atomic_task_id, reward, components, ts}</code>，
+      落 <code>brain/rewards/&lt;hand_id&gt;.jsonl</code>。</p>
+
+    <h4>⑤ 结构化 Termination Reason</h4>
+    <p>NanoRLM 在 trajectory 上明确标 <code>termination_reason</code>（done / max_steps / error）。
+      Loom 现在的 phase_trace 没有 enum 化的终止理由。</p>
+    <p><strong>落到 Loom：</strong>在 <code>WorkflowEpisode</code> 的最终状态加
+      <code>termination_reason: Literal["synthesis_success", "budget_exceeded", "repair_budget_exceeded", "user_interrupt", "adapter_error", "gap_unresolved", "schema_violation_unrecoverable"]</code>。
+      Replay 工具按 reason 分组统计——比例失衡（例如 30% 都是 <code>repair_budget_exceeded</code>）就是"该原子任务的 rubric 设计有问题"的信号。</p>
+
+    <h4>⑥ Task 维度的可批处理样本仓库（dataset curation）</h4>
+    <p>NanoRLM 的 <code>execute_tasks</code> 把 (task, sample, rollout) 串成三元组，方便后续切批训练。
+      Loom 目前 episode 之间相互独立，没法做"把过去 100 次 <code>market.macro_rates</code> 的结果拉出来回看"。</p>
+    <p><strong>落到 Loom：</strong>给每条 hand artifact 打 <code>atomic_task_id</code> + <code>strategy_id</code>（L10/L11 的 id）两个索引键，
+      再加一个 query layer <code>brain_harness/artifact_lake.py</code>，支持：
+      <code>find(atomic_task_id, strategy_id, since, reward_above)</code>。
+      这就是"未来 SFT/DPO 数据集" 与"今天的 best-practice 提取池"二合一。</p>
+
+    <h4>⑦ 浏览器 trajectory viewer = 已有的 detail overlay</h4>
+    <p>NanoRLM 自带一个 HTML viewer + JSON 导出。Loom 现成的
+      <code>bridge/webview/loom-detail-overlay.js</code> + L0/L1/L2 密度切换其实就是同一个东西，但目前 overlay 只盯 hand artifact 自身，
+      <strong>不能 replay 一整条 episode 的事件流</strong>。</p>
+    <p><strong>落到 Loom：</strong>给 overlay 加一个 "Episode timeline" tab，读 <code>brain/episodes/&lt;id&gt;.jsonl</code> 渲染成时间轴；
+      点任一事件可下钻到对应 artifact / prompt / patch。</p>
+
+    <h3>13.3 — Loom 多出 NanoRLM 没有的东西（说明边界）</h3>
+    <p>不要被借鉴清单带偏——以下是 Loom 该 own 的、NanoRLM 不涉及的：</p>
+    <ul class="spec-list">
+      <li><strong>多 Hand 编排</strong>：Brain → N 个 Hand 并行 / 串行 + 跨 Hand 验证。NanoRLM 是单 agent。</li>
+      <li><strong>13 维 State 模型（L3）</strong>：NanoRLM 只有 message history。Loom 是 state-first，13 维各司其职。</li>
+      <li><strong>跨 episode 记忆</strong>：BrainState / IntentWiki / GoalContext / Flywheel。NanoRLM 每 episode 重置。</li>
+      <li><strong>异构 adapter</strong>：闭源 / SDK / 开源 三类统一契约。NanoRLM 只有 HF causal LM。</li>
+      <li><strong>Meta 策略（L11）</strong>：从用户行为蒸馏 strategy spec。NanoRLM 完全没有这层。</li>
+      <li><strong>原子任务库（L10）</strong>：Brain 自带 rubric / acceptance / schema。NanoRLM 的任务由 dataset 直接给。</li>
+      <li><strong>面向人的数据产品</strong>：data_product.v1 + L0/L1/L2 渲染层。NanoRLM 没有 UI 层。</li>
+    </ul>
+
+    <h3>13.4 — 借鉴落到实施清单的改动</h3>
+    <p>原 12 步实施顺序里，要追加 4 件 NanoRLM 衍生事项：</p>
+    <ol class="spec-list">
+      <li><strong>RolloutView 层</strong>：新建 <code>brain/rollouts/&lt;id&gt;.jsonl</code> 与 <code>workflow_rollout.v1.json</code> schema；
+        adapter 按 <code>supports_logprobs</code> 决定写 token 级还是文本级。</li>
+      <li><strong>Multi-sample dispatch</strong>：hand spec 加 <code>samples_per_dispatch</code>，
+        新建 <code>brain_harness/sample_aggregator.py</code>。</li>
+      <li><strong>Reward Synthesizer + Relative Scorer</strong>：
+        <code>brain_harness/reward_synthesizer.py</code> +
+        <code>brain_harness/relative_scorer.py</code>；落 <code>brain/rewards/</code> 与 <code>brain/scoring_history/</code>。</li>
+      <li><strong>Artifact Lake + Termination Reasons</strong>：
+        <code>brain_harness/artifact_lake.py</code> 提供按 atomic_task_id/strategy_id 检索；
+        给 <code>WorkflowEpisode</code> 添加 enum <code>termination_reason</code>。</li>
+    </ol>
+
+    <div class="note">
+      <strong>哲学差异（一句话总结）：</strong>
+      NanoRLM 把一个简单环境压扁到训练循环里，Loom 把复杂业务编排开成 state-first pipeline——
+      两边都靠"<strong>把任务原子化、把数据分层、把信号显式化</strong>"才能跑通。
+      Loom 借鉴 NanoRLM 的不是"做 RL"，而是"<strong>把每次执行变成可分组、可比较、可回放的样本</strong>"。
+    </div>
+
+    <div class="note warn">
+      <strong>注意：</strong>不要把 NanoRLM 的"on-policy 更新模型权重"硬塞进 Loom——只要 Hand 是闭源 API，这条路就是死的。
+      但<strong>所有为 RL 准备的数据结构</strong>（RolloutView / RewardRecord / Termination Reason / Relative Scorer）即使不训练也立刻有用。
+    </div>
+  </section>
+
+  <!-- 实施 -->
+  <section class="level" id="impl">
+    <div class="level-head"><span class="level-tag">实施 · 分相落地</span></div>
+    <h2>怎么从今天的代码走到这张图</h2>
+
+    <ol>
+      <li>定义 <code>WorkflowEpisode</code> dataclass + JSON schema；附加式串进 <code>LoomCoreAgent.analyze()</code>，<strong>不改既有行为</strong>。</li>
+      <li>引入事件日志 writer（<code>brain/episodes/&lt;id&gt;.jsonl</code>），把 <code>phase_trace / rubric_coverage</code> 改为从日志派生。</li>
+      <li>给现有 6 个 adapter 补 <code>capabilities</code> 字典；规范 <code>InProcessAdapter</code> 为协议参考实现。</li>
+      <li>新增 <code>BudgetGovernor</code> 与 schema 校验闸，包住每次 dispatch。</li>
+      <li><strong>原子任务库</strong>：建 <code>brain/atomic_tasks/&lt;domain&gt;/*.yaml</code>，把 <code>market</code> 拆成 8 个原子任务（L10 表）。</li>
+      <li><strong>Brain 侧 Harness 模块</strong>：新建
+      <code>brain_harness/task_decomposer.py</code>、<code>rubric_composer.py</code>、<code>skill_recommender.py</code>、<code>disclosure.py</code>、<code>acceptance_policy.py</code>。
+      <code>dispatcher.resolve()</code> 由这些模块组合替代。</li>
+      <li><strong>策略库 Strategy Library</strong>：新建 <code>brain/strategy_library/&lt;strategy_id&gt;.yaml</code>，
+      并扩展 <code>distiller.py</code> 把 IntentWiki 数据蒸馏成 strategy spec。</li>
+      <li><strong>GoalTemplate + Rubric Library + Hand Skill Registry</strong>：新建
+      <code>brain/goal_templates/</code>、<code>brain/rubrics/&lt;domain&gt;/</code>、<code>brain/hand_skills/registry.yaml</code>。</li>
+      <li>把 <code>loom/hands/{market,sentiment,target,position}.py</code> 改造成<strong>薄壳</strong>，
+      原本各自塞的"自由发挥"逻辑下沉为原子任务库 + Brain 侧 policy。</li>
+      <li>落地 <code>brain.data_product.v1.json</code> 与 <code>/brain/runs</code> 路由。</li>
+      <li>定义 <code>persistent_hand_spec</code> schema 与晋升门，新建 <code>brain/hand_specs/</code>。</li>
+      <li>新增一个开源 adapter（如 <code>vllm.py</code>）打通通用契约，验证"换 agent 不动 Brain"。</li>
+      <li><strong>RolloutView 层</strong>（来自 L13）：新建 <code>brain/rollouts/&lt;id&gt;.jsonl</code> 与
+        <code>workflow_rollout.v1.json</code> schema；adapter 按 <code>supports_logprobs</code> 决定写 token 级或文本级。</li>
+      <li><strong>Multi-sample dispatch</strong>（来自 L13）：hand spec 加 <code>samples_per_dispatch</code>，
+        新建 <code>brain_harness/sample_aggregator.py</code>（best-of-rubric / majority-vote / all 三种策略）。</li>
+      <li><strong>Reward Synthesizer + Relative Scorer</strong>（来自 L13）：
+        <code>brain_harness/reward_synthesizer.py</code> + <code>relative_scorer.py</code>；
+        落 <code>brain/rewards/</code> 与 <code>brain/scoring_history/</code>。</li>
+      <li><strong>Artifact Lake + Termination Reasons</strong>（来自 L13）：
+        <code>brain_harness/artifact_lake.py</code> 按 atomic_task_id/strategy_id 检索；
+        给 <code>WorkflowEpisode</code> 加 enum <code>termination_reason</code>。</li>
+    </ol>
+
+    <h3>关键文件清单</h3>
+    <ul class="spec-list">
+      <li><strong><code>loom_core/agents/core_agent.py</code></strong> — 把 WorkflowEpisode 串入 analyze()。</li>
+      <li><strong><code>loom_core/agent_adapters/providers/*</code></strong> — 每个 provider 加 <code>capabilities</code>。</li>
+      <li><strong><code>loom/brain_harness/base.py</code></strong> — 新增 <code>plan_goal / plan_hands / review_acceptance / build_data_product</code>。</li>
+      <li><strong><code>loom/brain_harness/dispatcher.py</code></strong> — 重构为 <code>HandPlanner</code>。</li>
+      <li><strong><code>loom/brain_harness/goal_context.py</code></strong> — 加写锁 + 幂等 append。</li>
+      <li><strong><code>loom/brain.py</code></strong> — 新增 <code>/brain/runs</code> 路由。</li>
+      <li>新文件：<code>loom/brain_harness/workflow_episode.py</code>、<code>loom/brain_harness/budget_governor.py</code>。</li>
+      <li>新 schema：<code>brain/schemas/brain.data_product.v1.json</code>、<code>workflow_episode.v1.json</code>、<code>workflow_rollout.v1.json</code>。</li>
+      <li>新目录：<code>brain/hand_specs/</code>、<code>brain/episodes/</code>、<code>brain/rollouts/</code>、<code>brain/rewards/</code>、<code>brain/scoring_history/</code>。</li>
+      <li>NanoRLM 借鉴新文件：<code>brain_harness/sample_aggregator.py</code>、<code>reward_synthesizer.py</code>、<code>relative_scorer.py</code>、<code>artifact_lake.py</code>。</li>
+    </ul>
+  </section>
+
+  <!-- 验收 -->
+  <section class="level" id="acc">
+    <div class="level-head"><span class="level-tag">验收 · 怎么算"做对了"</span></div>
+    <h2>八条验收标准</h2>
+    <ul class="spec-list">
+      <li>1 · 一次 <code>LoomCoreAgent.analyze(question)</code> 调用产出可被事件日志离线 replay 还原的 <strong>WorkflowEpisode</strong>。</li>
+      <li>2 · 同一个 orchestrator 跑通 <strong>闭源 / SDK / 开源</strong> 三种 adapter，不用改 <code>LoomCoreAgent</code>。</li>
+      <li>3 · 违反 schema 的 hand artifact 被校验闸拦截，触发<strong>带反馈的修复 dispatch</strong>，不是默默通过或 raw retry。</li>
+      <li>4 · 未过晋升门的 runtime hand <strong>不能</strong>写入 <code>brain/hand_specs/</code>。</li>
+      <li>5 · <code>GET /brain/runs/{id}</code> 返回的 JSON 通过 <code>brain.data_product.v1</code> schema 校验。</li>
+      <li>6 · 既有 <code>/analyze</code>、presentation overlay、hand artifact UI <strong>不回退</strong>。</li>
+      <li>7 · <strong>（来自 L13）</strong>hand spec 设 <code>samples_per_dispatch=3</code> 时，单次 episode 落 3 份 artifact 到
+        <code>brain/rollouts/&lt;id&gt;.jsonl</code>，并按 best-of-rubric 返回最佳 1 份；其余可在 overlay 中查阅。</li>
+      <li>8 · <strong>（来自 L13）</strong>同一原子任务跑过 ≥5 次后，<code>relative_scorer</code> 能为新 artifact 算出归一化分数，
+        并体现在 trust_aggregate 上；<code>termination_reason</code> enum 在 episode 终态必填。</li>
+    </ul>
+
+    <div class="note warn">
+      <strong>风险护栏：</strong>持久 Hand 创建必须 domain 主权 + eval + 用户未否决 + 预算内 四项联合通过。任何 prompt 不能绕过晋升门直接落盘。
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

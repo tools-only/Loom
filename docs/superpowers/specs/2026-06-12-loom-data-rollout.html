@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loom Data Rollout — 业务流程 · 数据流 · 反馈闭环</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+:root {
+  --bg: #f3f0e9;
+  --panel: rgba(255,255,255,0.9);
+  --panel-strong: #ffffff;
+  --ink: #111218;
+  --muted: #5a5f6e;
+  --line: rgba(17,18,24,0.09);
+  --line-strong: rgba(17,18,24,0.16);
+  --violet: #6847f5;
+  --violet-soft: rgba(104,71,245,0.10);
+  --cyan: #0d8dc3;
+  --cyan-soft: rgba(13,141,195,0.10);
+  --mint: #0e8b62;
+  --mint-soft: rgba(14,139,98,0.10);
+  --amber: #b37910;
+  --amber-soft: rgba(179,121,16,0.10);
+  --rose: #c24570;
+  --rose-soft: rgba(194,69,112,0.10);
+  --shadow: 0 14px 44px rgba(18,20,30,0.07), 0 2px 8px rgba(18,20,30,0.04);
+  --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--font-body);
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(104,71,245,.07) 0%, transparent 36%),
+    radial-gradient(ellipse at 100% 0%, rgba(13,141,195,.08) 0%, transparent 32%),
+    linear-gradient(180deg,#f6f3ec 0%,#ece9e0 100%);
+  color:var(--ink);line-height:1.55;
+}
+.page{width:min(1300px,calc(100% - 40px));margin:0 auto;padding:36px 0 80px}
+
+/* ── Card ── */
+.card{margin-top:24px;background:var(--panel);border:1px solid rgba(255,255,255,.72);border-radius:26px;box-shadow:var(--shadow);backdrop-filter:blur(18px);overflow:hidden}
+.ci{padding:26px 28px}
+
+/* ── Hero ── */
+.hero{background:linear-gradient(140deg,rgba(255,255,255,.82),rgba(255,255,255,.66)),linear-gradient(140deg,rgba(104,71,245,.13),rgba(13,141,195,.10));position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(17,18,24,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(17,18,24,.04) 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(180deg,rgba(0,0,0,.4),transparent)}
+.hero-in{position:relative;z-index:1;padding:32px;display:grid;grid-template-columns:1fr 360px;gap:24px;align-items:start}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--violet);background:rgba(255,255,255,.76);border:1px solid rgba(104,71,245,.18);border-radius:999px;padding:7px 12px;margin-bottom:16px}
+h1{font-family:var(--font-display);font-size:clamp(36px,5vw,66px);line-height:.94;max-width:11em;letter-spacing:-.01em}
+.hero-sub{margin-top:14px;color:var(--muted);font-size:14.5px;max-width:680px}
+.hero-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{display:inline-flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:11px;padding:7px 11px;border-radius:999px;background:rgba(255,255,255,.76);border:1px solid var(--line);color:var(--muted)}
+.hero-aside{background:rgba(14,15,22,.94);border-radius:22px;padding:22px;color:#f3f5fb;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.hero-aside h2{font-family:var(--font-display);font-size:19px;margin-bottom:14px}
+.alist{display:grid;gap:11px}
+.ai{display:flex;gap:10px;align-items:flex-start;padding-top:11px;border-top:1px solid rgba(255,255,255,.07)}
+.ai:first-child{border-top:none;padding-top:0}
+.adot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.av{background:var(--violet)}.ac{background:var(--cyan)}.am{background:var(--mint)}.aa{background:var(--amber)}.ar{background:var(--rose)}
+.ai strong{display:block;font-size:12.5px;margin-bottom:2px}.ai span{font-size:11.5px;color:rgba(243,245,251,.58)}
+
+/* ── Section head ── */
+.sh{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px}
+.sh h2{font-family:var(--font-display);font-size:26px;line-height:1}
+.sh p{max-width:620px;font-size:13.5px;color:var(--muted);margin-top:5px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0}
+.lp{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.8);font-size:11.5px;color:var(--muted)}
+.sw{width:8px;height:8px;border-radius:50%}
+.sv{background:var(--violet)}.sc{background:var(--cyan)}.sm{background:var(--mint)}.sa{background:var(--amber)}.sr{background:var(--rose)}
+
+code{font-family:var(--font-mono);font-size:10.5px;padding:2px 6px;border-radius:999px;background:rgba(104,71,245,.10);color:var(--violet)}
+code.mint{background:rgba(14,139,98,.10);color:var(--mint)}
+code.cyan{background:rgba(13,141,195,.10);color:var(--cyan)}
+code.amber{background:rgba(179,121,16,.10);color:var(--amber)}
+
+/* ── Full pipeline (horizontal scroll) ── */
+.pipe-wrap{overflow-x:auto;padding-bottom:4px}
+.pipeline{display:flex;gap:0;min-width:900px}
+.pipe-step{
+  flex:1;min-width:0;position:relative;
+  padding:14px 14px 14px 14px;
+  border-radius:0;border:1px solid var(--line);border-right:none;
+  background:var(--panel-strong);
+  display:grid;align-content:start;gap:5px;
+}
+.pipe-step:first-child{border-radius:18px 0 0 18px}
+.pipe-step:last-child{border-radius:0 18px 18px 0;border-right:1px solid var(--line)}
+.pipe-step::after{
+  content:"›";position:absolute;right:-10px;top:50%;transform:translateY(-50%);
+  font-size:18px;color:var(--line-strong);z-index:2;background:var(--panel-strong);
+  width:20px;text-align:center;line-height:1;
+}
+.pipe-step:last-child::after{display:none}
+.pipe-step.violet{border-top:3px solid var(--violet)}
+.pipe-step.cyan{border-top:3px solid var(--cyan)}
+.pipe-step.mint{border-top:3px solid var(--mint)}
+.pipe-step.amber{border-top:3px solid var(--amber)}
+.pipe-step.rose{border-top:3px solid var(--rose)}
+.pnum{width:20px;height:20px;border-radius:50%;background:rgba(14,15,22,.9);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;margin-bottom:2px}
+.pipe-step h4{font-size:12.5px;line-height:1.2}
+.pipe-step p{font-size:11px;color:var(--muted)}
+
+/* ── Brain arch grid ── */
+.brain-arch{display:grid;grid-template-columns:1.1fr 0.9fr;gap:16px}
+.brain-col{display:grid;gap:14px}
+.module-box{border-radius:20px;padding:18px;border:1px solid var(--line);background:rgba(255,255,255,.88)}
+.module-box h3{font-family:var(--font-display);font-size:17px;margin-bottom:5px}
+.module-box .sub{font-size:12px;color:var(--muted);margin-bottom:12px}
+.m-rows{display:grid;gap:7px}
+.mrow{display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:13px;background:rgba(255,255,255,.72);border:1px solid var(--line)}
+.midx{width:18px;height:18px;border-radius:50%;flex-shrink:0;background:rgba(14,15,22,.88);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;margin-top:1px}
+.mrow strong{display:block;font-size:12px;margin-bottom:2px}.mrow span{font-size:11px;color:var(--muted)}
+.dark-panel{background:rgba(14,15,22,.95);color:#f3f5fb;border-radius:20px;padding:18px}
+.dark-panel h3{font-family:var(--font-display);font-size:17px;margin-bottom:12px}
+.dark-panel ul{list-style:none;display:grid;gap:10px}
+.dark-panel li{padding-top:10px;border-top:1px solid rgba(255,255,255,.07)}
+.dark-panel li:first-child{border-top:none;padding-top:0}
+.dark-panel li strong{display:block;font-size:12px;margin-bottom:2px}
+.dark-panel li span{font-size:11.5px;color:rgba(243,245,251,.58)}
+
+/* ── Brain State layer ── */
+.state-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.state-card{padding:16px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.9);display:grid;gap:9px}
+.state-card h4{font-size:14px;line-height:1.2}
+.state-card p{font-size:11.5px;color:var(--muted)}
+.state-card .files{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
+.stag{padding:4px 8px;border-radius:999px;font-size:10px;font-weight:700}
+.stag.v{background:var(--violet-soft);color:var(--violet)}
+.stag.c{background:var(--cyan-soft);color:var(--cyan)}
+.stag.m{background:var(--mint-soft);color:var(--mint)}
+.stag.a{background:var(--amber-soft);color:var(--amber)}
+
+/* ── Hand grid ── */
+.hand-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.hand-card{padding:16px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.9)}
+.hand-card h4{font-family:var(--font-display);font-size:16px;margin-bottom:6px}
+.hand-card .role{font-size:11px;color:var(--muted);margin-bottom:10px}
+.hand-card ul{list-style:none;display:grid;gap:5px}
+.hand-card li{font-size:11.5px;color:var(--muted);padding-left:12px;position:relative}
+.hand-card li::before{content:"·";position:absolute;left:0;color:var(--violet)}
+.htag{display:inline-block;margin-top:10px;padding:5px 9px;border-radius:999px;font-size:10px;font-weight:600}
+
+/* ── Artifact contract ── */
+.artifact-box{background:rgba(14,15,22,.95);color:#f3f5fb;border-radius:18px;padding:16px;font-family:var(--font-mono);font-size:11.5px;line-height:1.75}
+
+/* ── Two-path system map ── */
+.sysmap{display:grid;grid-template-columns:1fr 210px 1fr;gap:14px;align-items:stretch}
+.lane{border-radius:22px;padding:18px;background:rgba(255,255,255,.72);border:1px solid var(--line)}
+.lane-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+.lane-head h3{font-family:var(--font-display);font-size:17px}
+.lane-head span{font-size:11px;color:var(--muted)}
+.fstack{display:grid;gap:9px}
+.fbox{position:relative;padding:11px 11px 11px 14px;border-radius:15px;background:var(--panel-strong);border:1px solid var(--line)}
+.fbox::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:15px 0 0 15px}
+.fv::before{background:var(--violet)}.fc::before{background:var(--cyan)}.fm::before{background:var(--mint)}.fa::before{background:var(--amber)}.fr::before{background:var(--rose)}
+.ml{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:block}
+.fbox h4{font-size:12.5px;line-height:1.2;margin-bottom:3px}.fbox p{font-size:11px;color:var(--muted)}
+.center-col{border-radius:22px;padding:14px;background:linear-gradient(160deg,rgba(14,139,98,.07),rgba(104,71,245,.07)),rgba(255,255,255,.78);border:1px solid var(--line);display:grid;align-content:start;gap:10px}
+.cc-core{background:rgba(14,15,22,.95);color:#f3f5fb;border-radius:16px;padding:13px}
+.cc-core strong{display:block;font-family:var(--font-display);font-size:15px;margin-bottom:6px}
+.cc-core p{font-size:11px;color:rgba(243,245,251,.6)}
+.cpill{padding:9px 11px;border-radius:12px;border:1px dashed rgba(17,18,24,.13);background:rgba(255,255,255,.9)}
+.cpill strong{display:block;font-size:11.5px;margin-bottom:2px}.cpill span{font-size:10.5px;color:var(--muted)}
+
+/* ── Reward system ── */
+.reward-grid{display:grid;grid-template-columns:1.1fr 0.9fr;gap:16px}
+.rbox{border-radius:20px;padding:18px;border:1px solid var(--line);background:rgba(255,255,255,.88)}
+.rbox h3{font-family:var(--font-display);font-size:18px;margin-bottom:4px}
+.rbox .rsub{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+.rsteps{display:grid;gap:8px}
+.rs{display:flex;gap:9px;align-items:flex-start;padding:9px 11px;border-radius:13px;background:rgba(255,255,255,.72);border:1px solid var(--line)}
+.ri{width:18px;height:18px;border-radius:50%;flex-shrink:0;background:rgba(14,15,22,.88);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;margin-top:1px}
+.rs strong{display:block;font-size:12px;margin-bottom:2px}.rs span{font-size:11px;color:var(--muted)}
+
+/* ── Scorer ── */
+.scorer-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.scorer{padding:13px;border-radius:15px;border:1px solid var(--line);background:rgba(255,255,255,.9)}
+.sc-tag{display:inline-block;margin-bottom:7px;font-family:var(--font-mono);font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px}
+.sc-tag.v{background:var(--violet-soft);color:var(--violet)}.sc-tag.c{background:var(--cyan-soft);color:var(--cyan)}.sc-tag.m{background:var(--mint-soft);color:var(--mint)}.sc-tag.a{background:var(--amber-soft);color:var(--amber)}.sc-tag.r{background:var(--rose-soft);color:var(--rose)}
+.scorer h4{font-size:12.5px;margin-bottom:4px}.scorer p{font-size:11px;color:var(--muted)}
+.sf{margin-top:7px;padding:5px 7px;border-radius:9px;background:rgba(104,71,245,.07);font-family:var(--font-mono);font-size:9.5px;color:var(--violet)}
+
+/* ── Storage ── */
+.store-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.scard{padding:15px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.88);display:grid;gap:9px}
+.scard-top{display:flex;justify-content:space-between;align-items:flex-start;gap:9px}
+.scard h3{font-size:13.5px;line-height:1.2}
+.spill{padding:5px 9px;border-radius:999px;font-size:10px;font-weight:600;white-space:nowrap}
+.spill.m{background:var(--mint-soft);color:var(--mint)}.spill.v{background:var(--violet-soft);color:var(--violet)}.spill.c{background:var(--cyan-soft);color:var(--cyan)}.spill.a{background:var(--amber-soft);color:var(--amber)}
+.sdesc{font-size:11.5px;color:var(--muted)}
+.kv{display:grid;gap:5px;font-size:11px;border-top:1px solid var(--line);padding-top:7px}
+.kr{display:grid;grid-template-columns:60px 1fr;gap:7px}
+.kr strong{color:var(--ink)}.kr span{color:var(--muted)}
+
+/* ── Rollout rail ── */
+.rail{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.rc{min-height:170px;padding:15px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.9);display:grid;align-content:start;gap:8px}
+.rtag{width:fit-content;padding:5px 9px;border-radius:999px;font-size:10px;font-weight:700}
+.rtag.done{background:var(--mint-soft);color:var(--mint)}.rtag.now{background:var(--amber-soft);color:var(--amber)}.rtag.next{background:var(--violet-soft);color:var(--violet)}.rtag.later{background:var(--cyan-soft);color:var(--cyan)}
+.rc h3{font-size:14.5px;line-height:1.15}.rc p{font-size:11.5px;color:var(--muted)}
+
+/* ── Detection loop ── */
+.loop-grid{display:grid;grid-template-columns:1.2fr 0.8fr;gap:16px}
+.lsteps{display:grid;gap:10px}
+.ls{position:relative;padding:13px 14px 13px 46px;border-radius:17px;background:rgba(255,255,255,.88);border:1px solid var(--line)}
+.ln{position:absolute;left:12px;top:13px;width:21px;height:21px;border-radius:50%;background:rgba(14,15,22,.9);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700}
+.ls h3{font-size:13.5px;margin-bottom:3px}.ls p{font-size:12px;color:var(--muted)}
+
+/* ── Checklist ── */
+.check-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.ci2{display:flex;gap:10px;align-items:flex-start;padding:13px;border-radius:15px;border:1px solid var(--line);background:rgba(255,255,255,.88)}
+.ci2 i{font-size:16px;margin-top:2px;color:var(--violet);flex-shrink:0}
+.ci2 strong{display:block;font-size:12.5px;margin-bottom:3px}.ci2 span{font-size:11.5px;color:var(--muted)}
+
+.footer-note{margin-top:14px;text-align:center;font-size:11px;color:var(--muted)}
+
+/* ── Architecture Diagram ── */
+.arch-canvas{
+  position:relative;display:grid;gap:12px;overflow:hidden;
+  background:
+    radial-gradient(circle at 18% 12%,rgba(104,71,245,.22),transparent 30%),
+    radial-gradient(circle at 85% 18%,rgba(13,141,195,.18),transparent 28%),
+    linear-gradient(180deg,rgba(17,18,24,.97),rgba(26,28,38,.94));
+  border-radius:24px;padding:18px;border:1px solid rgba(17,18,24,.22);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 18px 50px rgba(17,18,24,.14);
+}
+.arch-canvas::before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.42;
+  background-image:
+    linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);
+  background-size:24px 24px;
+  mask-image:linear-gradient(180deg,rgba(0,0,0,.78),rgba(0,0,0,.18));
+}
+.arch-canvas::after{
+  content:"runtime topology";position:absolute;right:18px;top:12px;
+  font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.18em;
+  text-transform:uppercase;color:rgba(243,245,251,.24);
+}
+.arch-canvas>*{position:relative;z-index:1}
+.ac-layer{
+  border-radius:18px;overflow:hidden;
+  border:1px solid rgba(255,255,255,.12);
+  background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.78));
+  box-shadow:0 12px 32px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.75);
+}
+.ac-head{
+  min-height:40px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  font-family:var(--font-mono);font-size:10px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;
+  border-bottom:1px solid rgba(17,18,24,.08);
+}
+.ac-head span{font-size:9.5px;font-weight:500;letter-spacing:0;text-transform:none;opacity:.74}
+.ac-head.ui-h{background:linear-gradient(90deg,rgba(13,141,195,.18),rgba(13,141,195,.04));color:var(--cyan)}
+.ac-head.brain-h{background:linear-gradient(90deg,rgba(104,71,245,.22),rgba(104,71,245,.05));color:var(--violet)}
+.ac-head.hand-h{background:linear-gradient(90deg,rgba(13,141,195,.16),rgba(13,141,195,.04));color:var(--cyan)}
+.ac-head.ext-h{background:linear-gradient(90deg,rgba(179,121,16,.18),rgba(179,121,16,.04));color:var(--amber)}
+.ac-head.store-h{background:linear-gradient(90deg,rgba(14,139,98,.18),rgba(14,139,98,.04));color:var(--mint)}
+.ac-body{padding:12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.ac-body:has(.ac-node.wide){grid-template-columns:.9fr 1.35fr .9fr .95fr}
+.ac-node{
+  position:relative;min-width:0;padding:12px 12px 11px 13px;border-radius:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,249,252,.9));
+  border:1px solid rgba(17,18,24,.10);display:grid;align-content:start;gap:5px;
+  box-shadow:0 8px 18px rgba(17,18,24,.06),inset 0 1px 0 rgba(255,255,255,.9);
+}
+.ac-node::before{
+  content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;
+  background:var(--cyan);opacity:.72;
+}
+.ac-head.brain-h+.ac-brain-grid .ac-node::before{background:var(--violet)}
+.ac-head.store-h+div .ac-node::before{background:var(--mint)}
+.ac-node.wide,.ac-node.wider{grid-column:span 1}
+.ac-node .nicon{
+  width:25px;height:25px;border-radius:9px;display:grid;place-items:center;
+  font-size:16px;margin-bottom:1px;background:rgba(17,18,24,.05);color:var(--cyan);
+}
+.ac-node strong{font-size:12px;line-height:1.22;color:var(--ink)}
+.ac-node p{font-size:10.7px;color:var(--muted);line-height:1.45}
+.ac-node ul{list-style:none;display:grid;gap:3px}
+.ac-node ul li{font-size:10.6px;color:var(--muted);line-height:1.38}
+.ac-conn{
+  display:flex;justify-content:center;gap:10px;padding:0 8px;align-items:center;
+}
+.ac-conn-item{
+  min-width:120px;height:34px;display:flex;flex-direction:row;justify-content:center;align-items:center;gap:8px;
+  font-family:var(--font-mono);font-size:9.5px;font-weight:700;color:rgba(243,245,251,.68);
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:999px;
+}
+.ac-arrow-v{width:34px;height:2px;position:relative;border-radius:2px;box-shadow:0 0 14px currentColor}
+.ac-arrow-v.down::after{content:"";position:absolute;right:-1px;top:50%;transform:translateY(-50%) rotate(45deg);width:6px;height:6px;border-top:2px solid currentColor;border-right:2px solid currentColor}
+.ac-arrow-v.up::after{content:"";position:absolute;left:-1px;top:50%;transform:translateY(-50%) rotate(-135deg);width:6px;height:6px;border-top:2px solid currentColor;border-right:2px solid currentColor}
+.aclv{background:var(--violet);color:var(--violet)}
+.aclc{background:var(--cyan);color:var(--cyan)}
+.aclm{background:var(--mint);color:var(--mint)}
+.acla{background:var(--amber);color:var(--amber)}
+.aclr{background:var(--rose);color:var(--rose)}
+.ac-brain-grid{padding:12px;display:grid;grid-template-columns:minmax(170px,.82fr) minmax(280px,1.5fr) minmax(170px,.82fr);gap:12px}
+.ac-brain-col{display:grid;gap:10px;align-content:start}
+.ac-brain-col:nth-child(2) .ac-node{
+  background:linear-gradient(180deg,rgba(255,255,255,.99),rgba(244,241,255,.94));
+  border-color:rgba(104,71,245,.22);
+  box-shadow:0 12px 28px rgba(104,71,245,.12),inset 0 1px 0 rgba(255,255,255,.92);
+}
+.ac-brain-col:nth-child(2) .ac-node .nicon{background:var(--violet-soft);color:var(--violet)}
+.ac-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap}
+.ac-pill.v{background:var(--violet-soft);color:var(--violet)}
+.ac-pill.r{background:var(--rose-soft);color:var(--rose)}
+.ac-pill.m{background:var(--mint-soft);color:var(--mint)}
+.ac-pill.c{background:var(--cyan-soft);color:var(--cyan)}
+
+@media(max-width:1100px){
+  .hero-in,.sysmap,.reward-grid,.brain-arch,.loop-grid{grid-template-columns:1fr}
+  .pipeline{flex-wrap:wrap}
+  .hand-grid,.store-grid,.scorer-grid,.rail{grid-template-columns:repeat(2,1fr)}
+  .state-grid{grid-template-columns:1fr 1fr}
+  .ac-body{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ac-brain-grid{grid-template-columns:1fr}
+  .arch-canvas>div[style*="grid-template-columns"]{grid-template-columns:1fr!important}
+}
+@media(max-width:680px){
+  .page{width:calc(100% - 24px);padding-top:20px}
+  .hero-in,.ci{padding:18px}
+  h1{font-size:34px}
+  .hand-grid,.store-grid,.scorer-grid,.rail,.check-grid,.state-grid{grid-template-columns:1fr}
+  .sh{flex-direction:column}
+  .arch-canvas{padding:12px;border-radius:18px}
+  .arch-canvas::after{display:none}
+  .ac-head{align-items:flex-start;flex-direction:column;gap:3px}
+  .ac-body{grid-template-columns:1fr}
+  .ac-node.wide{grid-column:span 1}
+  .ac-conn{flex-wrap:wrap;justify-content:flex-start}
+  .ac-conn-item{min-width:0;width:100%;justify-content:flex-start;padding:0 12px}
+  .sa-hands{grid-template-columns:repeat(2,1fr)}
+  .sa-bottom{grid-template-columns:1fr}
+}
+
+/* ── Simplified arch ── */
+.sa-wrap{padding:0 0 24px}
+.sa-label{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.sa-label::after{content:"";flex:1;height:1px;background:var(--line)}
+.sa-flow{display:grid;gap:0;max-width:860px;margin:0 auto}
+.sa-box{border-radius:18px;padding:14px 18px;border:1px solid var(--line);background:rgba(255,255,255,.88)}
+.sa-box--ui{display:flex;gap:12px;align-items:center}
+.sa-box--brain{display:grid;gap:10px}
+.sa-box-head{display:flex;gap:12px;align-items:center}
+.sa-ni{width:32px;height:32px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px}
+.sa-box h4{font-family:var(--font-display);font-size:14px;margin-bottom:2px}
+.sa-box p{font-size:11px;color:var(--muted)}
+.sa-box--brain{background:linear-gradient(160deg,rgba(104,71,245,.07),rgba(104,71,245,.03));border-color:rgba(104,71,245,.20)}
+.sa-steps{display:flex;flex-wrap:wrap;gap:5px}
+.sa-step{padding:3px 9px;border-radius:999px;font-family:var(--font-mono);font-size:9.5px;font-weight:700}
+.sa-step.v{background:var(--violet-soft);color:var(--violet)}
+.sa-step.r{background:var(--rose-soft);color:var(--rose)}
+.sa-arrow{display:flex;align-items:center;gap:10px;justify-content:center;padding:6px 0}
+.sa-arrow-track{width:2px;height:28px;border-radius:2px;background:var(--line-strong)}
+.sa-arrow-labels{display:flex;flex-direction:column;gap:3px;text-align:center}
+.sa-arrow-labels span{font-family:var(--font-mono);font-size:9px;font-weight:600;letter-spacing:.04em;white-space:nowrap}
+.sa-hands{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.sa-hand{padding:12px 10px;border-radius:14px;border:1px solid rgba(13,141,195,.18);background:rgba(13,141,195,.05);text-align:center}
+.sa-hand h4{font-family:var(--font-display);font-size:13px;color:var(--cyan);margin-bottom:4px}
+.sa-hand p{font-size:10px;color:var(--muted);line-height:1.4}
+.sa-bottom{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sa-store,.sa-feedback{padding:12px 14px;border-radius:14px}
+.sa-store{border:1px solid rgba(14,139,98,.18);background:rgba(14,139,98,.05)}
+.sa-feedback{border:1px solid rgba(194,69,112,.18);background:rgba(194,69,112,.05)}
+.sa-store h4{color:var(--mint)}.sa-feedback h4{color:var(--rose)}
+.sa-store h4,.sa-feedback h4{font-family:var(--font-display);font-size:13px;margin-bottom:4px}
+.sa-store p,.sa-feedback p{font-size:10.5px;color:var(--muted);line-height:1.5}
+.sa-divider{border:none;border-top:1px solid var(--line);margin:22px 0}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ══ HERO ══ -->
+<div class="card hero">
+  <div class="hero-in">
+    <div>
+      <span class="eyebrow"><i class="ph-bold ph-flow-arrow"></i> Loom Data Rollout · 2026-06-12</span>
+      <h1>业务流程 · 数据流 · 反馈闭环</h1>
+      <p class="hero-sub">
+        完整记录 Loom 从用户提问 → Brain 路由 → Hand 并行执行 → 综合输出 → 自动评分 → 反馈写回的全链路。
+        涵盖 Brain / Hand 业务模块、BrainState 三层数据、GoalContext 生命周期、两条反馈通道（UI 显式 + 自动隐式）、
+        RewardedIntentHarness 政策学习、DataFlywheel episode 记录，以及所有持久化存储的角色与消费关系。
+      </p>
+      <div class="hero-chips">
+        <span class="chip"><i class="ph ph-git-branch"></i> loom-human-ag</span>
+        <span class="chip"><i class="ph ph-brain"></i> Brain port 3002</span>
+        <span class="chip"><i class="ph ph-hand"></i> 4 Hands</span>
+        <span class="chip"><i class="ph ph-recycle"></i> DataFlywheel</span>
+        <span class="chip"><i class="ph ph-arrows-clockwise"></i> RewardedIntentHarness</span>
+        <span class="chip"><i class="ph ph-database"></i> append-only stores</span>
+      </div>
+    </div>
+    <div class="hero-aside">
+      <h2>本文档覆盖</h2>
+      <div class="alist">
+        <div class="ai"><span class="adot av"></span><div><strong>业务流程全链路</strong><span>request → WorkflowResolver → B-plan → hand dispatch → B-review → synthesize → presentation。</span></div></div>
+        <div class="ai"><span class="adot ac"></span><div><strong>Brain 模块架构</strong><span>BrainHarness · BrainState（strategy / frameworks / notes）· GoalContext · WorkflowResolver。</span></div></div>
+        <div class="ai"><span class="adot am"></span><div><strong>Hand 模块</strong><span>4 个领域 hand（market / sentiment / target / position）的工具、输出契约与 source tier。</span></div></div>
+        <div class="ai"><span class="adot aa"></span><div><strong>自动反馈</strong><span>RewardedIntentHarness 6 维评分 + 政策 EMA 权重更新 + credit assignment。</span></div></div>
+        <div class="ai"><span class="adot ar"></span><div><strong>人类反馈 + 存储层 + 规划路线</strong><span>UI 显式投票 · Flywheel episode 注入 · 全部 JSONL/JSON 文件角色。</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 系统架构全图 ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div>
+        <h2>系统架构全图</h2>
+        <p>Loom 核心组件与数据流全览。从用户输入到 Brain 路由、Hand 并行执行、综合分析，以及自动与人类双路反馈回路。</p>
+      </div>
+      <div class="legend">
+        <span class="lp"><span class="sw sv"></span> Brain 层</span>
+        <span class="lp"><span class="sw sc"></span> UI / Hand 层</span>
+        <span class="lp"><span class="sw sm"></span> 存储层</span>
+        <span class="lp"><span class="sw sa"></span> 数据源</span>
+        <span class="lp"><span class="sw sr"></span> 反馈回路</span>
+      </div>
+    </div>
+
+    <!-- ▌ Simplified arch ▌ -->
+    <div class="sa-wrap">
+      <div class="sa-label">核心架构（简化）</div>
+      <div class="sa-flow">
+
+        <!-- UI -->
+        <div class="sa-box sa-box--ui">
+          <div class="sa-ni" style="background:rgba(17,18,24,.07)"><i class="ph ph-monitor"></i></div>
+          <div>
+            <h4>User / Webview</h4>
+            <p>问题输入 · 结果展示 · Feedback Widget · Episode 反馈</p>
+          </div>
+        </div>
+
+        <!-- Arrow ↕ -->
+        <div class="sa-arrow">
+          <div class="sa-arrow-track" style="background:linear-gradient(180deg,var(--violet),var(--violet))"></div>
+          <div class="sa-arrow-labels">
+            <span style="color:var(--violet)">↓ POST /analyze</span>
+            <span style="color:var(--mint)">↑ render / patch</span>
+          </div>
+        </div>
+
+        <!-- Brain -->
+        <div class="sa-box sa-box--brain">
+          <div class="sa-box-head">
+            <div class="sa-ni" style="background:var(--violet-soft)"><i class="ph ph-brain" style="color:var(--violet)"></i></div>
+            <div>
+              <h4 style="color:var(--violet)">Brain Engine &nbsp;<span style="font-size:11px;font-weight:400;color:var(--muted)">port 3002</span></h4>
+              <p>WorkflowResolver → BrainHarness · BrainState · IntentWiki · RewardedIntentHarness</p>
+            </div>
+          </div>
+          <div class="sa-steps">
+            <span class="sa-step v">① plan</span>
+            <span class="sa-step v">② dispatch hands</span>
+            <span class="sa-step v">③ review</span>
+            <span class="sa-step v">④ synthesize</span>
+            <span class="sa-step v">⑤ compose_presentation</span>
+            <span class="sa-step r">⑥ auto-reward</span>
+          </div>
+        </div>
+
+        <!-- Arrow ↕ -->
+        <div class="sa-arrow">
+          <div class="sa-arrow-track" style="background:linear-gradient(180deg,var(--cyan),var(--cyan))"></div>
+          <div class="sa-arrow-labels">
+            <span style="color:var(--cyan)">↓ parallel dispatch</span>
+            <span style="color:var(--cyan)">↑ artifacts</span>
+          </div>
+        </div>
+
+        <!-- Hands -->
+        <div class="sa-hands">
+          <div class="sa-hand">
+            <h4>Market Hand</h4>
+            <p>宏观 · 利率 · 资金面<br>FRED · Finnhub</p>
+          </div>
+          <div class="sa-hand">
+            <h4>Sentiment Hand</h4>
+            <p>情绪 · 定位<br>Reddit · StockTwits</p>
+          </div>
+          <div class="sa-hand">
+            <h4>Target Hand</h4>
+            <p>个股 · 基本面<br>EDGAR · Yahoo</p>
+          </div>
+          <div class="sa-hand">
+            <h4>Position Hand</h4>
+            <p>本地仓位<br>P&amp;L · 风险</p>
+          </div>
+        </div>
+
+        <!-- Arrow ↓ -->
+        <div class="sa-arrow">
+          <div class="sa-arrow-track"></div>
+          <div class="sa-arrow-labels">
+            <span>写入 / 读取</span>
+          </div>
+        </div>
+
+        <!-- Storage + Feedback -->
+        <div class="sa-bottom">
+          <div class="sa-store">
+            <h4>存储层</h4>
+            <p>brain_state (strategy · frameworks · learned-notes)<br>flywheel/records · goal_context/ · intent-stream.jsonl</p>
+          </div>
+          <div class="sa-feedback">
+            <h4>反馈回路</h4>
+            <p><strong>自动</strong>：synthesize → 6维评分 → reward_ledger → policies.json<br><strong>人工</strong>：UI thumbs / correction → feedback.jsonl → learned-notes</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <hr class="sa-divider">
+
+    <div class="arch-canvas">
+
+      <!-- ▌ UI LAYER ▌ -->
+      <div class="ac-layer">
+        <div class="ac-head ui-h">User Interface <span>Loom Webview · port 3000</span></div>
+        <div class="ac-body">
+          <div class="ac-node">
+            <i class="ph ph-chat-dots nicon"></i>
+            <strong>Question Input</strong>
+            <p>用户提问 → POST /analyze<br>context · domain_hint · hands[]</p>
+          </div>
+          <div class="ac-node wide">
+            <i class="ph ph-layout nicon"></i>
+            <strong>Hand Cards + Detail Panels</strong>
+            <p>compose_presentation() 渲染结果<br>overview · cards[] · detail_panels{} · quality_gaps[]</p>
+          </div>
+          <div class="ac-node">
+            <i class="ph ph-thumbs-up nicon"></i>
+            <strong>Feedback Widget</strong>
+            <p><code>data-anc^="loom-"</code> 自挂载<br>thumbs up/down · 备注 · POST /feedback</p>
+          </div>
+          <div class="ac-node">
+            <i class="ph ph-arrows-clockwise nicon"></i>
+            <strong>Episode Feedback UI</strong>
+            <p>POST /flywheel/feedback<br>episode_id · signal · corrected_stance</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ▌ Connector: UI ↕ Brain ▌ -->
+      <div class="ac-conn">
+        <div class="ac-conn-item">
+          <div class="ac-arrow-v aclv down"></div>
+          <span>POST /analyze</span>
+        </div>
+        <div class="ac-conn-item">
+          <div class="ac-arrow-v aclm up"></div>
+          <span>render / patch</span>
+        </div>
+        <div class="ac-conn-item">
+          <div class="ac-arrow-v aclr down"></div>
+          <span>POST /feedback</span>
+        </div>
+        <div class="ac-conn-item">
+          <div class="ac-arrow-v aclr down"></div>
+          <span>POST /flywheel/feedback</span>
+        </div>
+        <div class="ac-conn-item">
+          <div class="ac-arrow-v aclv down"></div>
+          <span>intent_stream.append</span>
+        </div>
+      </div>
+
+      <!-- ▌ BRAIN LAYER ▌ -->
+      <div class="ac-layer">
+        <div class="ac-head brain-h">Brain Engine <span>FastAPI · port 3002 · LoomCoreAgent · BrainHarness</span></div>
+        <div class="ac-brain-grid">
+
+          <!-- Left: Routing + State -->
+          <div class="ac-brain-col">
+            <div class="ac-node" style="background:rgba(104,71,245,.06);border-color:rgba(104,71,245,.16)">
+              <i class="ph ph-git-fork nicon" style="color:var(--violet)"></i>
+              <strong>WorkflowResolver</strong>
+              <ul>
+                <li>① domain_hint (caller)</li>
+                <li>② keyword match</li>
+                <li>③ LLM fallback</li>
+                <li>→ <strong>domain + hands[]</strong></li>
+              </ul>
+            </div>
+            <div class="ac-node">
+              <i class="ph ph-sliders nicon"></i>
+              <strong>BrainState</strong>
+              <ul>
+                <li>strategy.md → rules</li>
+                <li>frameworks.json</li>
+                <li>learned-notes.json</li>
+                <li style="color:var(--violet);font-size:9.5px">Python-side filtering<br>only matched → LLM</li>
+              </ul>
+            </div>
+            <div class="ac-node">
+              <i class="ph ph-flag nicon"></i>
+              <strong>GoalContext</strong>
+              <ul>
+                <li>key_findings[]</li>
+                <li>synthesis_history</li>
+                <li>contradiction_log[]</li>
+                <li>→ goal_context/*.json</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Center: Core Pipeline -->
+          <div class="ac-brain-col">
+            <div class="ac-node wider" style="background:rgba(104,71,245,.07);border-color:rgba(104,71,245,.22)">
+              <i class="ph ph-flow-arrow nicon" style="color:var(--violet)"></i>
+              <strong style="color:var(--violet);font-size:13px">BrainHarness — 核心管线</strong>
+              <ul style="gap:5px;margin-top:2px">
+                <li>① <strong>_assemble_prompt()</strong>：7 层 system prompt 动态组装</li>
+                <li>② <strong>plan()</strong>：写 analysis rubrics（维度 + 覆盖目标）</li>
+                <li>③ <strong>dispatch hands</strong>：parallel 执行，task + context + resource_menu</li>
+                <li>④ <strong>review()</strong>：rubric 覆盖率检查 → confidence_gaps + follow_up</li>
+                <li>⑤ <strong>synthesize()</strong>：stance · confidence · key_drivers · reversal_condition</li>
+                <li>⑥ <strong>compose_presentation()</strong>：overview · cards · detail_panels · quality_gaps</li>
+              </ul>
+            </div>
+            <div class="ac-node wider" style="background:rgba(194,69,112,.06);border-color:rgba(194,69,112,.20)">
+              <i class="ph ph-arrows-clockwise nicon" style="color:var(--rose)"></i>
+              <strong style="color:var(--rose)">RewardedIntentHarness — 自动奖励</strong>
+              <ul style="gap:4px;margin-top:2px">
+                <li>synthesize() 完成后<strong>立即自动运行</strong></li>
+                <li>plan()：selected_policies top-5 → prompt ⑦ 层约束</li>
+                <li>evaluate_and_update()：6 维 evaluator 评分</li>
+                <li>policy weight EMA：<code>w += 0.08×(r−0.5)</code></li>
+                <li>→ <strong>policies.json</strong> · reward_ledger.jsonl · credit_assignments</li>
+              </ul>
+            </div>
+            <div class="ac-node wider">
+              <i class="ph ph-recycle nicon"></i>
+              <strong>DataFlywheel</strong>
+              <ul>
+                <li>per-episode FlywheelRecord（每次 /analyze）</li>
+                <li>BrainSelfEval + HandEval[] + HumanFeedback[]</li>
+                <li>→ flywheel/records.jsonl + {episode_id}.json</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Right: Intent System -->
+          <div class="ac-brain-col">
+            <div class="ac-node">
+              <i class="ph ph-stream nicon"></i>
+              <strong>Intent Stream</strong>
+              <ul>
+                <li>IntentProcessor.parse()</li>
+                <li>→ intent-stream.jsonl</li>
+                <li>tail(5) → prompt ⑤</li>
+                <li style="color:var(--amber)">⚠ agent output 待补</li>
+              </ul>
+            </div>
+            <div class="ac-node">
+              <i class="ph ph-graph nicon"></i>
+              <strong>IntentWiki</strong>
+              <ul>
+                <li>ingest_event() 更新节点</li>
+                <li>activate() → prompt ⑥</li>
+                <li>8 个 zone 分类</li>
+                <li>→ intents.json</li>
+              </ul>
+            </div>
+            <div class="ac-node">
+              <i class="ph ph-flask nicon"></i>
+              <strong>ResourceDistiller</strong>
+              <ul>
+                <li>POST /distill</li>
+                <li>resource → AnalyticalFramework</li>
+                <li>→ frameworks.json</li>
+              </ul>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ▌ Connector: Brain → Hands ▌ -->
+      <div class="ac-conn">
+        <div class="ac-conn-item">
+          <div class="ac-arrow-v aclc down"></div>
+          <span>parallel dispatch</span>
+        </div>
+        <div class="ac-conn-item">
+          <div class="ac-arrow-v aclc up"></div>
+          <span>artifacts ←</span>
+        </div>
+        <div class="ac-conn-item">
+          <div class="ac-arrow-v aclv down"></div>
+          <span>task + resource_menu</span>
+        </div>
+        <div class="ac-conn-item">
+          <div class="ac-arrow-v aclm down"></div>
+          <span>→ stores</span>
+        </div>
+      </div>
+
+      <!-- ▌ Hands + Storage side-by-side ▌ -->
+      <div style="display:grid;grid-template-columns:1.5fr 0.5fr;gap:10px">
+
+        <!-- Hands + External -->
+        <div style="display:grid;gap:8px">
+          <div class="ac-layer">
+            <div class="ac-head hand-h">Hand Layer <span>4 个并行执行器 · BaseHand LLM agent</span></div>
+            <div class="ac-body">
+              <div class="ac-node">
+                <i class="ph ph-chart-line nicon"></i>
+                <strong>Market Hand</strong>
+                <p>宏观 · 利率 · 资金面<br><span style="color:var(--mint);font-size:10px">Tier A/B 优先</span></p>
+                <ul><li>FRED · Finnhub · EDGAR</li></ul>
+              </div>
+              <div class="ac-node">
+                <i class="ph ph-smiley nicon"></i>
+                <strong>Sentiment Hand</strong>
+                <p>情绪 · 持仓结构<br><span style="color:var(--amber);font-size:10px">Tier E/F 参考</span></p>
+                <ul><li>Fear&amp;Greed · AAII · NAAIM</li></ul>
+              </div>
+              <div class="ac-node">
+                <i class="ph ph-crosshair nicon"></i>
+                <strong>Target Hand</strong>
+                <p>标的跟踪 · 基本面<br><span style="color:var(--mint);font-size:10px">Tier A/B</span></p>
+                <ul><li>Finnhub ticker · EDGAR · web</li></ul>
+              </div>
+              <div class="ac-node">
+                <i class="ph ph-briefcase nicon"></i>
+                <strong>Position Hand</strong>
+                <p>持仓管理<br><span style="color:var(--violet);font-size:10px">Brain-owned data</span></p>
+                <ul><li>portfolio_data 注入（redacted）</li></ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="ac-conn" style="padding:2px 0">
+            <div class="ac-conn-item"><div class="ac-arrow-v acla down"></div><span>fetch_resource</span></div>
+            <div class="ac-conn-item"><div class="ac-arrow-v acla down"></div><span>web_search</span></div>
+            <div class="ac-conn-item"><div class="ac-arrow-v acla down"></div><span>fetch_url</span></div>
+            <div class="ac-conn-item"><div class="ac-arrow-v acla up"></div><span>raw data ←</span></div>
+          </div>
+
+          <div class="ac-layer">
+            <div class="ac-head ext-h">External Data Sources <span>Tier A/B: fact · C: news · E/F: sentiment only</span></div>
+            <div class="ac-body" style="flex-wrap:wrap;gap:6px;padding:10px 12px">
+              <span style="padding:5px 9px;border-radius:999px;background:var(--mint-soft);color:var(--mint);font-size:11px;font-weight:600">FRED</span>
+              <span style="padding:5px 9px;border-radius:999px;background:var(--mint-soft);color:var(--mint);font-size:11px;font-weight:600">SEC EDGAR</span>
+              <span style="padding:5px 9px;border-radius:999px;background:var(--mint-soft);color:var(--mint);font-size:11px;font-weight:600">Finnhub</span>
+              <span style="padding:5px 9px;border-radius:999px;background:var(--mint-soft);color:var(--mint);font-size:11px;font-weight:600">Yahoo Finance</span>
+              <span style="padding:5px 9px;border-radius:999px;background:var(--mint-soft);color:var(--mint);font-size:11px;font-weight:600">CFTC COT</span>
+              <span style="padding:5px 9px;border-radius:999px;background:var(--cyan-soft);color:var(--cyan);font-size:11px;font-weight:600">Reuters RSS</span>
+              <span style="padding:5px 9px;border-radius:999px;background:var(--cyan-soft);color:var(--cyan);font-size:11px;font-weight:600">MarketWatch</span>
+              <span style="padding:5px 9px;border-radius:999px;background:var(--cyan-soft);color:var(--cyan);font-size:11px;font-weight:600">CNBC RSS</span>
+              <span style="padding:5px 9px;border-radius:999px;background:var(--amber-soft);color:var(--amber);font-size:11px;font-weight:600">Fear &amp; Greed</span>
+              <span style="padding:5px 9px;border-radius:999px;background:var(--amber-soft);color:var(--amber);font-size:11px;font-weight:600">AAII · NAAIM</span>
+              <span style="padding:5px 9px;border-radius:999px;background:var(--amber-soft);color:var(--amber);font-size:11px;font-weight:600">StockTwits · Reddit</span>
+              <span style="padding:5px 9px;border-radius:999px;background:var(--rose-soft);color:var(--rose);font-size:11px;font-weight:600">KOL RSS</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Storage right column -->
+        <div class="ac-layer" style="align-self:start">
+          <div class="ac-head store-h">Storage Layer <span>append-only</span></div>
+          <div style="padding:10px 12px;display:grid;gap:6px">
+            <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:2px">Intent</div>
+            <div style="padding:7px 9px;border-radius:11px;background:var(--violet-soft);font-size:10.5px"><strong style="color:var(--violet);display:block">intent-stream.jsonl</strong><span style="color:var(--muted)">turn-level 意图事件</span></div>
+            <div style="padding:7px 9px;border-radius:11px;background:var(--violet-soft);font-size:10.5px"><strong style="color:var(--violet);display:block">intents.json</strong><span style="color:var(--muted)">IntentWiki 节点 (8 zones)</span></div>
+            <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 0 2px">Feedback &amp; Reward</div>
+            <div style="padding:7px 9px;border-radius:11px;background:var(--rose-soft);font-size:10.5px"><strong style="color:var(--rose);display:block">feedback.jsonl</strong><span style="color:var(--muted)">UI + detector 统一</span></div>
+            <div style="padding:7px 9px;border-radius:11px;background:var(--rose-soft);font-size:10.5px"><strong style="color:var(--rose);display:block">reward_ledger.jsonl</strong><span style="color:var(--muted)">6 维自动奖励记录</span></div>
+            <div style="padding:7px 9px;border-radius:11px;background:var(--rose-soft);font-size:10.5px"><strong style="color:var(--rose);display:block">policies.json</strong><span style="color:var(--muted)">policy weight EMA</span></div>
+            <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 0 2px">Episode &amp; Goal</div>
+            <div style="padding:7px 9px;border-radius:11px;background:var(--mint-soft);font-size:10.5px"><strong style="color:var(--mint);display:block">flywheel/*.json</strong><span style="color:var(--muted)">episode 完整记录</span></div>
+            <div style="padding:7px 9px;border-radius:11px;background:var(--mint-soft);font-size:10.5px"><strong style="color:var(--mint);display:block">goal_context/*.json</strong><span style="color:var(--muted)">研究目标生命周期</span></div>
+            <div style="font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 0 2px">Brain State</div>
+            <div style="padding:7px 9px;border-radius:11px;background:var(--cyan-soft);font-size:10.5px"><strong style="color:var(--cyan);display:block">strategy.md</strong><span style="color:var(--muted)">策略规则 + weighting</span></div>
+            <div style="padding:7px 9px;border-radius:11px;background:var(--cyan-soft);font-size:10.5px"><strong style="color:var(--cyan);display:block">frameworks.json</strong><span style="color:var(--muted)">蒸馏分析框架</span></div>
+            <div style="padding:7px 9px;border-radius:11px;background:var(--cyan-soft);font-size:10.5px"><strong style="color:var(--cyan);display:block">learned-notes.json</strong><span style="color:var(--muted)">Learner 输出面</span></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ▌ Feedback loops annotation ▌ -->
+      <div style="padding:11px 14px;border-radius:15px;background:rgba(14,15,22,.04);border:1px dashed var(--line-strong);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <span style="font-family:var(--font-mono);font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);white-space:nowrap">反馈回路</span>
+        <span class="ac-pill r"><i class="ph ph-thumbs-up"></i>Path A：UI 显式 → POST /feedback → feedback_store.append()</span>
+        <span class="ac-pill v"><i class="ph ph-arrows-clockwise"></i>Path B：synthesize → evaluate_and_update() → reward_ledger → policies.json</span>
+        <span class="ac-pill c"><i class="ph ph-magnifying-glass"></i>Path C（规划中）：CorrectionDetector → implicit correction → feedback.jsonl</span>
+        <span class="ac-pill m"><i class="ph ph-arrow-arc-left"></i>Learner（Stage 3）：correction → learned-notes → hand prompt injection</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══ 业务流程全链路 ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div>
+        <h2>业务流程全链路</h2>
+        <p>一次 <code>POST /analyze</code> 请求在系统内经历的完整旅程，从路由决策到反馈写回。</p>
+      </div>
+    </div>
+    <div class="pipe-wrap">
+      <div class="pipeline">
+        <div class="pipe-step violet">
+          <div class="pnum">1</div>
+          <h4>WorkflowResolver</h4>
+          <p>domain_hint → keyword match → LLM 分类；产出 <code>{domain, mode, hands[]}</code></p>
+        </div>
+        <div class="pipe-step violet">
+          <div class="pnum">2</div>
+          <h4>Prompt Assembly</h4>
+          <p>BrainState.query_rules + frameworks + intent stream tail(5) + IntentWiki 激活 + RewardedIntent 政策 → 7 层 system prompt</p>
+        </div>
+        <div class="pipe-step violet">
+          <div class="pnum">3</div>
+          <h4>B-Plan</h4>
+          <p><code>BrainHarness.plan()</code> 写 analysis rubrics（分析维度），非 per-hand 分配；一次 LLM call</p>
+        </div>
+        <div class="pipe-step cyan">
+          <div class="pnum">4</div>
+          <h4>Hand Dispatch</h4>
+          <p>market / sentiment / target / position 并行执行；每 hand 自主决策 fetch_resource / web_search / fetch_url</p>
+        </div>
+        <div class="pipe-step amber">
+          <div class="pnum">5</div>
+          <h4>B-Review</h4>
+          <p><code>BrainHarness.review()</code> 检查 rubric 覆盖；confidence_gaps + follow_up 决策</p>
+        </div>
+        <div class="pipe-step mint">
+          <div class="pnum">6</div>
+          <h4>Synthesize</h4>
+          <p>stance / confidence / key_drivers / reversal_condition；variable-overlap gate 精筛 frameworks</p>
+        </div>
+        <div class="pipe-step rose">
+          <div class="pnum">7</div>
+          <h4>Auto Reward + Flywheel</h4>
+          <p><code>evaluate_and_update()</code> 立即运行；<code>FlywheelRecord.new()</code> 写 episode；<code>write_last_synthesis()</code></p>
+        </div>
+        <div class="pipe-step rose">
+          <div class="pnum">8</div>
+          <h4>Presentation + Intent</h4>
+          <p><code>compose_presentation()</code> 组装 cards/detail_panels；intent event 追加到 stream + IntentWiki</p>
+        </div>
+      </div>
+    </div>
+    <!-- Prompt 7 layers -->
+    <div style="margin-top:14px;padding:13px 16px;border-radius:15px;background:rgba(104,71,245,.07);border:1px solid rgba(104,71,245,.13)">
+      <strong style="font-size:12.5px">Prompt 7 层结构（BrainHarness._assemble_prompt）</strong>
+      <p style="font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.7">
+        ① <code>brain.md</code> 静态角色合约（identity, not data）&nbsp;→&nbsp;
+        ② <code>brain-coordination SKILL</code> 元技能索引（静态）&nbsp;→&nbsp;
+        ③ <code>BrainState.query_rules(domain)</code> 策略规则（Python 侧过滤，非批量加载）&nbsp;→&nbsp;
+        ④ <code>query_frameworks(domain, hand_claims)</code> 分析框架（variable-overlap gate：只有 hand claims 含相关变量才纳入）&nbsp;→&nbsp;
+        ⑤ <code>intent_stream.tail(5)</code> 最近 5 条用户意图事件（用户的 WHY）&nbsp;→&nbsp;
+        ⑥ <code>IntentWiki.activate()</code> 长效意图节点激活（zone 分类 + confidence）&nbsp;→&nbsp;
+        ⑦ <code>RewardedIntentHarness.format_plan_for_prompt()</code> 已选政策作为生成约束
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Brain 模块架构 ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div>
+        <h2>Brain 模块架构</h2>
+        <p>Brain（port 3002）是系统的决策核心，不执行具体数据获取，只负责策略路由、任务分解、综合分析与学习更新。</p>
+      </div>
+    </div>
+    <div class="brain-arch">
+      <div class="brain-col">
+        <div class="module-box">
+          <h3>BrainHarness <span style="font-size:12px;font-weight:400;color:var(--muted)">loom/brain_harness/base.py</span></h3>
+          <p class="sub">Brain 的核心编排层，管理 prompt 组装、三段式 LLM 调用（plan/review/synthesize）和 presentation 构建。</p>
+          <div class="m-rows">
+            <div class="mrow"><div class="midx">1</div><div><strong>plan(question, workflow_decision)</strong><span>写分析维度（rubrics），不分配 per-hand 任务。</span></div></div>
+            <div class="mrow"><div class="midx">2</div><div><strong>review(question, analysis_plan, hand_artifacts)</strong><span>检查 rubric 覆盖率，产出 confidence_gaps 和 follow_up_tasks。</span></div></div>
+            <div class="mrow"><div class="midx">3</div><div><strong>synthesize(question, hand_artifacts, ...)</strong><span>汇总 hand key_claims → stance / confidence / key_drivers / reversal_condition。综合后立即触发 evaluate_and_update()。</span></div></div>
+            <div class="mrow"><div class="midx">4</div><div><strong>compose_presentation(synthesis, hand_artifacts)</strong><span>构建 overview / cards[] / detail_panels{} / quality_gaps[]，供 UI 渲染。</span></div></div>
+          </div>
+        </div>
+
+        <div class="module-box">
+          <h3>WorkflowResolver <span style="font-size:12px;font-weight:400;color:var(--muted)">brain_harness/dispatcher.py</span></h3>
+          <p class="sub">domain-aware hand 调度策略。优先级：caller hint → keyword match → LLM 分类。</p>
+          <div class="m-rows">
+            <div class="mrow"><div class="midx" style="font-size:8px">hint</div><div><strong>context["domain_hint"]</strong><span>调用方直接传 domain，跳过所有推断。</span></div></div>
+            <div class="mrow"><div class="midx" style="font-size:8px">kw</div><div><strong>workflows.json trigger_keywords</strong><span>正则 scan 问题文本，内置 + user overrides（brain/personal/workflows.json）合并生效。</span></div></div>
+            <div class="mrow"><div class="midx" style="font-size:8px">llm</div><div><strong>LLM fallback 分类</strong><span>一次廉价 LLM call；mode = full_fanout（全部相关 hand）或 dynamic（按 hands_pool）。</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="brain-col">
+        <div class="dark-panel">
+          <h3>GoalContext <span style="font-size:12px;font-weight:400;color:rgba(243,245,251,.55)">brain_harness/goal_context.py</span></h3>
+          <ul>
+            <li><strong>GoalContext 对象</strong><span>per-goal 研究生命周期：goal_type（market_research / position_review / target_tracking / ad_hoc）、status（open / investigating / concluded）</span></li>
+            <li><strong>key_findings[]</strong><span>Finding：claim + hand_id + confidence + episode_id + tags；upsert by finding_id</span></li>
+            <li><strong>synthesis_history[]</strong><span>SynthesisSnapshot：episode_id · stance · confidence · key_drivers · reversal_condition；保留最近 20 条</span></li>
+            <li><strong>contradiction_log[]</strong><span>记录两个 hand 之间的相互矛盾（hand_a / hand_b / description / resolved）</span></li>
+            <li><strong>持久化</strong><span>每个 goal 一份 JSON：<code>brain/goal_context/{goal_id}.json</code>，GoalContextStore 管理 CRUD</span></li>
+          </ul>
+        </div>
+
+        <div class="module-box">
+          <h3>ResourceDistiller <span style="font-size:12px;font-weight:400;color:var(--muted)">brain_harness/distiller.py</span></h3>
+          <p class="sub">把外部资源（RSS 文章、研报）蒸馏为可检索的 AnalyticalFramework，写入 brain/personal/frameworks.json。</p>
+          <div class="m-rows">
+            <div class="mrow"><div class="midx">→</div><div><strong>POST /distill</strong><span>输入 resource_url / source_author，同步追加 IntentEvent（resource_share 类型）到 intent-stream。</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Brain State 三层 ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div>
+        <h2>BrainState — 三层可查询数据</h2>
+        <p>Brain 侧唯一的结构化状态存储。所有选择逻辑在 Python 进程运行，只有命中的条目进入 LLM prompt，这是 Brain harness 与 Hand harness 的核心结构差异。</p>
+      </div>
+      <div class="legend">
+        <span class="lp"><span class="sw sv"></span> Strategy Rules</span>
+        <span class="lp"><span class="sw sc"></span> Frameworks</span>
+        <span class="lp"><span class="sw sm"></span> Learned Notes</span>
+      </div>
+    </div>
+    <div class="state-grid">
+      <div class="state-card">
+        <h4>策略规则层 <code>brain/personal/strategy.md</code></h4>
+        <p>YAML front-matter 解析。StrategyRule：rule_id · condition · action · priority · domains[]。</p>
+        <p><strong>query_rules(domain, question)</strong>：Python 侧过滤 domain 匹配的规则，按 priority 排序，仅命中规则进入 prompt。</p>
+        <div class="files">
+          <span class="stag v">default_style</span>
+          <span class="stag v">weighting{}</span>
+          <span class="stag v">position_rules[]</span>
+        </div>
+      </div>
+      <div class="state-card">
+        <h4>分析框架层 <code>brain/personal/frameworks.json</code></h4>
+        <p>AnalyticalFramework：name · key_variables[] · decision_logic · weight_hints · failure_conditions · confidence（high/medium/low/untested）· tags[]</p>
+        <p><strong>query_frameworks(domain, hand_claims, min_confidence)</strong>：variable-overlap gate — 只有 hand key_claims 包含 framework 的 key_variables 才纳入 prompt。</p>
+        <div class="files">
+          <span class="stag c">framework_id</span>
+          <span class="stag c">distilled_at</span>
+          <span class="stag c">source_url</span>
+        </div>
+      </div>
+      <div class="state-card">
+        <h4>学习笔记层 <code>brain/personal/learned-notes.json</code></h4>
+        <p>LearnedNote：timestamp · domain · note · tags[]。</p>
+        <p><strong>query_notes(domain, n=5)</strong>：返回该 domain 最近 n 条笔记，注入 prompt 第 ③ 层之后。</p>
+        <p style="margin-top:8px;font-size:11px;color:var(--muted)">这是 Learner（Stage 3）的输出面 — 高价值 correction 总结后写入此处，下次 synthesize 自动生效。</p>
+        <div class="files">
+          <span class="stag m">append only</span>
+          <span class="stag m">domain-scoped</span>
+        </div>
+      </div>
+      <div class="state-card">
+        <h4>Intent Stream <code>brain/context/intent-stream.jsonl</code></h4>
+        <p>turn-level 用户意图事件。每次 /analyze 结束后异步追加（IntentProcessor.parse() → IntentEvent）。</p>
+        <p><strong>tail(5)</strong>：最近 5 条事件作为"用户的 WHY"注入 prompt 第 ⑤ 层。</p>
+        <p style="margin-top:8px;font-size:11px;color:var(--amber)">⚠ 当前缺口：只记录 human input，agent output turn 未写入 → CorrectionDetector 无法建立 turn pair。</p>
+        <div class="files">
+          <span class="stag a">human input only</span>
+        </div>
+      </div>
+      <div class="state-card">
+        <h4>Intent Wiki <code>brain/intent_wiki/intents.json</code></h4>
+        <p>长效用户意图节点，按 8 个 zone 分类：content_requirements / decision_style / workflow_preferences / source_preferences / object_behavior / risk_sensitivity / personal_style / domain_principles。</p>
+        <p>每次 ingest_event 更新 confidence + evidence_count。<strong>activate(question, domain)</strong> 产出 IntentActivation（active_intents[]），供 RewardedIntentHarness 使用。</p>
+        <div class="files">
+          <span class="stag c">8 zones</span>
+          <span class="stag c">confidence 0–1</span>
+        </div>
+      </div>
+      <div class="state-card">
+        <h4>Last Synthesis Snapshot <code>brain/context/last-synthesis.md</code></h4>
+        <p>最近一次综合结果的 Markdown 快照，BrainHarness.write_last_synthesis() 在每次 synthesize 后写入。</p>
+        <p>仅在文件 mtime &lt; 24h 时自动注入 prompt（第 ⑦ 层之后），提供跨 session 的上下文连续性。</p>
+        <div class="files">
+          <span class="stag m">24h TTL</span>
+          <span class="stag m">auto-expire</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Hand 模块 ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div>
+        <h2>Hand 模块 — 4 个领域执行器</h2>
+        <p>每个 Hand 是独立的 LLM agent（BaseHand），接收 task + context + resource_menu，自主决定调用哪些工具，输出统一 artifact 契约。</p>
+      </div>
+    </div>
+    <div class="hand-grid">
+      <div class="hand-card">
+        <h4>Market Hand</h4>
+        <p class="role">宏观面 · 利率 · 资金面 · 技术面</p>
+        <ul>
+          <li>fetch_resource (fred / finnhub)</li>
+          <li>web_search (宏观/央行)</li>
+          <li>fetch_url (EDGAR / FRED API)</li>
+        </ul>
+        <span class="htag" style="background:var(--violet-soft);color:var(--violet)">Tier A/B 优先</span>
+      </div>
+      <div class="hand-card">
+        <h4>Sentiment Hand</h4>
+        <p class="role">市场情绪 · 持仓结构 · KOL</p>
+        <ul>
+          <li>fetch_resource (fear-greed / aaii)</li>
+          <li>fetch_resource (cftc-cot)</li>
+          <li>kol-rss fetch_url</li>
+        </ul>
+        <span class="htag" style="background:var(--amber-soft);color:var(--amber)">Tier E/F 参考</span>
+      </div>
+      <div class="hand-card">
+        <h4>Target Hand</h4>
+        <p class="role">标的跟踪 · 基本面 · 催化剂</p>
+        <ul>
+          <li>fetch_resource (finnhub ticker)</li>
+          <li>fetch_url (SEC EDGAR)</li>
+          <li>web_search (earnings / news)</li>
+        </ul>
+        <span class="htag" style="background:var(--cyan-soft);color:var(--cyan)">ticker 参数化</span>
+      </div>
+      <div class="hand-card">
+        <h4>Position Hand</h4>
+        <p class="role">持仓管理 · 风险敞口</p>
+        <ul>
+          <li>Brain 注入 portfolio_data</li>
+          <li>data_policy: redacted summary only</li>
+          <li>不调用外部资源</li>
+        </ul>
+        <span class="htag" style="background:var(--mint-soft);color:var(--mint)">Brain-owned data</span>
+      </div>
+    </div>
+
+    <!-- Artifact contract -->
+    <h3 style="font-family:var(--font-display);font-size:17px;margin:20px 0 11px">Hand Artifact 输出契约</h3>
+    <div class="artifact-box">
+      <span style="color:#7dd3fc">artifact</span> = {<br>
+      &nbsp;&nbsp;<span style="color:#86efac">narrative</span>: <span style="color:#fde68a">str</span> <span style="color:rgba(243,245,251,.4)"># 可读结论段落（前 200 字符进入 synthesize 输入）</span><br>
+      &nbsp;&nbsp;<span style="color:#86efac">sections</span>: [{ id, title, summary, bullets[] }] <span style="color:rgba(243,245,251,.4)"># detail_panel 的展开层</span><br>
+      &nbsp;&nbsp;<span style="color:#86efac">evidence</span>: [{ source, source_tier, freshness, claim, support }]<br>
+      &nbsp;&nbsp;<span style="color:#86efac">raw_sources</span>: [{ resource_id, query, freshness }] <span style="color:rgba(243,245,251,.4)"># synthesize 统计 n_web / n_fetch</span><br>
+      &nbsp;&nbsp;<span style="color:#86efac">metadata</span>: {<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#a5f3fc">key_claims</span>: str[] | {claim, source, rubric}[], <span style="color:rgba(243,245,251,.4)"># 核心主张，进入 synthesis</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#a5f3fc">confidence</span>: float,<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#a5f3fc">gaps</span>: str[], <span style="color:rgba(243,245,251,.4)"># 缺失/陈旧信息，保留在 detail_panel</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#a5f3fc">resources_used</span>: str[], <span style="color:rgba(243,245,251,.4)"># → source_tier 推断 (A/B | C | E/F)</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#a5f3fc">source_notes</span>: [{source, tier, freshness, note}],<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#a5f3fc">error</span>: str | null<br>
+      &nbsp;&nbsp;}<br>
+      }
+    </div>
+
+    <div style="margin-top:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div style="padding:11px;border-radius:14px;background:var(--mint-soft);border:1px solid rgba(14,139,98,.18)">
+        <strong style="font-size:12px">Source Tier A/B</strong>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px">fred · sec-edgar · finnhub · yahoo-finance · cftc-cot — 建立事实基础</p>
+      </div>
+      <div style="padding:11px;border-radius:14px;background:var(--cyan-soft);border:1px solid rgba(13,141,195,.18)">
+        <strong style="font-size:12px">Source Tier C</strong>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px">reuters-rss · marketwatch-rss · cnbc-rss — 新闻归因</p>
+      </div>
+      <div style="padding:11px;border-radius:14px;background:var(--amber-soft);border:1px solid rgba(179,121,16,.18)">
+        <strong style="font-size:12px">Source Tier E/F</strong>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px">fear-greed · aaii · stocktwits · reddit · kol-rss — 仅情绪参考，不覆盖 A/B</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 反馈通道 System Map ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div>
+        <h2>反馈通道 System Map</h2>
+        <p>两条路径在进入共享存储前结构已对齐，差异只保留在 <code>source</code> 与 <code>confidence</code> 字段，消费方无需感知入口。</p>
+      </div>
+      <div class="legend">
+        <span class="lp"><span class="sw sv"></span> UI Path</span>
+        <span class="lp"><span class="sw sc"></span> Auto Path</span>
+        <span class="lp"><span class="sw sm"></span> Shared Store</span>
+        <span class="lp"><span class="sw sa"></span> Learning Output</span>
+        <span class="lp"><span class="sw sr"></span> Detector (planned)</span>
+      </div>
+    </div>
+    <div class="sysmap">
+      <div class="lane">
+        <div class="lane-head"><h3>Path A — UI 显式反馈</h3><span>precision-first</span></div>
+        <div class="fstack">
+          <div class="fbox fv">
+            <span class="ml">触发</span>
+            <h4>Thumbs up/down + 备注输入</h4>
+            <p><code>hand-feedback-widget.js</code> MutationObserver 自挂载到所有 <code>data-anc^="loom-"</code> 节点。事件字段：<code>hand_id · type · vote · note · ts</code></p>
+          </div>
+          <div class="fbox fa">
+            <span class="ml">传输</span>
+            <h4><code>POST http://127.0.0.1:3002/feedback</code></h4>
+            <p>前端只发结构化事件，不承担学习或聚合逻辑。</p>
+          </div>
+          <div class="fbox fm">
+            <span class="ml">写入</span>
+            <h4><code>_core.feedback_store.append(body)</code></h4>
+            <p>LoomCoreRuntime 内部 store，标注 <code>source=ui_feedback</code>，消费方统一读取。</p>
+          </div>
+          <div class="fbox fv">
+            <span class="ml">附加路径（Episode 注入）</span>
+            <h4><code>POST /flywheel/feedback</code></h4>
+            <p>Body: <code>{ episode_id, signal, comment, corrected_stance }</code> → <code>FlywheelWriter.append_human_feedback()</code> 追加到 <code>brain/flywheel/{episode_id}.json</code></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="center-col">
+        <div class="cc-core">
+          <strong>Shared Store Layer</strong>
+          <p>所有下游组件围绕统一格式工作。source 只用于权重分层，不影响存储结构。</p>
+        </div>
+        <div class="cpill"><strong><code>feedback.jsonl</code></strong><span>统一反馈事件 (UI + detector)</span></div>
+        <div class="cpill"><strong><code>intent-stream.jsonl</code></strong><span>turn-level 上下文流</span></div>
+        <div class="cpill"><strong><code>flywheel/*.json</code></strong><span>episode-level 学习记录</span></div>
+        <div class="cpill"><strong><code>intent_harness/</code></strong><span>奖励台账 + 政策权重</span></div>
+      </div>
+
+      <div class="lane">
+        <div class="lane-head"><h3>Path B — 自动反馈</h3><span>coverage-first</span></div>
+        <div class="fstack">
+          <div class="fbox fc">
+            <span class="ml">每次 synthesize 后自动触发（已实现）</span>
+            <h4>RewardedIntentHarness.evaluate_and_update()</h4>
+            <p>无需人工。传入 activation + plan + synthesis + hand_artifacts → 6 维 evaluator 评分。</p>
+          </div>
+          <div class="fbox fr">
+            <span class="ml">评分 + 权重更新</span>
+            <h4>policy weight EMA 更新</h4>
+            <p><code>w += 0.08 × (reward − 0.5)</code>，clamp [0.15, 0.95]。写回 <code>policies.json</code>。</p>
+          </div>
+          <div class="fbox fm">
+            <span class="ml">写入</span>
+            <h4><code>reward_ledger.jsonl · credit_assignments.jsonl</code></h4>
+            <p>RewardReport + CreditAssignment 独立存储，可供 P4 FlywheelAnalyzer 消费。</p>
+          </div>
+          <div class="fbox fc" style="opacity:.6">
+            <span class="ml">规划中 Stage 2</span>
+            <h4>CorrectionDetector — 隐式纠正扫描</h4>
+            <p>定时扫描 intent-stream 相邻 turn pairs，识别"用户纠正上一轮 agent 输出"，写 <code>feedback.jsonl</code>（source=correction_detector）。前提：intent-stream 补齐 agent output turn。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ RewardedIntentHarness ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div>
+        <h2>Auto Reward — RewardedIntentHarness</h2>
+        <p>每次 synthesize 后自动运行，三段：Policy Planning（选政策）→ Evaluation（6 维评分）→ Credit Assignment（更新权重）。</p>
+      </div>
+    </div>
+    <div class="reward-grid">
+      <div class="rbox">
+        <h3>Policy Planning</h3>
+        <p class="rsub">根据激活的 Intent zones 选政策，注入 Brain prompt 最后一层作为执行约束。</p>
+        <div class="rsteps">
+          <div class="rs"><div class="ri">1</div><div><strong>IntentWiki.activate(question, domain)</strong><span>返回 IntentActivation：active_intents[]（含 zone / label / confidence）。</span></div></div>
+          <div class="rs"><div class="ri">2</div><div><strong>plan(activation, domain, question, limit=5)</strong><span>遍历政策，score = weight + 0.12×|matched_zones|，取 top-5 selected，写 episodes.jsonl。</span></div></div>
+          <div class="rs"><div class="ri">3</div><div><strong>format_plan_for_prompt(plan)</strong><span>格式化为"执行约束"注入 system prompt，LLM 必须遵循（非背景记忆）。</span></div></div>
+        </div>
+      </div>
+      <div class="rbox">
+        <h3>Evaluation &amp; Credit</h3>
+        <p class="rsub">synthesize 完成后立即自动评估，结果反向更新政策权重。</p>
+        <div class="rsteps">
+          <div class="rs"><div class="ri">1</div><div><strong>evaluate_and_update(activation, plan, synthesis, hand_artifacts)</strong><span>6 个 evaluator，产出 evaluator_scores{}（每个 0-1）。</span></div></div>
+          <div class="rs"><div class="ri">2</div><div><strong>policy_rewards 聚合</strong><span>每条政策的分数 = 其 reward_targets 对应 evaluator 分的均值。</span></div></div>
+          <div class="rs"><div class="ri">3</div><div><strong>_update_policy_weights()</strong><span><code>w ← clamp(w + 0.08×(r−0.5), 0.15, 0.95)</code>；average_reward 用 running mean 更新。</span></div></div>
+          <div class="rs"><div class="ri">4</div><div><strong>credit_assignments.jsonl</strong><span>每条政策：credit = positive(≥0.6) / negative(&lt;0.45) / neutral，附 reason（diagnosis 文本）。</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="font-family:var(--font-display);font-size:17px;margin:20px 0 11px">6 维自动评分</h3>
+    <div class="scorer-grid">
+      <div class="scorer"><span class="sc-tag v">intent_coverage</span><h4>意图覆盖率</h4><p>active_intents 的关键词在输出文本中的命中比例。</p><div class="sf">0.25 + 0.75 × hits / len(intents)</div></div>
+      <div class="scorer"><span class="sc-tag c">relevance</span><h4>相关性</h4><p>用户问题关键词命中率；intents 过多时轻微惩罚 −0.08。</p><div class="sf">clamp(0.35 + 0.55 × q_hits/q_words, 0.1, 0.9)</div></div>
+      <div class="scorer"><span class="sc-tag m">freshness</span><h4>新鲜度</h4><p>若 intent 需要 recent context，检查输出中是否有新鲜度信号。</p><div class="sf">0.82 if fresh_signal else 0.28</div></div>
+      <div class="scorer"><span class="sc-tag a">risk_coverage</span><h4>风险覆盖</h4><p>intent zones 含 risk_sensitivity 时，统计风险词命中数。</p><div class="sf">clamp(0.25 + hits × 0.16, 0, 0.9)</div></div>
+      <div class="scorer"><span class="sc-tag r">decision_usefulness</span><h4>决策可用性</h4><p>输出结构性：stance 明确 / key_drivers / reversal_condition 各加分。</p><div class="sf">0.35 +0.18×stance +0.18×drivers +0.14×reversal +0.1×conf</div></div>
+      <div class="scorer"><span class="sc-tag v">style_fit</span><h4>风格匹配</h4><p>P0 固定 0.55（占位）；P4 由 FlywheelAnalyzer 基于历史行为动态推断。</p><div class="sf">0.55 static (P0)</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DataFlywheel ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div>
+        <h2>DataFlywheel — Episode 学习记录</h2>
+        <p>每次 /analyze 产生一个 FlywheelRecord，把零散事件提升为可复盘 learning unit。P0 写入，P4 FlywheelAnalyzer 派生学习信号。</p>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 0.7fr;gap:16px">
+      <div>
+        <h3 style="font-size:15px;margin-bottom:10px">FlywheelRecord 数据结构</h3>
+        <div class="artifact-box">
+          <span style="color:#7dd3fc">FlywheelRecord</span> {<br>
+          &nbsp;&nbsp;<span style="color:#86efac">episode_id</span>: <span style="color:#fde68a">"ep-{ts_ms}-{uuid8}"</span><br>
+          &nbsp;&nbsp;<span style="color:#86efac">goal_id</span>: str, ts, question, domain<br>
+          &nbsp;&nbsp;<span style="color:#86efac">brain_self_eval</span>: <span style="color:#7dd3fc">BrainSelfEval</span> {<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;confidence, stance, key_driver_count,<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;has_reversal_condition, cold_start, hand_count<br>
+          &nbsp;&nbsp;}<br>
+          &nbsp;&nbsp;<span style="color:#86efac">hand_evaluations</span>: <span style="color:#7dd3fc">HandEval</span>[] {<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;hand_id, artifact_present, claim_count,<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;gap_count, source_tier (A/B | C | E/F)<br>
+          &nbsp;&nbsp;}<br>
+          &nbsp;&nbsp;<span style="color:#86efac">human_feedback</span>: <span style="color:#7dd3fc">HumanFeedback</span>[] <span style="color:rgba(243,245,251,.4)"># async inject</span><br>
+          &nbsp;&nbsp;<span style="color:#86efac">profile_signals</span>: dict[] <span style="color:rgba(243,245,251,.4)"># P4 FlywheelAnalyzer</span><br>
+          &nbsp;&nbsp;<span style="color:#86efac">strategy_signals</span>: dict[] <span style="color:rgba(243,245,251,.4)"># P4 FlywheelAnalyzer</span><br>
+          }
+        </div>
+      </div>
+      <div style="display:grid;gap:10px;align-content:start">
+        <h3 style="font-size:15px">Human Feedback 注入</h3>
+        <div class="fbox fv">
+          <span class="ml">端点</span>
+          <h4><code>POST /flywheel/feedback</code></h4>
+          <p><code>{ episode_id, signal, comment, corrected_stance }</code></p>
+        </div>
+        <div class="fbox fm">
+          <span class="ml">写入</span>
+          <h4><code>FlywheelWriter.append_human_feedback()</code></h4>
+          <p>追加到 <code>brain/flywheel/{episode_id}.json</code> 的 <code>human_feedback[]</code>。</p>
+        </div>
+        <div style="padding:10px 12px;border-radius:14px;background:rgba(179,121,16,.08);border:1px solid rgba(179,121,16,.18);font-size:11.5px">
+          <strong>signal 类型</strong>：thumbs_up / thumbs_down / correction / ignore<br>
+          <strong>corrected_stance</strong>：人工指定正确 stance（buy/hold/reduce），供监督式纠偏使用。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 存储层 ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div>
+        <h2>存储层</h2>
+        <p>所有 store 均为 append-only。消费者在读取时根据 source / confidence / domain 加权，原始事件永久保留。</p>
+      </div>
+    </div>
+    <div class="store-grid">
+      <article class="scard">
+        <div class="scard-top"><h3><code>brain/context/intent-stream.jsonl</code></h3><span class="spill c">context</span></div>
+        <p class="sdesc">turn-level 意图事件。Brain prompt 第 ⑤ 层 tail(5)，CorrectionDetector 的原始数据源（当前仅 human input）。</p>
+        <div class="kv">
+          <div class="kr"><strong>Producer</strong><span>IntentProcessor.parse() → 每次 /analyze 后异步追加</span></div>
+          <div class="kr"><strong>Consumer</strong><span>BrainHarness prompt; CorrectionDetector (planned)</span></div>
+          <div class="kr"><strong>缺口</strong><span>agent output turn 未写入，无法建立 correction pair</span></div>
+        </div>
+      </article>
+      <article class="scard">
+        <div class="scard-top"><h3><code>brain/intent_wiki/intents.json</code></h3><span class="spill v">wiki</span></div>
+        <p class="sdesc">长效意图节点（IntentNode[]），8 个 zone 分类，ingest_event 更新 confidence + evidence_count。</p>
+        <div class="kv">
+          <div class="kr"><strong>Producer</strong><span>IntentWiki.ingest_event()</span></div>
+          <div class="kr"><strong>Consumer</strong><span>activate() → prompt ⑥ 层 + RewardedIntentHarness.plan()</span></div>
+          <div class="kr"><strong>格式</strong><span>JSON（非 JSONL），每次写入覆盖整文件</span></div>
+        </div>
+      </article>
+      <article class="scard">
+        <div class="scard-top"><h3><code>brain/intent_harness/policies.json</code></h3><span class="spill v">policy</span></div>
+        <p class="sdesc">5 条政策及其当前 weight / average_reward / reward_count。每次 evaluate_and_update 后更新。</p>
+        <div class="kv">
+          <div class="kr"><strong>Producer</strong><span>RewardedIntentHarness._update_policy_weights()</span></div>
+          <div class="kr"><strong>Consumer</strong><span>plan() 打分 + format_plan_for_prompt()</span></div>
+          <div class="kr"><strong>更新</strong><span>EMA: w += 0.08×(r−0.5)，clamp [0.15, 0.95]</span></div>
+        </div>
+      </article>
+      <article class="scard">
+        <div class="scard-top"><h3><code>brain/intent_harness/reward_ledger.jsonl</code></h3><span class="spill v">reward</span></div>
+        <p class="sdesc">每次 synthesize 后追加 RewardReport：overall_reward + 6 evaluator_scores + policy_rewards + diagnosis。</p>
+        <div class="kv">
+          <div class="kr"><strong>Producer</strong><span>evaluate_and_update() → 每次综合后自动写</span></div>
+          <div class="kr"><strong>Consumer</strong><span>分析工具 / P4 FlywheelAnalyzer</span></div>
+          <div class="kr"><strong>配套</strong><span>credit_assignments.jsonl + episodes.jsonl</span></div>
+        </div>
+      </article>
+      <article class="scard">
+        <div class="scard-top"><h3><code>brain/flywheel/records.jsonl</code></h3><span class="spill m">episode</span></div>
+        <p class="sdesc">紧凑摘要行（episode_id / goal_id / ts / domain / stance / confidence / cold_start）；全量详情在 <code>brain/flywheel/{episode_id}.json</code>。</p>
+        <div class="kv">
+          <div class="kr"><strong>Producer</strong><span>FlywheelWriter.append_record()</span></div>
+          <div class="kr"><strong>Consumer</strong><span>episode review / FlywheelAnalyzer(P4)</span></div>
+          <div class="kr"><strong>HF 注入</strong><span>append_human_feedback() 写 per-episode JSON</span></div>
+        </div>
+      </article>
+      <article class="scard">
+        <div class="scard-top"><h3><code>brain/goal_context/{goal_id}.json</code></h3><span class="spill a">goal</span></div>
+        <p class="sdesc">研究目标生命周期快照：key_findings[] / synthesis_history[-20:] / contradiction_log[] / episode_ids[]。</p>
+        <div class="kv">
+          <div class="kr"><strong>Producer</strong><span>GoalContextStore (每次 analyze 更新)</span></div>
+          <div class="kr"><strong>Consumer</strong><span>Brain State Engine 渲染 / 复盘工具</span></div>
+          <div class="kr"><strong>状态</strong><span>open / investigating / concluded</span></div>
+        </div>
+      </article>
+      <article class="scard">
+        <div class="scard-top"><h3><code>brain/personal/strategy.md</code></h3><span class="spill v">state</span></div>
+        <p class="sdesc">YAML front-matter：default_style / weighting{} / position_rules[]（StrategyRule）。BrainState 每次调用 _reload() 重新解析。</p>
+        <div class="kv">
+          <div class="kr"><strong>Producer</strong><span>手动编辑 / Learner 输出（planned）</span></div>
+          <div class="kr"><strong>Consumer</strong><span>BrainState.query_rules() → prompt ③ 层</span></div>
+        </div>
+      </article>
+      <article class="scard">
+        <div class="scard-top"><h3><code>brain/personal/frameworks.json</code></h3><span class="spill c">state</span></div>
+        <p class="sdesc">AnalyticalFramework[]，由 ResourceDistiller 从资源蒸馏写入。variable-overlap gate 确保只有相关框架进入 prompt。</p>
+        <div class="kv">
+          <div class="kr"><strong>Producer</strong><span>ResourceDistiller (POST /distill)</span></div>
+          <div class="kr"><strong>Consumer</strong><span>BrainState.query_frameworks() → prompt ④ 层</span></div>
+        </div>
+      </article>
+      <article class="scard">
+        <div class="scard-top"><h3><code>brain/personal/learned-notes.json</code></h3><span class="spill m">state</span></div>
+        <p class="sdesc">LearnedNote[]：Learner 的输出面，不是采集源。高价值 correction 总结写入后，下次 synthesize 自动注入 prompt。</p>
+        <div class="kv">
+          <div class="kr"><strong>Producer</strong><span>Stage 3 Learner（planned）</span></div>
+          <div class="kr"><strong>Consumer</strong><span>BrainState.query_notes() → prompt ③ 层后</span></div>
+        </div>
+      </article>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Detection & Learning Loop ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div>
+        <h2>Detection &amp; Learning Loop</h2>
+        <p>从反馈采集到行为改变需要 4 个环节。Detector 只产生带置信度的结构化信号，不直接写策略。</p>
+      </div>
+    </div>
+    <div class="loop-grid">
+      <div class="lsteps">
+        <div class="ls"><span class="ln">1</span><h3>Detect（Stage 2，规划中）</h3><p>CorrectionDetector 扫描 intent-stream 相邻 turn pairs，分类"用户是否在纠正上一轮 agent 输出"，提取 correction_text + agent_claim + confidence。前提：intent-stream 补齐 agent output turn。</p></div>
+        <div class="ls"><span class="ln">2</span><h3>Normalize（结构已就位）</h3><p>无论来自 UI widget 还是 detector，事件整理为统一 feedback schema。差异只在 <code>source</code>（ui_feedback / correction_detector）和 <code>confidence</code> 字段，消费方逻辑不变。</p></div>
+        <div class="ls"><span class="ln">3</span><h3>Auto Aggregate（已实现，每次 synthesize）</h3><p>RewardedIntentHarness.evaluate_and_update()：6 维评分 → policy_rewards → credit assignment → policy weight EMA 更新。这个环节无需等待 Stage 1/2，现在即运行。</p></div>
+        <div class="ls"><span class="ln">4</span><h3>Apply（Stage 3，规划中）</h3><p>把高价值 correction 写回 <code>learned-notes.json</code>、资源排序（resource_tier weighting）或 <code>strategy.md</code>，让 hand 在下次执行前真正读到变化。FlywheelAnalyzer（P4）派生 profile_signals / strategy_signals。</p></div>
+      </div>
+      <aside class="dark-panel">
+        <h3>Boundary Rules</h3>
+        <ul>
+          <li><strong>Detector 不直接更新策略</strong><span>只产生带置信度信号，避免单次误判直接污染 hand 行为。</span></li>
+          <li><strong>Stores stay append-only</strong><span>所有原始事件保留；权重、过滤与总结放在消费者层完成。</span></li>
+          <li><strong>Learning outputs must be readable</strong><span>至少 learned notes 或 episode record 必须可被操作者和 hand 双重消费。</span></li>
+          <li><strong>Confidence affects weighting, not persistence</strong><span>低置信度事件保留，但不与显式用户纠正等权处理。</span></li>
+          <li><strong>UI layer stays thin</strong><span>前端只发事件，不承担 detector、学习或聚合逻辑。</span></li>
+          <li><strong>Auto reward already live (P0)</strong><span>RewardedIntentHarness 在 synthesize 后立即运行，无需等待任何人工操作。</span></li>
+        </ul>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Rollout Plan ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div>
+        <h2>Rollout 阶段</h2>
+        <p>按已有基础层 → 当前缺口 → 下一步构建 → 下游杠杆划分。</p>
+      </div>
+    </div>
+    <div class="rail">
+      <article class="rc">
+        <span class="rtag done">已完成 (P0)</span>
+        <h3>持久化基础 + 自动奖励</h3>
+        <p>feedback store / flywheel records / intent-stream / IntentWiki / RewardedIntentHarness（自动评分 + 政策权重更新）/ DataFlywheel 已完整运行。</p>
+      </article>
+      <article class="rc">
+        <span class="rtag now">当前缺口 (Stage 1)</span>
+        <h3>补齐 agent output turn</h3>
+        <p>synthesize() 完成后追加 agent output 事件到 intent-stream.jsonl，字段至少含 <code>type="agent_output" · stance · confidence · narrative[:200] · ts</code>。</p>
+      </article>
+      <article class="rc">
+        <span class="rtag next">下一步 (Stage 2)</span>
+        <h3>CorrectionDetector</h3>
+        <p>复用现有 scheduler，实现保守版 detector，扫描相邻 turn pairs，结果写 <code>feedback.jsonl</code>（source=correction_detector），再与 UI path 做 precision 交集评估。</p>
+      </article>
+      <article class="rc">
+        <span class="rtag later">下游 (Stage 3/P4)</span>
+        <h3>闭合 Learner Loop</h3>
+        <p>高价值 correction 自动沉淀到 learned notes / evidence 库 / resource ranking。FlywheelAnalyzer 派生 profile_signals + strategy_signals，style_fit evaluator 动态化。</p>
+      </article>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Implementation Checklist ══ -->
+<div class="card">
+  <div class="ci">
+    <div class="sh">
+      <div><h2>Implementation Checklist</h2><p>工程实现清单，每条对应明确边界。</p></div>
+    </div>
+    <div class="check-grid">
+      <div class="ci2"><i class="ph-bold ph-check-square"></i><div><strong>✅ RewardedIntentHarness — 已运行</strong><span>6 维自动评分 + policy weight EMA + credit assignment 已完整实现，每次 synthesize 后自动触发。</span></div></div>
+      <div class="ci2"><i class="ph-bold ph-check-square"></i><div><strong>✅ UI 反馈 Widget + 端点 — 已实现</strong><span>hand-feedback-widget.js 已挂载；POST /feedback 路由到 feedback_store；POST /flywheel/feedback 已实现。</span></div></div>
+      <div class="ci2"><i class="ph-bold ph-check-square"></i><div><strong>✅ DataFlywheel + GoalContext — 已实现</strong><span>FlywheelWriter.append_record() 每次 /analyze 自动写入；GoalContext CRUD 已就位。</span></div></div>
+      <div class="ci2"><i class="ph-bold ph-square"></i><div><strong>⬜ 补齐 intent-stream agent output turn (Stage 1)</strong><span>synthesize() 后追加 type="agent_output" 事件，使相邻 turn pair 可建立，解锁 CorrectionDetector。</span></div></div>
+      <div class="ci2"><i class="ph-bold ph-square"></i><div><strong>⬜ 定义 correction event schema</strong><span>source · confidence · agent_claim · correction_text · turn_pair_cursor，对齐 detector 与 learner 消费格式。</span></div></div>
+      <div class="ci2"><i class="ph-bold ph-square"></i><div><strong>⬜ 实现 CorrectionDetector + scan cursor (Stage 2)</strong><span>记录已处理 pair 位置，防止重复扫描；输出写 feedback.jsonl（source=correction_detector）。</span></div></div>
+      <div class="ci2"><i class="ph-bold ph-square"></i><div><strong>⬜ A/B signal overlap review</strong><span>用 UI path 高精度样本校验 detector precision + false positive 类型，按周产出评估报告。</span></div></div>
+      <div class="ci2"><i class="ph-bold ph-square"></i><div><strong>⬜ Learner 输出落到 learned-notes.json (Stage 3)</strong><span>高价值 correction 自动写回 brain/personal/learned-notes.json，hand 下次执行前自动注入 prompt。</span></div></div>
+    </div>
+    <p class="footer-note">File: <code>docs/superpowers/specs/2026-06-12-loom-data-rollout.html</code> · branch: loom-human-ag · 2026-06-12</p>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

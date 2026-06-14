@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>BrainStateEngine — 架构图与实现规格</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..60,400;12..60,700;12..60,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ink:#14152B; --fg1:#1e1f3a; --fg2:#4a4b6a; --fg3:#7a7b9a;
+  --border:rgba(20,21,43,.09); --border2:rgba(20,21,43,.16);
+  --paper:#FAFBFF;
+
+  /* palette */
+  --iris:#7A5AF8;  --iris-l:#EDE9FE; --iris-d:#5B21B6;
+  --teal:#0D9488;  --teal-l:#CCFBF1; --teal-d:#0F766E;
+  --amber:#D97706; --amber-l:#FEF3C7;
+  --rose:#E11D48;  --rose-l:#FFE4E6;
+  --sky:#0284C7;   --sky-l:#E0F2FE;
+  --em:#059669;    --em-l:#D1FAE5;
+  --slate:#475569; --slate-l:#F1F5F9;
+  --node:#334155;  --node-l:#F0FDF4;
+
+  --r:18px; --rm:12px; --rs:8px; --rp:999px;
+  --sh:0 2px 12px rgba(20,21,43,.08),0 1px 3px rgba(20,21,43,.04);
+  --shl:0 8px 28px rgba(20,21,43,.11),0 2px 8px rgba(20,21,43,.06);
+
+  --fd:'Bricolage Grotesque','PingFang SC','Microsoft YaHei',sans-serif;
+  --fb:'Plus Jakarta Sans','PingFang SC','Microsoft YaHei',sans-serif;
+  --fm:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+body{font-family:var(--fb);color:var(--fg1);background:radial-gradient(ellipse at 25% 0%,#edf2ff 0%,#f3f0ff 35%,#fafbff 75%);background-attachment:fixed;min-height:100vh;line-height:1.7}
+
+.wrap{max-width:1040px;margin:0 auto;padding:44px 24px 96px}
+
+/* ── header ── */
+.hd{padding:44px 0 32px;border-bottom:1px solid var(--border);margin-bottom:36px}
+.hd .ey{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--iris);margin-bottom:10px}
+.hd h1{font-family:var(--fd);font-size:clamp(24px,4vw,38px);font-weight:800;color:var(--ink);line-height:1.2;margin-bottom:12px}
+.hd p{font-size:15px;color:var(--fg2);max-width:680px;line-height:1.65}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:16px}
+.chip{display:inline-flex;align-items:center;gap:5px;background:white;border:1px solid var(--border);border-radius:var(--rp);padding:4px 12px;font-size:12px;font-weight:600;color:var(--fg2)}
+.chip span{width:6px;height:6px;border-radius:50%;background:var(--iris)}
+
+/* ── sticky nav ── */
+.nav{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:36px;position:sticky;top:12px;z-index:20;background:rgba(250,251,255,.9);backdrop-filter:blur(14px);padding:8px 12px;border-radius:var(--rp);border:1px solid var(--border);box-shadow:var(--sh);width:fit-content}
+.nav a{text-decoration:none;font-size:11.5px;font-weight:600;color:var(--fg2);padding:4px 11px;border-radius:var(--rp);transition:all .15s}
+.nav a:hover{background:var(--iris);color:white}
+
+/* ── section ── */
+.sec{margin-bottom:60px}
+.sec-lbl{display:inline-flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--fg3);margin-bottom:8px}
+.sec-lbl .nb{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white}
+.sec>h2{font-family:var(--fd);font-size:22px;font-weight:800;color:var(--ink);margin-bottom:6px}
+.sec>.lead{font-size:14px;color:var(--fg2);margin-bottom:24px;line-height:1.65;max-width:740px}
+hr.dv{border:none;border-top:1px solid var(--border);margin:52px 0}
+
+/* ════════════════════════════════════════
+   LOOM SYSTEM ARCHITECTURE DIAGRAM
+   ════════════════════════════════════════ */
+.sys-diagram{background:white;border:1px solid var(--border);border-radius:var(--r);padding:28px 24px;box-shadow:var(--sh);overflow-x:auto}
+.sys-diagram .d-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--fg3);margin-bottom:20px}
+
+/* layer rows */
+.sys-layer{margin-bottom:0}
+.sys-layer-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--fg3);margin-bottom:8px;padding-left:4px}
+
+.sys-row{display:flex;gap:10px;align-items:stretch;margin-bottom:8px;flex-wrap:nowrap}
+.sys-box{
+  border-radius:var(--rm);padding:11px 14px;
+  display:flex;flex-direction:column;gap:3px;
+  min-width:0;
+}
+.sb-name{font-size:13px;font-weight:700;color:var(--ink);white-space:nowrap}
+.sb-sub{font-size:11px;color:var(--fg2);line-height:1.4}
+.sb-port{font-family:var(--fm);font-size:10px;padding:2px 7px;border-radius:var(--rp);background:rgba(20,21,43,.07);color:var(--fg3);width:fit-content;margin-top:2px}
+
+/* box color variants */
+.sb-browser {background:#F8FAFF;border:1px solid #C7D7FD}
+.sb-anchor  {background:#EEF2FF;border:1px solid #A5B4FC}
+.sb-mcp     {background:#F3F0FF;border:1px solid #C4B5FD}
+.sb-core    {background:var(--teal-l);border:1px solid rgba(13,148,136,.25)}
+.sb-brain   {background:var(--iris-l);border:1px solid rgba(122,90,248,.25)}
+.sb-bse     {background:linear-gradient(135deg,var(--iris-l),var(--teal-l));border:2px solid var(--iris);position:relative}
+.sb-bse::before{content:'★ NEW';position:absolute;top:-9px;right:10px;font-size:9px;font-weight:800;background:var(--iris);color:white;padding:1px 7px;border-radius:var(--rp)}
+.sb-hand    {background:var(--amber-l);border:1px solid rgba(217,119,6,.25)}
+.sb-hand2   {background:var(--em-l);border:1px solid rgba(5,150,105,.25)}
+.sb-fly     {background:var(--em-l);border:1px dashed rgba(5,150,105,.5)}
+.sb-canvas  {background:var(--sky-l);border:1px solid rgba(2,132,199,.25)}
+
+/* connectors between rows */
+.sys-conn{display:flex;justify-content:center;align-items:center;gap:16px;margin:0 0 8px;height:24px}
+.conn-line{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--fg3)}
+.conn-line::before,.conn-line::after{content:'';display:block;width:1px;height:16px;background:var(--border2)}
+.arr{font-size:14px}
+
+/* brain internals */
+.brain-inner{background:rgba(122,90,248,.04);border:1px solid rgba(122,90,248,.15);border-radius:var(--rm);padding:14px 12px;margin-top:8px}
+.bi-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--iris);margin-bottom:10px}
+.bi-layers{display:flex;flex-direction:column;gap:6px}
+.bi-layer{border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px}
+.bi-num{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white;flex-shrink:0}
+.bi-name{font-size:12.5px;font-weight:700;color:var(--ink)}
+.bi-desc{font-size:11px;color:var(--fg2)}
+.bi-l1{background:rgba(122,90,248,.08);border:1px solid rgba(122,90,248,.2)}
+.bi-l2{background:rgba(13,148,136,.08);border:1px solid rgba(13,148,136,.2)}
+.bi-l3{background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2)}
+.bi-l4{background:rgba(2,132,199,.08);border:1px solid rgba(2,132,199,.2)}
+.bi-l5{background:rgba(5,150,105,.08);border:1px solid rgba(5,150,105,.25)}
+
+/* hand grid */
+.hand-grid{display:flex;gap:6px;flex-wrap:wrap}
+.hand-pill{font-size:11px;font-weight:600;padding:4px 11px;border-radius:var(--rp);background:var(--amber-l);border:1px solid rgba(217,119,6,.25);color:var(--amber)}
+
+/* ════════════════════════════════════════
+   BSE INTERNAL ARCHITECTURE
+   ════════════════════════════════════════ */
+.bse-diagram{background:white;border:2px solid var(--iris);border-radius:var(--r);padding:28px 24px;box-shadow:var(--sh);overflow-x:auto}
+.bse-diagram .d-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--iris);margin-bottom:22px}
+
+.bse-flow{display:flex;flex-direction:column;gap:0}
+
+.bse-node{
+  border-radius:var(--rm);padding:14px 16px;
+  display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:center;
+}
+.bse-node .bn-icon{width:36px;height:36px;border-radius:var(--rs);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.bse-node .bn-text h4{font-size:14px;font-weight:700;color:var(--ink)}
+.bse-node .bn-text p{font-size:12px;color:var(--fg2);line-height:1.4;margin-top:2px}
+.bse-node .bn-badge{font-size:10px;font-weight:700;text-transform:uppercase;padding:3px 9px;border-radius:var(--rp);white-space:nowrap}
+
+.bn-n1{background:var(--iris-l);border:1px solid rgba(122,90,248,.2)}
+.bn-n2{background:var(--teal-l);border:1px solid rgba(13,148,136,.2)}
+.bn-n3{background:var(--amber-l);border:1px solid rgba(217,119,6,.2)}
+.bn-n4{background:var(--sky-l);border:1px solid rgba(2,132,199,.2)}
+.bn-n5{background:var(--em-l);border:1px solid rgba(5,150,105,.25);border-style:dashed}
+
+.bse-arrow{display:flex;align-items:center;gap:6px;padding:4px 8px;font-size:11.5px;color:var(--fg3);font-style:italic}
+.bse-arrow::before{content:'';width:2px;height:24px;background:linear-gradient(to bottom,var(--border2),var(--border));margin-left:18px}
+
+/* input/output lanes */
+.bse-io{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}
+.bse-io-box{border-radius:var(--rs);padding:12px 14px}
+.bse-in{background:rgba(2,132,199,.05);border:1px dashed rgba(2,132,199,.3)}
+.bse-out{background:rgba(5,150,105,.05);border:1px dashed rgba(5,150,105,.3)}
+.bse-io-box .io-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px}
+.bse-in .io-lbl{color:var(--sky)}
+.bse-out .io-lbl{color:var(--em)}
+.bse-io-box ul{list-style:none;display:flex;flex-direction:column;gap:4px}
+.bse-io-box li{font-size:12px;color:var(--fg2);display:flex;gap:5px}
+.bse-io-box li::before{content:'→';color:var(--iris);font-weight:700;flex-shrink:0}
+
+/* flywheel loop visual */
+.fw-visual{background:rgba(5,150,105,.04);border:1px solid rgba(5,150,105,.2);border-radius:var(--rm);padding:18px;margin:16px 0}
+.fw-visual .fwv-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--em);margin-bottom:14px}
+.fw-loop-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:center}
+.fw-loop-box{border-radius:8px;padding:10px 12px;text-align:center;background:white;border:1px solid var(--border);box-shadow:var(--sh)}
+.fw-loop-box .fl-icon{font-size:18px;margin-bottom:4px}
+.fw-loop-box .fl-label{font-size:11px;font-weight:700;color:var(--ink)}
+.fw-loop-box .fl-desc{font-size:10.5px;color:var(--fg2);margin-top:3px;line-height:1.4}
+.fw-arr{display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--fg3)}
+
+/* ════════════════════════════════════════
+   LAYER DETAILS
+   ════════════════════════════════════════ */
+.layer-card{background:white;border:1px solid var(--border);border-radius:var(--r);padding:28px;box-shadow:var(--sh);margin-bottom:20px}
+.layer-card:hover{box-shadow:var(--shl);transform:translateY(-1px);transition:all .15s}
+.lc-header{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.lc-num{width:44px;height:44px;border-radius:var(--rm);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.lc-meta h3{font-family:var(--fd);font-size:18px;font-weight:800;color:var(--ink)}
+.lc-meta .lc-file{font-family:var(--fm);font-size:11.5px;color:var(--fg3);margin-top:2px}
+.lc-meta .lc-new{font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:var(--rp);background:var(--iris-l);color:var(--iris);margin-left:8px}
+
+.lc-body{font-size:14px;color:var(--fg2);line-height:1.7}
+.lc-body strong{color:var(--ink)}
+.lc-body code{font-family:var(--fm);font-size:12px;background:rgba(20,21,43,.06);padding:1px 5px;border-radius:4px;color:var(--iris)}
+
+/* responsibility list */
+.resp-list{list-style:none;display:flex;flex-direction:column;gap:7px;margin:14px 0}
+.resp-list li{display:flex;gap:10px;padding:10px 14px;border-radius:8px;font-size:13.5px;background:rgba(20,21,43,.02);border-left:3px solid transparent}
+.resp-list li .ri{font-size:14px;flex-shrink:0;margin-top:1px}
+.resp-list li .rt{color:var(--fg1)}
+.resp-list li .rt strong{color:var(--ink)}
+
+/* code block */
+pre.code{background:rgba(20,21,43,.04);border:1px solid var(--border);border-radius:var(--rs);padding:15px 17px;font-family:var(--fm);font-size:12px;line-height:1.8;color:var(--fg2);overflow-x:auto;margin:14px 0}
+pre.code .kw{color:var(--iris);font-weight:600}
+pre.code .cl{color:var(--teal);font-weight:600}
+pre.code .cm{color:var(--fg3);font-style:italic}
+pre.code .st{color:var(--amber)}
+pre.code .nm{color:var(--em)}
+
+/* impl note */
+.impl{background:rgba(122,90,248,.05);border:1px solid rgba(122,90,248,.18);border-radius:var(--rm);padding:14px 18px;margin:14px 0;font-size:13.5px;color:var(--fg1);line-height:1.65}
+.impl strong{color:var(--iris)}
+.warn{background:var(--amber-l);border:1px solid rgba(217,119,6,.25);border-radius:var(--rm);padding:13px 17px;margin:14px 0;font-size:13px;color:var(--fg1);line-height:1.6}
+
+/* two-col */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.mini-card{background:rgba(20,21,43,.02);border:1px solid var(--border);border-radius:var(--rs);padding:13px 14px}
+.mini-card .mc-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--fg3);margin-bottom:7px}
+.mini-card ul{list-style:none;display:flex;flex-direction:column;gap:4px}
+.mini-card li{font-size:12.5px;color:var(--fg2);display:flex;gap:5px}
+.mini-card li::before{content:'·';color:var(--iris);font-weight:700}
+
+/* data schema tags */
+.schema-row{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.schema-tag{font-family:var(--fm);font-size:11px;font-weight:500;padding:3px 10px;border-radius:4px;background:rgba(20,21,43,.05);color:var(--fg2);border:1px solid var(--border)}
+.schema-tag.new{background:var(--iris-l);color:var(--iris-d);border-color:rgba(122,90,248,.25)}
+.schema-tag.ext{background:var(--teal-l);color:var(--teal-d);border-color:rgba(13,148,136,.25)}
+
+/* comparison table */
+.ct{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+.ct th{background:rgba(20,21,43,.04);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:9px 12px;text-align:left;border-bottom:1px solid var(--border2);color:var(--fg2)}
+.ct td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+.ct tr:last-child td{border-bottom:none}
+.ct .dim{font-weight:600;color:var(--ink)}
+.ct .old{color:var(--fg3)}
+.ct .nw{color:var(--fg1);font-weight:500}
+
+/* position section */
+.position-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0}
+.pos-card{background:white;border:1px solid var(--border);border-radius:var(--rm);padding:18px;box-shadow:var(--sh)}
+.pos-card h4{font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.pos-card p{font-size:13px;color:var(--fg2);line-height:1.6}
+.pos-card .conn-arrows{font-size:12px;color:var(--fg3);margin-top:8px;font-family:var(--fm)}
+
+/* phase timeline */
+.phase-line{display:flex;flex-direction:column;gap:0}
+.ph-item{display:flex;gap:14px;padding-bottom:20px;position:relative}
+.ph-item:last-child{padding-bottom:0}
+.ph-item::after{content:'';position:absolute;left:15px;top:34px;width:2px;height:calc(100% - 14px);background:linear-gradient(to bottom,var(--border2),transparent)}
+.ph-item:last-child::after{display:none}
+.ph-dot{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:white;z-index:1}
+.ph-body h4{font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:5px}
+.ph-body p{font-size:13px;color:var(--fg2);line-height:1.6}
+.ph-body .ph-files{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.ph-file{font-family:var(--fm);font-size:10.5px;padding:2px 8px;border-radius:4px;background:rgba(20,21,43,.05);color:var(--fg2)}
+
+/* footer */
+.foot{margin-top:60px;padding-top:18px;border-top:1px solid var(--border);font-size:12px;color:var(--fg3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+
+@media(max-width:700px){
+  .two-col,.position-grid,.fw-loop-row{grid-template-columns:1fr}
+  .sys-row{flex-wrap:wrap}
+  .bse-io{grid-template-columns:1fr}
+  .bse-node{grid-template-columns:36px 1fr}
+  .bse-node .bn-badge{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<header class="hd">
+  <div class="ey">Architecture Specification · BrainStateEngine</div>
+  <h1>架构图与实现规格</h1>
+  <p>BrainStateEngine 在 Loom 整体架构中的位置、内部五层架构可视化、每层的具体功能与实现方式。</p>
+  <div class="chips">
+    <span class="chip"><span></span>2026-06-09</span>
+    <span class="chip"><span></span>Loom · Brain-Hand Architecture</span>
+    <span class="chip"><span></span>v0.1 Design Spec</span>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav class="nav">
+  <a href="#loom-arch">Loom 整体架构</a>
+  <a href="#bse-arch">BSE 内部架构</a>
+  <a href="#layer1">L1 IntentProfile</a>
+  <a href="#layer2">L2 StrategyState</a>
+  <a href="#layer3">L3 Orchestration</a>
+  <a href="#layer4">L4 GoalContext</a>
+  <a href="#layer5">L5 DataFlywheel</a>
+  <a href="#position">Loom 中的位置</a>
+  <a href="#impl">实施路径</a>
+</nav>
+
+<!-- ══════════════════════════════════════════
+     SECTION 1: LOOM SYSTEM ARCHITECTURE
+     ══════════════════════════════════════════ -->
+<section class="sec" id="loom-arch">
+  <div class="sec-lbl"><span class="nb" style="background:var(--iris)">1</span>Loom 整体架构</div>
+  <h2>Loom 系统全景图</h2>
+  <p class="lead">BrainStateEngine 位于 LoomBrain 服务内部，是 Brain 侧的核心状态管理层。了解它在整个 Loom 栈中的位置，是理解其边界和职责的前提。</p>
+
+  <div class="sys-diagram">
+    <div class="d-title">Loom System Architecture — BrainStateEngine 所在位置</div>
+
+    <!-- Row 0: User interfaces -->
+    <div class="sys-layer-label">用户界面层</div>
+    <div class="sys-row">
+      <div class="sys-box sb-canvas" style="flex:1">
+        <span class="sb-name">🎨 Canvas UI</span>
+        <span class="sb-sub">canvas.html · 自由白板协作工作区</span>
+        <span class="sb-port">bridge/webview/canvas.html</span>
+      </div>
+      <div class="sys-box sb-browser" style="flex:1">
+        <span class="sb-name">🌐 Anchor Webview</span>
+        <span class="sb-sub">index.html · 结构化研究报告界面</span>
+        <span class="sb-port">bridge/webview/index.html</span>
+      </div>
+      <div class="sys-box sb-browser" style="flex:1">
+        <span class="sb-name">📊 Intent Stream UI</span>
+        <span class="sb-sub">用户意图流 + 策略可视化</span>
+        <span class="sb-port">:3002/intent-stream</span>
+      </div>
+    </div>
+
+    <div class="sys-conn">
+      <span class="conn-line">envelope / WS push <span class="arr">↕</span></span>
+      <span class="conn-line">POST /intent/capture <span class="arr">↓</span></span>
+      <span class="conn-line">POST /analyze <span class="arr">↕</span></span>
+    </div>
+
+    <!-- Row 1: Service layer -->
+    <div class="sys-layer-label">服务层</div>
+    <div class="sys-row">
+      <div class="sys-box sb-anchor" style="flex:1.2">
+        <span class="sb-name">⚓ Anchor Service</span>
+        <span class="sb-sub">Web UI daemon · op routing · session management</span>
+        <span class="sb-port">Node.js · :3000</span>
+      </div>
+      <div class="sys-box sb-mcp" style="flex:0.8">
+        <span class="sb-name">🔌 MCP Shim</span>
+        <span class="sb-sub">stdio JSON-RPC bridge · /ws/agent</span>
+        <span class="sb-port">mcp/shim.cjs</span>
+      </div>
+      <div class="sys-box sb-core" style="flex:1">
+        <span class="sb-name">🧩 LoomCore Runtime</span>
+        <span class="sb-sub">Human-Agent interface · adapter registry · providers (CC, Codex, SDK)</span>
+        <span class="sb-port">loom_core/ · in-process</span>
+      </div>
+    </div>
+
+    <div class="sys-conn">
+      <span class="conn-line">HTTP + WS <span class="arr">↕</span></span>
+    </div>
+
+    <!-- Row 2: Brain Service — expanded -->
+    <div class="sys-layer-label">Brain 服务层 ← BrainStateEngine 在这里</div>
+    <div class="sys-row">
+      <div class="sys-box sb-brain" style="flex:1">
+        <span class="sb-name">🧠 LoomBrain (FastAPI)</span>
+        <span class="sb-sub">POST /analyze · POST /intent/capture · GET /intent-stream · POST /run</span>
+        <span class="sb-port">loom/brain.py · :3002</span>
+
+        <!-- Brain internals -->
+        <div class="brain-inner" style="margin-top:10px">
+          <div class="bi-title">BrainStateEngine — 内部五层</div>
+          <div class="bi-layers">
+            <div class="bi-layer bi-l1">
+              <div class="bi-num" style="background:var(--iris)">1</div>
+              <div>
+                <div class="bi-name">IntentProfile</div>
+                <div class="bi-desc">动态用户意图画像 · 信念状态 · 分析风格</div>
+              </div>
+            </div>
+            <div class="bi-layer bi-l2">
+              <div class="bi-num" style="background:var(--teal)">2</div>
+              <div>
+                <div class="bi-name">StrategyState</div>
+                <div class="bi-desc">派生策略 · 研究优先级 · EvalDimensions</div>
+              </div>
+            </div>
+            <div class="bi-layer bi-l3">
+              <div class="bi-num" style="background:var(--amber)">3</div>
+              <div>
+                <div class="bi-name">OrchestrationLayer</div>
+                <div class="bi-desc">MDP Hand 编排 · HandConfig · 冲突仲裁</div>
+              </div>
+            </div>
+            <div class="bi-layer bi-l4">
+              <div class="bi-num" style="background:var(--sky)">4</div>
+              <div>
+                <div class="bi-name">GoalContext</div>
+                <div class="bi-desc">跨 session 目标上下文 · key_findings 积累</div>
+              </div>
+            </div>
+            <div class="bi-layer bi-l5">
+              <div class="bi-num" style="background:var(--em)">5</div>
+              <div>
+                <div class="bi-name">DataFlywheel</div>
+                <div class="bi-desc">原生数据飞轮 · 反哺 L1+L2 更新</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Existing harness components -->
+        <div style="margin-top:10px;padding:10px 12px;background:var(--slate-l);border-radius:8px;border:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--slate);margin-bottom:8px">现有 Harness 组件（继续保留）</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            <span style="font-size:11px;background:white;border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--fg2)">BrainState (rules/frameworks)</span>
+            <span style="font-size:11px;background:white;border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--fg2)">IntentWiki (durable nodes)</span>
+            <span style="font-size:11px;background:white;border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--fg2)">IntentProcessor (LLM parser)</span>
+            <span style="font-size:11px;background:white;border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--fg2)">BrainHarness (prompt assembler)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sys-conn">
+      <span class="conn-line">HandConfig + task params <span class="arr">↓</span> · results + self-eval <span class="arr">↑</span></span>
+    </div>
+
+    <!-- Row 3: Hand Agents -->
+    <div class="sys-layer-label">Hand Agent 层</div>
+    <div class="sys-row" style="flex-wrap:wrap">
+      <div class="sys-box sb-hand" style="flex:1;min-width:130px">
+        <span class="sb-name">📈 MarketHand</span>
+        <span class="sb-sub">macro · rates · liquidity · breadth</span>
+        <span class="sb-port">hands/market.py</span>
+      </div>
+      <div class="sys-box sb-hand" style="flex:1;min-width:130px">
+        <span class="sb-name">💰 TargetHand</span>
+        <span class="sb-sub">ticker · fundamentals · earnings · valuation</span>
+        <span class="sb-port">hands/target.py</span>
+      </div>
+      <div class="sys-box sb-hand" style="flex:1;min-width:130px">
+        <span class="sb-name">😊 SentimentHand</span>
+        <span class="sb-sub">news · social · fear&greed · COT</span>
+        <span class="sb-port">hands/sentiment.py</span>
+      </div>
+      <div class="sys-box sb-hand2" style="flex:1;min-width:130px">
+        <span class="sb-name">📦 PositionHand</span>
+        <span class="sb-sub">portfolio · position logic · P&L</span>
+        <span class="sb-port">hands/position.py</span>
+      </div>
+      <div class="sys-box sb-fly" style="flex:1;min-width:130px">
+        <span class="sb-name">＋ Future Hands</span>
+        <span class="sb-sub">sector · alternatives · custom connectors</span>
+        <span class="sb-port">hands/*.py</span>
+      </div>
+    </div>
+
+    <div class="sys-conn">
+      <span class="conn-line">connector data · Tier A–F sources <span class="arr">↓</span></span>
+    </div>
+
+    <!-- Row 4: Data sources -->
+    <div class="sys-layer-label">数据源层</div>
+    <div class="sys-row" style="flex-wrap:wrap">
+      <div class="sys-box" style="background:#F0FDF4;border:1px solid #86EFAC;flex:1;min-width:100px;padding:8px 12px">
+        <span class="sb-name" style="font-size:12px">Tier A</span>
+        <span class="sb-sub">SEC EDGAR · FRED</span>
+      </div>
+      <div class="sys-box" style="background:#EFF6FF;border:1px solid #93C5FD;flex:1;min-width:100px;padding:8px 12px">
+        <span class="sb-name" style="font-size:12px">Tier B</span>
+        <span class="sb-sub">Finnhub · Yahoo · CFTC</span>
+      </div>
+      <div class="sys-box" style="background:#FFF7ED;border:1px solid #FDBA74;flex:1;min-width:100px;padding:8px 12px">
+        <span class="sb-name" style="font-size:12px">Tier C</span>
+        <span class="sb-sub">Reuters · MarketWatch · CNBC</span>
+      </div>
+      <div class="sys-box" style="background:#FEF2F2;border:1px solid #FCA5A5;flex:1;min-width:100px;padding:8px 12px">
+        <span class="sb-name" style="font-size:12px">Tier E/F</span>
+        <span class="sb-sub">StockTwits · Reddit · KOL RSS</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="dv">
+
+<!-- ══════════════════════════════════════════
+     SECTION 2: BSE INTERNAL ARCHITECTURE
+     ══════════════════════════════════════════ -->
+<section class="sec" id="bse-arch">
+  <div class="sec-lbl"><span class="nb" style="background:var(--iris)">2</span>BSE 内部架构</div>
+  <h2>BrainStateEngine — 五层架构图</h2>
+  <p class="lead">五层之间形成单向派生链（1→2→3）和积累链（3→4→5→1），数据飞轮闭合整个循环。</p>
+
+  <div class="bse-diagram">
+    <div class="d-title">BrainStateEngine Internal Architecture · 数据流与层间关系</div>
+
+    <!-- Inputs -->
+    <div class="bse-io">
+      <div class="bse-io-box bse-in">
+        <div class="io-lbl">输入来源</div>
+        <ul>
+          <li>用户 anchor ops（refine / edit / annotate）</li>
+          <li>用户 query 和资源分享</li>
+          <li>strategy_edit 事件（IntentStream）</li>
+          <li>IntentWiki 显式意图节点（种子）</li>
+          <li>BrainState 规则 + 分析框架库</li>
+        </ul>
+      </div>
+      <div class="bse-io-box bse-out">
+        <div class="io-lbl">输出去向</div>
+        <ul>
+          <li>BrainHarness _assemble_prompt() 的上下文</li>
+          <li>每个 Hand 的 HandConfig（任务参数）</li>
+          <li>Brain synthesis（stance / confidence / reversal_condition）</li>
+          <li>GoalContext 更新后的 context_summary</li>
+          <li>DataFlywheel → IntentProfile + StrategyState 优化</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Layer 1 -->
+    <div class="bse-node bn-n1">
+      <div class="bn-icon" style="background:var(--iris-l)">🧠</div>
+      <div class="bn-text">
+        <h4>Layer 1 — IntentProfile</h4>
+        <p>维护动态用户模型：belief_state（当前信念）· active_intents（带置信度）· analytical_style · intent_velocity</p>
+      </div>
+      <span class="bn-badge" style="background:var(--iris-l);color:var(--iris-d)">动态推断</span>
+    </div>
+    <div class="bse-arrow">↓ 派生 — IntentProfile 驱动 StrategyState 的研究方向和资源权重</div>
+
+    <!-- Layer 2 -->
+    <div class="bse-node bn-n2">
+      <div class="bn-icon" style="background:var(--teal-l)">🗺️</div>
+      <div class="bn-text">
+        <h4>Layer 2 — StrategyState</h4>
+        <p>从 IntentProfile 派生的可执行策略：research_priorities · information_strategy · EvalDimensions（可验证维度）</p>
+      </div>
+      <span class="bn-badge" style="background:var(--teal-l);color:var(--teal-d)">策略派生</span>
+    </div>
+    <div class="bse-arrow">↓ 驱动 — StrategyState 生成每个 Hand 的 HandConfig，并定义验证标准</div>
+
+    <!-- Layer 3 -->
+    <div class="bse-node bn-n3">
+      <div class="bn-icon" style="background:var(--amber-l)">⚙️</div>
+      <div class="bn-text">
+        <h4>Layer 3 — OrchestrationLayer</h4>
+        <p>MDP 多步编排：HandConfig per Hand · phase-conditional execution · 冲突仲裁 · Lazy Evaluation · 边际信息增益测量</p>
+      </div>
+      <span class="bn-badge" style="background:var(--amber-l);color:var(--amber)">MDP 编排</span>
+    </div>
+    <div class="bse-arrow">↓ 积累 — Hand 结果 + 冲突 + 评分进入 GoalContext</div>
+
+    <!-- Layer 4 -->
+    <div class="bse-node bn-n4">
+      <div class="bn-icon" style="background:var(--sky-l)">📋</div>
+      <div class="bn-text">
+        <h4>Layer 4 — GoalContext</h4>
+        <p>跨 session 目标上下文：key_findings 累积 · synthesis_history · contradiction_log · 动态 context_summary</p>
+      </div>
+      <span class="bn-badge" style="background:var(--sky-l);color:var(--sky)">跨 session</span>
+    </div>
+    <div class="bse-arrow">↓ 沉淀 — 每次 episode 的结构化数据写入 DataFlywheel</div>
+
+    <!-- Layer 5 -->
+    <div class="bse-node bn-n5">
+      <div class="bn-icon" style="background:var(--em-l)">🔄</div>
+      <div class="bn-text">
+        <h4>Layer 5 — DataFlywheel</h4>
+        <p>结构化原生数据积累：Brain 自评 + Hand 评估 + 人类反馈 + FlywheelAnalyzer → 反哺更新 L1 + L2</p>
+      </div>
+      <span class="bn-badge" style="background:var(--em-l);color:var(--em)">闭环优化</span>
+    </div>
+
+    <!-- Flywheel loop visual -->
+    <div class="fw-visual" style="margin-top:20px">
+      <div class="fwv-title">数据飞轮闭环</div>
+      <div class="fw-loop-row">
+        <div class="fw-loop-box">
+          <div class="fl-icon">⚡</div>
+          <div class="fl-label">Episode 执行</div>
+          <div class="fl-desc">Brain synthesis + Hand 调用产生原生数据</div>
+        </div>
+        <div class="fw-arr">→</div>
+        <div class="fw-loop-box">
+          <div class="fl-icon">👤</div>
+          <div class="fl-label">Human 反馈注入</div>
+          <div class="fl-desc">用户后续行为通过 episode_id 关联</div>
+        </div>
+        <div class="fw-arr">→</div>
+        <div class="fw-loop-box">
+          <div class="fl-icon">🔍</div>
+          <div class="fl-label">FlywheelAnalyzer</div>
+          <div class="fl-desc">提取 profile_signals + strategy_signals</div>
+        </div>
+        <div class="fw-arr">→</div>
+        <div class="fw-loop-box">
+          <div class="fl-icon">🧠</div>
+          <div class="fl-label">L1+L2 更新</div>
+          <div class="fl-desc">IntentProfile + StrategyState 自动优化</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:10px;font-size:11px;color:var(--fg3);font-style:italic">↑ 下次 episode 用更优的 IntentProfile 和 StrategyState 重新开始</div>
+    </div>
+  </div>
+</section>
+
+<hr class="dv">
+
+<!-- ══════════════════════════════════════════
+     SECTION 3–7: LAYER DETAILS
+     ══════════════════════════════════════════ -->
+
+<!-- Layer 1 -->
+<section class="sec" id="layer1">
+  <div class="sec-lbl"><span class="nb" style="background:var(--iris)">L1</span>Layer 1</div>
+  <h2>IntentProfile — 动态用户意图画像</h2>
+  <p class="lead">Brain 从行为中主动推断和维护的用户模型。与 IntentWiki（用户显式声明）相对：IntentWiki 是人工种子，IntentProfile 是演化结果。</p>
+
+  <div class="layer-card">
+    <div class="lc-header">
+      <div class="lc-num" style="background:var(--iris-l)">🧠</div>
+      <div class="lc-meta">
+        <h3>IntentProfile <span class="lc-new">新增</span></h3>
+        <div class="lc-file">loom/brain_harness/intent_profile.py · brain/state/intent_profile.json</div>
+      </div>
+    </div>
+    <div class="lc-body">
+
+      <ul class="resp-list">
+        <li style="border-left-color:var(--iris)">
+          <span class="ri">📍</span>
+          <span class="rt"><strong>belief_state</strong>：Brain 追踪用户当前对各 topic 的信念状态。<code>{"NVDA": {stance: "cautiously_bullish", confidence: 0.68, last_updated: "...", source: "strategy_edit"}}</code>。当用户接受 buy stance、修改 strategy rule 或明确表达立场时更新。</span>
+        </li>
+        <li style="border-left-color:var(--iris)">
+          <span class="ri">⚡</span>
+          <span class="rt"><strong>intent_velocity</strong>：意图变化速率 [0.0–1.0]。高 velocity（>0.7）表示用户正在调整视野，Brain 应减少 GoalContext 的惰性、更频繁刷新策略；低 velocity（<0.3）表示稳定期，GoalContext 可以积累更长时间再更新。</span>
+        </li>
+        <li style="border-left-color:var(--iris)">
+          <span class="ri">🎨</span>
+          <span class="rt"><strong>analytical_style</strong>：从 anchor ops 学习的分析风格：<code>density</code>（expand ops 多 → 偏详细），<code>framework_pref</code>（哪类分析框架被频繁引用），<code>risk_appetite</code>（reversal_condition 是否经常被用户修改），<code>time_horizon</code>（问题里 near-term vs long-term 的比例）。</span>
+        </li>
+        <li style="border-left-color:var(--iris)">
+          <span class="ri">🎯</span>
+          <span class="rt"><strong>domain_focus</strong>：当前关注层级。<code>{primary: "market_research", secondary: ["macro", "sector_rotation"], ticker_watch: ["NVDA", "MSFT", "TSM"]}</code>。从 query_patterns 和 intent_stream 中推断。</span>
+        </li>
+      </ul>
+
+      <pre class="code"><span class="kw">@dataclass</span>
+<span class="cl">class</span> IntentProfile:
+    profile_id:       <span class="cl">str</span>
+    updated_at:       <span class="cl">str</span>
+    <span class="cm"># 从 IntentWiki 种子 + 行为推断的合并意图列表</span>
+    active_intents:   <span class="cl">list</span>[IntentNode]          <span class="cm"># zone/label/confidence/evidence_count</span>
+    belief_state:     <span class="cl">dict</span>[<span class="cl">str</span>, BeliefRecord]     <span class="cm"># {topic: stance+confidence+source}</span>
+    analytical_style: StyleRecord                   <span class="cm"># density/framework_pref/risk_appetite</span>
+    intent_velocity:  <span class="cl">float</span>                       <span class="cm"># 意图漂移速率</span>
+    domain_focus:     DomainFocus                   <span class="cm"># primary/secondary/ticker_watch</span>
+
+<span class="cm"># 更新触发器 (IntentProfileUpdater)</span>
+<span class="kw">class</span> <span class="cl">IntentProfileUpdater</span>:
+    <span class="kw">def</span> on_intent_event(self, event: IntentEvent) -> <span class="cl">None</span>:
+        <span class="cm"># strategy_edit → belief_state update + intent_velocity up</span>
+        <span class="cm"># resource_share → domain_focus update + framework_pref</span>
+        <span class="cm"># stance accepted → belief_state confidence up</span>
+        <span class="cm"># reversal triggered → belief_state reversal, velocity up</span>
+        ...</pre>
+
+      <div class="impl">
+        <strong>与 IntentWiki 的边界：</strong>IntentWiki 节点由用户主动编辑，是最高优先级的显式意图声明；IntentProfile 从行为中推断，置信度随证据累积增长。冲突时 IntentWiki 优先。IntentProfile.active_intents = IntentWiki 节点（高置信度种子）+ 推断节点（中低置信度）的并集。
+      </div>
+
+      <div class="two-col">
+        <div class="mini-card">
+          <div class="mc-lbl">更新触发器</div>
+          <ul>
+            <li>用户接受 Brain synthesis stance</li>
+            <li>strategy_edit 事件（belief 变化信号）</li>
+            <li>reversal_condition 被用户标记触发</li>
+            <li>anchor expand/shorten 频率（density 偏好）</li>
+            <li>resource_share 来源类型（framework_pref）</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <div class="mc-lbl">读取时机</div>
+          <ul>
+            <li>StrategyState 派生前（L1 → L2）</li>
+            <li>BrainHarness._assemble_prompt() 构建时</li>
+            <li>GoalContext 创建新 goal 时</li>
+            <li>DataFlywheel 提取 profile_signals 后</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="dv">
+
+<!-- Layer 2 -->
+<section class="sec" id="layer2">
+  <div class="sec-lbl"><span class="nb" style="background:var(--teal)">L2</span>Layer 2</div>
+  <h2>StrategyState — 从意图派生的可执行策略</h2>
+  <p class="lead">StrategyState 是 Brain 根据当前 IntentProfile 为当前 goal 生成的"行动纲领"。它不是静态规则文件，而是动态派生的执行计划，核心是为每类 Hand 定义<strong>可验证的评估维度</strong>。</p>
+
+  <div class="layer-card">
+    <div class="lc-header">
+      <div class="lc-num" style="background:var(--teal-l)">🗺️</div>
+      <div class="lc-meta">
+        <h3>StrategyState <span class="lc-new">新增</span></h3>
+        <div class="lc-file">loom/brain_harness/strategy_state.py · brain/state/strategy_{goal_id}.json</div>
+      </div>
+    </div>
+    <div class="lc-body">
+
+      <ul class="resp-list">
+        <li style="border-left-color:var(--teal)">
+          <span class="ri">🔬</span>
+          <span class="rt"><strong>research_priorities</strong>：基于 IntentProfile.belief_state + domain_focus 派生的当前研究重点，按优先级排序。例：<code>["NVDA Q3 earnings quality", "AI capex cycle sustainability", "Fed path Q4 2026"]</code>。</span>
+        </li>
+        <li style="border-left-color:var(--teal)">
+          <span class="ri">📡</span>
+          <span class="rt"><strong>information_strategy</strong>：信息关注策略，派生自 IntentProfile.analytical_style + IntentWiki.source_preferences。包含：<code>source_weights</code>（各 Hand 的重要性权重）、<code>recency_requirement</code>（实时/日/周）、<code>signal_focus</code>（重点关注的信号类型）。</span>
+        </li>
+        <li style="border-left-color:var(--teal)">
+          <span class="ri">✅</span>
+          <span class="rt"><strong>evaluation_dims（核心创新）</strong>：策略为每类 Hand 定义具体的、可验证的评估标准。例：<code>{hand:"earnings_hand", dim:"has_eps_consensus", verify:"key_claims contains numeric EPS figure", weight:0.8}</code>。这使评估从通用词袋升级为策略特定的结构验证。</span>
+        </li>
+        <li style="border-left-color:var(--teal)">
+          <span class="ri">📐</span>
+          <span class="rt"><strong>position_logic</strong>（仓位管理模式）：维护各头寸的存续逻辑、持有条件和退出准则。<code>{NVDA: {thesis: "AI capex 长周期受益", hold_condition: "capex guidance 维持", exit_trigger: "两季度 EPS miss >10%"}}</code>。</span>
+        </li>
+      </ul>
+
+      <pre class="code"><span class="kw">@dataclass</span>
+<span class="cl">class</span> EvalDimension:
+    dim_id:   <span class="cl">str</span>
+    hand_id:  <span class="cl">str</span>
+    label:    <span class="cl">str</span>          <span class="cm"># "提供当前 EPS consensus 数字"</span>
+    verify:   <span class="cl">str</span>          <span class="cm"># 可执行的验证逻辑 (Python expression or prompt)</span>
+    weight:   <span class="cl">float</span>         <span class="cm"># 在 synthesis quality 评估中的权重</span>
+    required: <span class="cl">bool</span> = <span class="nm">False</span>  <span class="cm"># True = 缺失则评估失败，不只是降分</span>
+
+<span class="kw">@dataclass</span>
+<span class="cl">class</span> StrategyState:
+    strategy_id:          <span class="cl">str</span>
+    goal_id:              <span class="cl">str</span>
+    derived_from_profile: <span class="cl">str</span>          <span class="cm"># profile_id + snapshot_ts</span>
+    updated_at:           <span class="cl">str</span>
+    research_priorities:  <span class="cl">list</span>[<span class="cl">str</span>]
+    information_strategy: InfoStrategy  <span class="cm"># source_weights + recency + signal_focus</span>
+    evaluation_dims:      <span class="cl">list</span>[EvalDimension]
+    framework_ids:        <span class="cl">list</span>[<span class="cl">str</span>]    <span class="cm"># 从 BrainState.frameworks 中选取</span>
+    position_logic:       <span class="cl">dict</span>         <span class="cm"># {ticker: PositionLogic} 仓位管理模式专用</span>
+    confidence_threshold: <span class="cl">float</span> = <span class="nm">0.65</span> <span class="cm"># 触发 lazy evaluation 停止的阈值</span></pre>
+
+      <div class="impl">
+        <strong>EvalDimension vs 当前 词袋评估器：</strong>当前 <code>_score_intent_coverage()</code> 用正则匹配关键词，任何问题都用同一套词表。StrategyState 在"研究 NVDA 盈利质量"这个 goal 下，为 <code>earnings_hand</code> 定义 <code>has_eps_consensus_number</code>（必须有具体数字）、<code>has_guidance_language</code>（必须有 guidance 表述）、<code>covers_q3_period</code>（时间范围正确）等维度——这是布尔型的、与策略直接相关的验证，精度质变。
+      </div>
+
+      <div class="two-col">
+        <div class="mini-card">
+          <div class="mc-lbl">派生逻辑（P1 阶段：规则）</div>
+          <ul>
+            <li>domain_focus.ticker_watch → research_priorities 第一条</li>
+            <li>source_preferences zone → information_strategy.source_weights</li>
+            <li>risk_sensitivity zone → EvalDim: has_reversal_condition</li>
+            <li>analytical_style.density → framework 选取数量</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <div class="mc-lbl">派生逻辑（P4 阶段：飞轮驱动）</div>
+          <ul>
+            <li>EvalDim 权重来自历史 dim_scores 的预测力统计</li>
+            <li>source_weights 来自 Cross-Source Calibration</li>
+            <li>confidence_threshold 来自历史 synthesis 质量分布</li>
+            <li>framework_ids 来自 framework utility estimation</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="dv">
+
+<!-- Layer 3 -->
+<section class="sec" id="layer3">
+  <div class="sec-lbl"><span class="nb" style="background:var(--amber)">L3</span>Layer 3</div>
+  <h2>OrchestrationLayer — MDP 多步 Hand 编排</h2>
+  <p class="lead">不是"选哪些 Hands"（单步 bandit），而是"以什么顺序、附带什么上下文、在什么条件下触发下一 phase"（MDP）。Brain 是编排的控制器，每步决策都基于已积累的 Hand 输出状态。</p>
+
+  <div class="layer-card">
+    <div class="lc-header">
+      <div class="lc-num" style="background:var(--amber-l)">⚙️</div>
+      <div class="lc-meta">
+        <h3>OrchestrationLayer <span class="lc-new">新增</span></h3>
+        <div class="lc-file">loom/brain_harness/orchestration.py</div>
+      </div>
+    </div>
+    <div class="lc-body">
+
+      <ul class="resp-list">
+        <li style="border-left-color:var(--amber)">
+          <span class="ri">📝</span>
+          <span class="rt"><strong>HandConfig 生成</strong>：StrategyState → 为每个 Hand 生成具体任务参数。<code>{hand_id: "earnings_hand", focus: "Q3 EPS vs consensus + guidance language", depth: "deep", time_window: "90d", look_for: ["consensus_eps", "guidance_revision", "margin_trend"], exclude: ["noise_signals"]}</code>。Hand 接收 config 后可调整 query 策略，而不是总用相同的默认参数。</span>
+        </li>
+        <li style="border-left-color:var(--amber)">
+          <span class="ri">🔀</span>
+          <span class="rt"><strong>MDP 编排计划</strong>：Phase 1（必须执行）→ 测量 synthesis 置信度 → Phase 2（条件触发）→ … 。例：<code>phase_1: [macro, fundamental], condition: "confidence < 0.65", phase_2: [sector], condition: "conflict_detected", phase_3: [verification]</code>。支持 Lazy Evaluation：置信度达阈值则不启动后续 phase，节省 API 成本。</span>
+        </li>
+        <li style="border-left-color:var(--amber)">
+          <span class="ri">⚡</span>
+          <span class="rt"><strong>冲突检测 + 仲裁</strong>：对比所有 Hand 输出，识别三类冲突：<code>temporal</code>（宏观领先指标 vs 近期微观数据，时间维度不同）、<code>methodological</code>（技术面 vs 基本面，方法论不同）、<code>source_overlap</code>（多个 Hands 引用同一数据源，分歧是虚假的）。每类冲突对应不同的仲裁策略，仲裁结果写入 ConflictLog。</span>
+        </li>
+        <li style="border-left-color:var(--amber)">
+          <span class="ri">📊</span>
+          <span class="rt"><strong>Hand 评估（EvalDimension 驱动）</strong>：对每个 Hand 的结果按 StrategyState.evaluation_dims 逐维度评分，产生 HandEvaluation：<code>{hand_id, dim_scores: {dim_id: 0|1|0.5}, overall: 0.82, missing: ["eps_consensus_number"], flagged_gaps: [...]}</code>。missing 字段直接告诉 Brain 哪个信息缺口需要追问或降低对该 Hand 的信任度。</span>
+        </li>
+      </ul>
+
+      <pre class="code"><span class="cm"># OrchestrationLayer 主执行流</span>
+<span class="kw">async def</span> <span class="cl">orchestrate</span>(self, strategy: StrategyState, question: <span class="cl">str</span>, goal: GoalContext):
+    plan = self._build_plan(strategy, question)           <span class="cm"># → OrchestrationPlan (phases)</span>
+    state = OrchestrationState(plan=plan, results=[], evals=[], conflicts=[])
+
+    <span class="kw">for</span> phase <span class="kw">in</span> plan.phases:
+        <span class="cm"># 1. 生成每个 Hand 的 config（策略驱动）</span>
+        configs = {h: self._build_config(h, strategy, state) <span class="kw">for</span> h <span class="kw">in</span> phase.hands}
+
+        <span class="cm"># 2. 执行（并行 + 信息级联：前 phase 输出作为后 Hand 上下文）</span>
+        results = <span class="kw">await</span> asyncio.gather(*[self._run_hand(h, configs[h], goal) <span class="kw">for</span> h <span class="kw">in</span> phase.hands])
+        state.results.extend(results)
+
+        <span class="cm"># 3. 冲突检测 + 分类</span>
+        conflicts = self._detect_conflicts(results)
+        state.conflicts.extend(conflicts)
+
+        <span class="cm"># 4. 按 EvalDimensions 评分</span>
+        evals = [self._evaluate(r, strategy.evaluation_dims) <span class="kw">for</span> r <span class="kw">in</span> results]
+        state.evals.extend(evals)
+
+        <span class="cm"># 5. Lazy Evaluation: 若 synthesis 置信度已足够 → 停止</span>
+        conf = self._estimate_synthesis_confidence(state)
+        <span class="kw">if</span> conf >= strategy.confidence_threshold <span class="kw">and not</span> conflicts.has_unresolved:
+            <span class="kw">break</span>
+
+    <span class="kw">return</span> OrchestrationResult(state)</pre>
+
+      <div class="impl">
+        <strong>信息级联（Information Cascade）：</strong>当 phase 1 的 macro_hand 输出"Fed 维持利率概率 78%，市场充分 price in"时，Brain 可以在启动 phase 2 的 sector_hand 时注入这个上下文：<code>config.extra_context = "Fed path confirmed stable; focus on rate-insensitive sub-sectors"</code>。这比让所有 Hands 完全独立运行能获得更有针对性的信息，代价是串行化带来的延迟——策略决定什么时候值得级联。
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="dv">
+
+<!-- Layer 4 -->
+<section class="sec" id="layer4">
+  <div class="sec-lbl"><span class="nb" style="background:var(--sky)">L4</span>Layer 4</div>
+  <h2>GoalContext — 跨 Session 目标上下文</h2>
+  <p class="lead">替代当前每次覆写的 last-synthesis.md。一个研判目标（如"NVDA Q3 研究"）可以跨多个 session 持续积累知识，synthesis 不是重置，而是叠加。</p>
+
+  <div class="layer-card">
+    <div class="lc-header">
+      <div class="lc-num" style="background:var(--sky-l)">📋</div>
+      <div class="lc-meta">
+        <h3>GoalContext <span class="lc-new">新增</span></h3>
+        <div class="lc-file">loom/brain_harness/goal_context.py · brain/goals/{goal_id}.json</div>
+      </div>
+    </div>
+    <div class="lc-body">
+
+      <ul class="resp-list">
+        <li style="border-left-color:var(--sky)">
+          <span class="ri">🆔</span>
+          <span class="rt"><strong>goal_id + status 生命周期</strong>：<code>open</code>（研究中，每次 synthesis 自动更新）→ <code>investigating</code>（有初步结论，Brain 监视 reversal 条件）→ <code>concluded</code>（已决策，归档但可检索）。每个 goal 独立存档，并发多个 goal 可以同时进行。</span>
+        </li>
+        <li style="border-left-color:var(--sky)">
+          <span class="ri">🗂️</span>
+          <span class="rt"><strong>key_findings 累积</strong>：来自 Hand 结果和 Brain synthesis 的关键发现，不覆写只追加，用 <code>superseded_by</code> 字段标记哪些已被新发现替代。使 Brain 能回答"我们之前发现了什么，现在有什么新的"。</span>
+        </li>
+        <li style="border-left-color:var(--sky)">
+          <span class="ri">📜</span>
+          <span class="rt"><strong>synthesis_history</strong>：每次 Brain synthesis 的结构化快照 <code>[{ts, stance, confidence, key_drivers, reversal_condition}]</code>，保留完整历史。支持 Structured Prediction Calibration（观察 stance 变化轨迹），支持用户理解"AI 的判断为什么变了"。</span>
+        </li>
+        <li style="border-left-color:var(--sky)">
+          <span class="ri">⚠️</span>
+          <span class="rt"><strong>contradiction_log（跨 session）</strong>：同一冲突（宏观熊市信号 vs 企业微观强势）如果在多个 session 中反复出现，被标记为"结构性不确定性"，Brain synthesis 必须在 reversal_condition 中显式处理，不能简单取平均。</span>
+        </li>
+        <li style="border-left-color:var(--sky)">
+          <span class="ri">📝</span>
+          <span class="rt"><strong>context_summary（动态摘要）</strong>：每次 synthesis 后 Brain 更新的目标状态摘要，取代当前 last-synthesis.md。作为下次 synthesis 的上下文输入，使 Brain 的 <code>_assemble_prompt()</code> 能获得连贯的历史上下文而不只是孤立的 last-synthesis。</span>
+        </li>
+      </ul>
+
+      <pre class="code"><span class="kw">@dataclass</span>
+<span class="cl">class</span> Finding:
+    finding_id:    <span class="cl">str</span>
+    hand_id:       <span class="cl">str</span>          <span class="cm"># 来源 Hand</span>
+    claim:         <span class="cl">str</span>
+    confidence:    <span class="cl">float</span>
+    ts:            <span class="cl">str</span>
+    superseded_by: <span class="cl">str</span> | <span class="nm">None</span>    <span class="cm"># 被哪条新发现取代，None = 仍有效</span>
+
+<span class="kw">@dataclass</span>
+<span class="cl">class</span> GoalContext:
+    goal_id:            <span class="cl">str</span>          <span class="cm"># e.g. "market_research_NVDA_2026Q3"</span>
+    goal_type:          <span class="cl">str</span>          <span class="cm"># market_research | position_review | macro_scan</span>
+    goal_description:   <span class="cl">str</span>
+    status:             <span class="cl">str</span>          <span class="cm"># open | investigating | concluded</span>
+    created_at:         <span class="cl">str</span>
+    updated_at:         <span class="cl">str</span>
+    strategy_id:        <span class="cl">str</span>          <span class="cm"># 当前关联的 StrategyState</span>
+
+    key_findings:       <span class="cl">list</span>[Finding]          <span class="cm"># 累积，不覆写</span>
+    synthesis_history:  <span class="cl">list</span>[SynthesisSnapshot] <span class="cm"># 每次 synthesis 快照</span>
+    contradiction_log:  <span class="cl">list</span>[Contradiction]     <span class="cm"># 跨 session 冲突记录</span>
+    context_summary:    <span class="cl">str</span>                    <span class="cm"># Brain 每次更新的摘要</span>
+    episode_ids:        <span class="cl">list</span>[<span class="cl">str</span>]              <span class="cm"># 关联的所有 episode</span></pre>
+
+      <div class="warn">
+        <strong>当前 vs 升级后：</strong>当前 <code>last-synthesis.md</code> 每次 <code>write_last_synthesis()</code> 都覆写，Brain 只看到"上一次"的结论。GoalContext 让 Brain 能看到"这个问题我们研究了 5 次，stance 从 hold 变到 buy 是因为 Q2 earnings beat 打破了之前的疑虑，但 macro 冲突仍然没有解决"——这才是分析师的工作方式。
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="dv">
+
+<!-- Layer 5 -->
+<section class="sec" id="layer5">
+  <div class="sec-lbl"><span class="nb" style="background:var(--em)">L5</span>Layer 5</div>
+  <h2>DataFlywheel — 结构化原生数据与优化闭环</h2>
+  <p class="lead">收集的不是衍生指标（reward = 0.73），而是 Brain 在执行过程中自然产生的决策记录——谁说了什么、Brain 如何判断、用户如何回应。这些数据是可审计的、可解释的，直接用于更新 L1 + L2。</p>
+
+  <div class="layer-card">
+    <div class="lc-header">
+      <div class="lc-num" style="background:var(--em-l)">🔄</div>
+      <div class="lc-meta">
+        <h3>DataFlywheel <span class="lc-new">新增</span></h3>
+        <div class="lc-file">loom/brain_harness/flywheel.py · brain/flywheel/{flywheel_records}.jsonl</div>
+      </div>
+    </div>
+    <div class="lc-body">
+
+      <div class="schema-row">
+        <span class="schema-tag new">episode_id</span>
+        <span class="schema-tag new">goal_id</span>
+        <span class="schema-tag new">brain_self_eval</span>
+        <span class="schema-tag new">hand_evaluations</span>
+        <span class="schema-tag new">hand_self_reports</span>
+        <span class="schema-tag new">orchestration_trace</span>
+        <span class="schema-tag new">human_feedback (async)</span>
+        <span class="schema-tag new">profile_signals (derived)</span>
+        <span class="schema-tag new">strategy_signals (derived)</span>
+      </div>
+
+      <ul class="resp-list">
+        <li style="border-left-color:var(--em)">
+          <span class="ri">🧠</span>
+          <span class="rt"><strong>brain_self_eval</strong>：Brain 对当次 synthesis 质量的自评：<code>{synthesis_completeness: 0.82, key_drivers_specificity: 0.75, reversal_condition_quality: "specific|vague|missing", hand_coverage_gaps: ["earnings_hand missing EPS number"]}</code>。Brain 在输出 synthesis 时同时输出这些结构化自评，不是事后计算。</span>
+        </li>
+        <li style="border-left-color:var(--em)">
+          <span class="ri">📋</span>
+          <span class="rt"><strong>hand_evaluations</strong>：OrchestrationLayer 按 EvalDimension 产生的每个 Hand 的评分：<code>{hand_id: {dim_scores: {...}, overall: float, missing: [...], load_bearing: bool}}</code>。<code>load_bearing</code> 标记该 Hand 是否实际被 Brain 引用为 key_driver——是"被引用率"的实时观察。</span>
+        </li>
+        <li style="border-left-color:var(--em)">
+          <span class="ri">👤</span>
+          <span class="rt"><strong>human_feedback（异步注入）</strong>：用户后续行为通过 <code>episode_id</code> 关联到该 episode，异步写入。信号类型：<code>stance_accepted</code>（正）、<code>stance_modified</code>（负 + 修改方向）、<code>strategy_edit</code>（最强信号）、<code>anchor_delete</code>（负）、<code>reversal_triggered</code>（预测质量验证）。</span>
+        </li>
+        <li style="border-left-color:var(--em)">
+          <span class="ri">⚡</span>
+          <span class="rt"><strong>FlywheelAnalyzer → 优化信号提取</strong>：定期（或积累 N 条后触发）分析 FlywheelRecord，提取：<code>profile_signals</code>（"用户在 NVDA research 中连续 3 次修改了 macro 权重 → belief_state.NVDA.uncertainty_source = macro"）和 <code>strategy_signals</code>（"earnings_hand 的 has_guidance_dim 与 stance_accepted 相关系数 0.73 → 提升该维度权重"）。</span>
+        </li>
+      </ul>
+
+      <pre class="code"><span class="kw">@dataclass</span>
+<span class="cl">class</span> FlywheelRecord:
+    episode_id:         <span class="cl">str</span>
+    goal_id:            <span class="cl">str</span>
+    ts:                 <span class="cl">str</span>
+
+    <span class="cm"># 原生数据 — episode 结束时自动产生，无需额外标注</span>
+    brain_self_eval:    BrainSelfEval
+    hand_evaluations:   <span class="cl">dict</span>[<span class="cl">str</span>, HandEval]  <span class="cm"># {hand_id: dim_scores + load_bearing}</span>
+    hand_self_reports:  <span class="cl">dict</span>[<span class="cl">str</span>, <span class="cl">dict</span>]    <span class="cm"># Hand 主动上报的质量信号</span>
+    orchestration_trace: <span class="cl">list</span>[PhaseTrace]  <span class="cm"># 实际执行了哪些 phases + 触发条件</span>
+    conflict_log:       <span class="cl">list</span>[Conflict]    <span class="cm"># 本 episode 检测到的冲突</span>
+
+    <span class="cm"># 延迟注入 — 通过 episode_id 异步关联</span>
+    human_feedback: <span class="cl">list</span>[HumanFeedback]   <span class="cm"># intent capture 中标记了 episode_id 的事件</span>
+
+    <span class="cm"># FlywheelAnalyzer 计算 — 分析后填充</span>
+    profile_signals:  <span class="cl">list</span>[ProfileSignal]  <span class="cm"># → IntentProfile 更新</span>
+    strategy_signals: <span class="cl">list</span>[StrategySignal] <span class="cm"># → StrategyState 更新</span></pre>
+
+      <div class="two-col">
+        <div class="mini-card">
+          <div class="mc-lbl">与当前 RewardedIntentHarness 的关系</div>
+          <ul>
+            <li>reward_ledger.jsonl → 重构为 FlywheelRecord（更丰富）</li>
+            <li>policy weight 更新 → strategy_signals 驱动</li>
+            <li>evaluator_scores → 替换为 EvalDimension 评分</li>
+            <li>PolicyPlan → 重构为 OrchestrationPlan（MDP）</li>
+          </ul>
+        </div>
+        <div class="mini-card">
+          <div class="mc-lbl">飞轮数据质量保证</div>
+          <ul>
+            <li>episode_id 必须在生成时写入 card data-attribute</li>
+            <li>human_feedback 通过 intent capture POST 写入</li>
+            <li>brain_self_eval 必须在 synthesis call 内同步产生</li>
+            <li>load_bearing flag 来自 key_drivers 字段引用分析</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="dv">
+
+<!-- ══════════════════════════════════════════
+     SECTION 8: POSITION IN LOOM
+     ══════════════════════════════════════════ -->
+<section class="sec" id="position">
+  <div class="sec-lbl"><span class="nb" style="background:var(--slate)">↔</span>在 Loom 中的位置</div>
+  <h2>BrainStateEngine 与现有组件的交互关系</h2>
+  <p class="lead">BrainStateEngine 不替换现有组件，而是在它们之上建立统一的状态主权层。各组件通过明确的读写接口与 BSE 交互。</p>
+
+  <div class="position-grid">
+    <div class="pos-card">
+      <h4>📥 IntentWiki → L1 IntentProfile</h4>
+      <p>IntentWiki 节点作为高置信度种子，被 IntentProfileUpdater 读取并合并到 active_intents。IntentWiki 继续接受用户的显式编辑，每次编辑触发 IntentProfile 同步更新。</p>
+      <div class="conn-arrows">IntentWiki.nodes → IntentProfile.active_intents (seed)</div>
+    </div>
+    <div class="pos-card">
+      <h4>📚 BrainState → L2 StrategyState</h4>
+      <p>BrainState 的 rules 和 frameworks 是 StrategyState 的可用工具库。StrategyState 从中按 IntentProfile 权重选取当前 goal 适用的规则和框架，而不是全量加载。</p>
+      <div class="conn-arrows">BrainState.query_frameworks(domain) → StrategyState.framework_ids</div>
+    </div>
+    <div class="pos-card">
+      <h4>🔧 BrainHarness → L3 Orchestration</h4>
+      <p>BrainHarness._assemble_prompt() 现在从 BrainStateEngine 获取 StrategyState + GoalContext，而不是直接拼接所有状态文件。OrchestrationLayer 的执行结果写回 BrainHarness 的 hand_artifacts。</p>
+      <div class="conn-arrows">BSE.get_prompt_context() → BrainHarness._assemble_prompt()</div>
+    </div>
+    <div class="pos-card">
+      <h4>📡 IntentStream → L1 Update Loop</h4>
+      <p>IntentProcessor 处理用户事件后，不只是 append 到 intent-stream.jsonl，而是同步触发 IntentProfileUpdater.on_intent_event()，实时更新 IntentProfile。</p>
+      <div class="conn-arrows">IntentProcessor.parse() → IntentProfileUpdater.on_intent_event()</div>
+    </div>
+    <div class="pos-card">
+      <h4>🎨 canvas-client.js → episode_id 链路</h4>
+      <p>Canvas 生成时，Brain 返回的 episode_id 被写入 card 的 data-anc-episode 属性。用户后续 refine/delete/build-on 该 card 时，canvas-client 携带 episode_id 调用 /intent/capture，使 human_feedback 能正确归因。</p>
+      <div class="conn-arrows">canvas generate → episode_id → card[data-anc-episode] → human_feedback</div>
+    </div>
+    <div class="pos-card">
+      <h4>🔄 RewardedIntentHarness → DataFlywheel</h4>
+      <p>现有 reward_ledger.jsonl 和 policy weight 机制迁移为 DataFlywheel 的一部分。FlywheelRecord 是 reward report 的超集（更多字段），FlywheelAnalyzer 取代 _update_policy_weights()，产生更细粒度的 strategy_signals。</p>
+      <div class="conn-arrows">reward_ledger → FlywheelRecord (superset)</div>
+    </div>
+  </div>
+
+  <table class="ct" style="margin-top:20px">
+    <thead><tr><th>接口</th><th>现有实现</th><th>升级后</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="dim">/analyze POST</td>
+        <td class="old">brain.py 直接调用 BrainHarness.synthesize()</td>
+        <td class="nw">BSE.begin_episode(goal_id) → OrchestrationLayer.orchestrate() → BrainHarness.synthesize() with context</td>
+      </tr>
+      <tr>
+        <td class="dim">_assemble_prompt()</td>
+        <td class="old">加载所有状态文件，query_rules + IntentWiki + IntentStream tail</td>
+        <td class="nw">BSE.get_prompt_context(goal_id) 返回 StrategyState + GoalContext.context_summary + active_intents</td>
+      </tr>
+      <tr>
+        <td class="dim">Hand 任务参数</td>
+        <td class="old">Hand 用默认参数，workflow_decision 只决定调用哪些</td>
+        <td class="nw">OrchestrationLayer._build_config(hand_id, strategy) 生成策略驱动的 HandConfig</td>
+      </tr>
+      <tr>
+        <td class="dim">synthesis 后处理</td>
+        <td class="old">write_last_synthesis() 覆写 last-synthesis.md</td>
+        <td class="nw">BSE.end_episode() → GoalContext.add_synthesis_snapshot() + FlywheelRecord.write()</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<hr class="dv">
+
+<!-- ══════════════════════════════════════════
+     SECTION 9: IMPLEMENTATION PHASES
+     ══════════════════════════════════════════ -->
+<section class="sec" id="impl">
+  <div class="sec-lbl"><span class="nb" style="background:var(--iris)">→</span>实施路径</div>
+  <h2>分阶段实施——现有组件继续工作</h2>
+  <p class="lead">BrainStateEngine 是增量演化的架构。每个阶段都是独立可运行的改进，不需要大规模重写。</p>
+
+  <div class="phase-line">
+    <div class="ph-item">
+      <div class="ph-dot" style="background:var(--em)">P0</div>
+      <div class="ph-body">
+        <h4>P0 — 数据骨架（1周）</h4>
+        <p>建立数据基础，使所有后续阶段的数据积累从现在开始。GoalContext 替代 last-synthesis.md，episode_id 链路接通，FlywheelRecord 开始写入（字段逐步填充）。</p>
+        <div class="ph-files">
+          <span class="ph-file">goal_context.py（骨架）</span>
+          <span class="ph-file">flywheel.py（write only）</span>
+          <span class="ph-file">brain.py（episode_id 生成 + return）</span>
+          <span class="ph-file">canvas-client.js（episode_id → card data attr）</span>
+        </div>
+      </div>
+    </div>
+    <div class="ph-item">
+      <div class="ph-dot" style="background:var(--sky)">P1</div>
+      <div class="ph-body">
+        <h4>P1 — 评估层升级（2周）</h4>
+        <p>StrategyState 第一版（规则驱动，非 ML），EvalDimension 手工定义，Evaluator 升级为 LLM-as-judge（异步）。飞轮信号开始有意义。</p>
+        <div class="ph-files">
+          <span class="ph-file">strategy_state.py（v1 规则派生）</span>
+          <span class="ph-file">orchestration.py（EvalDimension 评分）</span>
+          <span class="ph-file">harness/eval_log.py → flywheel.py</span>
+          <span class="ph-file">brain_harness/base.py（接入 StrategyState）</span>
+        </div>
+      </div>
+    </div>
+    <div class="ph-item">
+      <div class="ph-dot" style="background:var(--teal)">P2</div>
+      <div class="ph-body">
+        <h4>P2 — 意图画像（3周）</h4>
+        <p>IntentProfile 从 IntentStream 历史中推断 belief_state + analytical_style。GoalContext 的 key_findings 开始跨 session 积累。FlywheelAnalyzer 提取 profile_signals。</p>
+        <div class="ph-files">
+          <span class="ph-file">intent_profile.py</span>
+          <span class="ph-file">intent_processor.py（触发 profile update）</span>
+          <span class="ph-file">goal_context.py（key_findings 累积）</span>
+          <span class="ph-file">flywheel.py（FlywheelAnalyzer v1）</span>
+        </div>
+      </div>
+    </div>
+    <div class="ph-item">
+      <div class="ph-dot" style="background:var(--amber)">P3</div>
+      <div class="ph-body">
+        <h4>P3 — 编排升级（4周）</h4>
+        <p>HandConfig 策略派生，OrchestrationPlan MDP（phase 条件触发 + Lazy Evaluation），ConflictLog。Structured Prediction Calibration（200+ episodes 后）。</p>
+        <div class="ph-files">
+          <span class="ph-file">orchestration.py（MDP + HandConfig + LazyEval）</span>
+          <span class="ph-file">hands/base.py（接收 HandConfig 参数）</span>
+          <span class="ph-file">calibration.py（ECE + temperature scaling）</span>
+        </div>
+      </div>
+    </div>
+    <div class="ph-item">
+      <div class="ph-dot" style="background:var(--iris)">P4</div>
+      <div class="ph-body">
+        <h4>P4 — 飞轮闭合（后续，500+ episodes）</h4>
+        <p>FlywheelAnalyzer 完整版：strategy_signals 自动更新 EvalDimension 权重和 source_weights。Cross-Source Calibration（regime-dependent）。Similar past questions retrieval。</p>
+        <div class="ph-files">
+          <span class="ph-file">flywheel.py（FlywheelAnalyzer 完整版）</span>
+          <span class="ph-file">strategy_state.py（飞轮驱动更新）</span>
+          <span class="ph-file">retrieval.py（相似案例向量检索）</span>
+          <span class="ph-file">cross_source_calibration.py</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <span>BrainStateEngine Architecture Spec · 2026-06-09</span>
+  <span>loom/brain_harness/ · Brain-Hand Architecture</span>
+</footer>
+
+</div>
+</body>
+</html>

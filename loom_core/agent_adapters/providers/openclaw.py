@@ -4,6 +4,16 @@ from typing import Any
 from loom_core.agent_adapters.adapter import AgentAdapter
 
 
+_HW: dict[str, bool] = {
+    "supports_streaming": False,
+    "supports_tool_call_loop": False,
+    "supports_partial_events": False,
+    "supports_seed": False,
+    "supports_logprobs": False,
+    "supports_constrained_decoding": False,
+}
+
+
 def create_provider() -> dict[str, Any]:
     capabilities = ["workspace.patch", "analysis.review"]
     adapter = AgentAdapter(
@@ -12,5 +22,6 @@ def create_provider() -> dict[str, Any]:
         protocol="openai",
         endpoint="http://localhost:18789/v1/chat/completions",
         capabilities=capabilities,
+        hw_capabilities=_HW,
     )
-    return {"id": "openclaw", "label": "OpenClaw Agent", "capabilities": capabilities, "instance": adapter}
+    return {"id": "openclaw", "label": "OpenClaw Agent", "capabilities": capabilities, "hw_capabilities": _HW, "instance": adapter}

@@ -1,9 +1,9 @@
 // Hand Settings Panel — self-mounts gear button on [data-anc^="loom-"] sections
-// Reads/writes http://127.0.0.1:3001/hand/:id/config
+// Reads/writes http://127.0.0.1:3002/hand/:id/config
 // Uses Bloom tokens only. No new CSS introduced.
 
 (function () {
-  const BRAIN_URL = 'http://127.0.0.1:3001';
+  const BRAIN_URL = 'http://127.0.0.1:3002';
   const ATTR = 'data-hsp-mounted';
 
   const SCHEMA_LABELS = {

@@ -112,6 +112,10 @@ function anchorLayoutContract() {
     '- KPI cards must be scannable: short label in kpi-label-top, one compact value in kpi-value, supporting text in kpi-unit. Never put long prose beside the value.',
     '- For ticker/watchlist cards, do not force six columns. Use anc-kpi-grid and let CSS wrap; keep each card meaningful at 240px width.',
     '- Long analysis belongs in p/li or nested anc-section blocks, not inside KPI cards.',
+    '- For layered work, keep the visible card to high-level judgment only: conclusion, one or two signals, and minimal visual summary.',
+    '- Put deeper data, evidence, source notes, payload fields, caveats, and detailed analysis in a hidden `<aside class="anc-detail" hidden>` inside the same card. Do not duplicate the visible card as the detail content.',
+    '- Detail asides may contain `<section class="anc-detail-section" data-detail-section="..." data-detail-label="...">`; standard section classes are `anc-detail-section--content`, `anc-detail-section--sources`, `anc-detail-section--hand-eval`, and `anc-detail-section--brain-eval`.',
+    '- Add `data-has-detail="true"` to any card with an `anc-detail` aside so Loom can open it as a generic expandable card across market, coding, design, and other domains.',
     '- Avoid inline widths, fixed heights, negative letter spacing, and tiny font sizes. Text must wrap naturally and never become vertical.',
     '- Preserve every data-anc, data-handles, data-deps attribute and existing class unless the user explicitly asks otherwise.'
   ].join('\n');
@@ -1781,10 +1785,11 @@ function handleAgentMessage(ws, msg, agentId) {
 
   } else if (type === 'patch') {
     const { patches } = msg;
-    wsTrace('recv', label, 'patch', { count: patches?.length || 0, patches: patches?.map(p => p.anchor_id) });
-    if (!patches || !Array.isArray(patches) || patches.length === 0) {
+    if (!Array.isArray(patches) || patches.length === 0) {
+      wsTrace('recv', label, 'patch', { count: 0, invalid_patches_type: typeof patches });
       ack(false, { error: 'patches array required' }); return;
     }
+    wsTrace('recv', label, 'patch', { count: patches.length, patches: patches.map(p => p.anchor_id) });
     timelineMark('agent_content_generated');
     broadcastPatches(patches);
     timelineMark('webview_patch_broadcast');

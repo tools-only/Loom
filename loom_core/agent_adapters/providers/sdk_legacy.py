@@ -16,6 +16,16 @@ from typing import Any, Callable, Awaitable
 from ..adapter import LOOM_HAND_CONTRACT
 
 
+_SDK_HW_CAPABILITIES: dict[str, bool] = {
+    "supports_streaming": False,
+    "supports_tool_call_loop": False,
+    "supports_partial_events": False,
+    "supports_seed": False,
+    "supports_logprobs": False,
+    "supports_constrained_decoding": False,
+}
+
+
 class InProcessAdapter:
     """Generic in-process adapter — domain provides the invoke callable.
 
@@ -28,12 +38,14 @@ class InProcessAdapter:
         adapter_id: str,
         invoke_fn: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
         capabilities: list[str] | None = None,
+        hw_capabilities: dict[str, bool] | None = None,
     ) -> None:
         if not adapter_id:
             raise ValueError("adapter_id must be non-empty")
         self.id = adapter_id
         self._invoke_fn = invoke_fn
         self.capabilities = capabilities or []
+        self.hw_capabilities: dict[str, bool] = hw_capabilities or dict(_SDK_HW_CAPABILITIES)
 
     async def invoke(self, task: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         if not task:
@@ -57,19 +69,23 @@ def create_provider(
     adapter_id: str,
     invoke_fn: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
     capabilities: list[str] | None = None,
+    hw_capabilities: dict[str, bool] | None = None,
     label: str | None = None,
 ) -> dict[str, Any]:
     """Factory used by trading domain to register a legacy SDK hand."""
     caps = capabilities or []
+    hw_caps = hw_capabilities or dict(_SDK_HW_CAPABILITIES)
     adapter = InProcessAdapter(
         adapter_id=adapter_id,
         invoke_fn=invoke_fn,
         capabilities=caps,
+        hw_capabilities=hw_caps,
     )
     return {
         "id": adapter_id,
         "label": label or f"SDK Legacy — {adapter_id}",
         "capabilities": caps,
+        "hw_capabilities": hw_caps,
         "instance": adapter,
     }
 
@@ -79,6 +95,7 @@ def create_brain_inline_provider(
     model: str,
     adapter_id: str = "brain-inline",
     capabilities: list[str] | None = None,
+    hw_capabilities: dict[str, bool] | None = None,
     label: str | None = None,
     max_tokens: int = 2400,
 ) -> dict[str, Any]:
@@ -100,12 +117,15 @@ def create_brain_inline_provider(
         Registry id; defaults to ``"brain-inline"``.
     capabilities : list[str] | None
         Adapter capabilities; defaults to ``["brain.inline", "runtime.generated"]``.
+    hw_capabilities : dict[str, bool] | None
+        Optional hardware capability map.
     label : str | None
         Human-readable label.
     max_tokens : int
         ``max_tokens`` argument forwarded to ``client.messages.create``.
     """
     caps = capabilities or ["brain.inline", "runtime.generated"]
+    hw_caps = hw_capabilities or dict(_SDK_HW_CAPABILITIES)
 
     async def _invoke(task: dict[str, Any]) -> dict[str, Any]:
         sys_prompt = task.get("system_prompt") or LOOM_HAND_CONTRACT
@@ -201,10 +221,12 @@ def create_brain_inline_provider(
         adapter_id=adapter_id,
         invoke_fn=_invoke,
         capabilities=caps,
+        hw_capabilities=hw_caps,
     )
     return {
         "id": adapter_id,
         "label": label or f"Brain Inline — {adapter_id}",
         "capabilities": caps,
+        "hw_capabilities": hw_caps,
         "instance": adapter,
     }

@@ -1,9 +1,9 @@
 // Hand Feedback Widget — self-mounts on [data-anc^="loom-"] sections via MutationObserver
-// Posts reward signals to http://127.0.0.1:3001/feedback
+// Posts reward signals to http://127.0.0.1:3002/feedback
 // Uses Bloom tokens only. No new CSS introduced.
 
 (function () {
-  const BRAIN_URL = 'http://127.0.0.1:3001';
+  const BRAIN_URL = 'http://127.0.0.1:3002';
   const ATTR = 'data-hfw-mounted';
 
   function extractHandId(ancId) {

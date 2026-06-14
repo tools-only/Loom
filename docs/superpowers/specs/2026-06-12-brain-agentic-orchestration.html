@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loom Brain Agentic Orchestration 方案</title>
+<style>
+:root {
+  --bg: #f6f4ef;
+  --ink: #15161b;
+  --muted: #5f6470;
+  --line: rgba(21, 22, 27, 0.12);
+  --panel: #ffffff;
+  --panel-soft: #fbfaf7;
+  --violet: #6f4ff2;
+  --blue: #1267b3;
+  --green: #087a5b;
+  --amber: #a66b00;
+  --rose: #b43d63;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: linear-gradient(180deg, #faf8f3 0%, var(--bg) 100%);
+  color: var(--ink);
+  line-height: 1.55;
+}
+.page {
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 36px 0 72px;
+}
+.hero {
+  padding: 34px 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+.eyebrow {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid rgba(111, 79, 242, 0.22);
+  border-radius: 999px;
+  color: var(--violet);
+  background: rgba(111, 79, 242, 0.08);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+h1 {
+  margin: 18px 0 12px;
+  font-size: clamp(34px, 5vw, 62px);
+  line-height: 0.98;
+  letter-spacing: 0;
+  max-width: 920px;
+}
+.hero p {
+  max-width: 860px;
+  color: var(--muted);
+  font-size: 16px;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.8);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  margin-top: 22px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 10px 28px rgba(20, 21, 28, 0.05);
+}
+.span-12 { grid-column: span 12; }
+.span-8 { grid-column: span 8; }
+.span-6 { grid-column: span 6; }
+.span-4 { grid-column: span 4; }
+h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+  line-height: 1.15;
+}
+h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+p { margin: 0 0 10px; }
+ul, ol { margin: 8px 0 0 18px; padding: 0; }
+li { margin: 6px 0; }
+code {
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(111, 79, 242, 0.09);
+  color: #5037bd;
+}
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.step {
+  min-height: 118px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+.step strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.step span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.accent-v { border-top: 3px solid var(--violet); }
+.accent-b { border-top: 3px solid var(--blue); }
+.accent-g { border-top: 3px solid var(--green); }
+.accent-a { border-top: 3px solid var(--amber); }
+.decision {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.decision-box {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+.tag {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 750;
+}
+.tag-green { background: rgba(8, 122, 91, 0.1); color: var(--green); }
+.tag-blue { background: rgba(18, 103, 179, 0.1); color: var(--blue); }
+.tag-violet { background: rgba(111, 79, 242, 0.1); color: var(--violet); }
+.tag-amber { background: rgba(166, 107, 0, 0.1); color: var(--amber); }
+.schema {
+  overflow-x: auto;
+  padding: 16px;
+  border-radius: 8px;
+  background: #171821;
+  color: #f4f7fb;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.schema .k { color: #8ee6b7; }
+.schema .s { color: #f7d27e; }
+.schema .c { color: #8fc7ff; }
+.note {
+  padding: 14px 16px;
+  border-left: 4px solid var(--rose);
+  border-radius: 8px;
+  background: rgba(180, 61, 99, 0.08);
+  color: #583041;
+}
+@media (max-width: 860px) {
+  .span-8, .span-6, .span-4 { grid-column: span 12; }
+  .pipeline, .decision { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <section class="hero">
+    <span class="eyebrow">Loom Brain · Agentic Orchestration</span>
+    <h1>把 Brain 从固定 fanout 升级为 state-first 的任务编排中枢</h1>
+    <p>
+      当前方案的核心是：Brain 不再只是把问题扔给几个固定 hand agents，而是先建立可查询、可持久、可复盘的 workflow state，
+      再基于 goal、rubric、任务图和验收标准动态创建/编排 hand agents，最后验收、补跑、汇总，并为固定任务提供无 UI 的高效率 data rollout。
+    </p>
+    <div class="meta">
+      <span class="pill">状态先验</span>
+      <span class="pill">动态 hand 流程</span>
+      <span class="pill">固定任务持久 hand</span>
+      <span class="pill">Headless HTTP JSON API</span>
+      <span class="pill">Goal + Flywheel 复盘</span>
+    </div>
+  </section>
+
+  <section class="grid">
+    <article class="card span-8">
+      <h2>一、目标状态</h2>
+      <p>
+        Brain 的职责升级为完整 agent 流程控制器：任务理解、目标建模、rubric 设计、hand agent 创建、并行/串行编排、成果验收、缺口补跑、最终 synthesis 和数据沉淀。
+      </p>
+      <ul>
+        <li><strong>正常任务：</strong>继续和人类通过现有 UI 交互，保留 `/analyze`、presentation、card drill-down 体验。</li>
+        <li><strong>固定任务：</strong>例如 `loom-fin` 市场研判、个人仓位管理、科研调研等，允许沉淀为持久 hand/task 定义。</li>
+        <li><strong>高频自动化：</strong>固定任务通过 headless HTTP JSON API 输出结构化 data product，不依赖 UI patch。</li>
+      </ul>
+    </article>
+
+    <aside class="card span-4">
+      <h2>当前代码基础</h2>
+      <ul>
+        <li>`LoomCoreAgent.analyze()` 已有 plan → dispatch → review → synthesize 雏形。</li>
+        <li>`BrainState` 已能按 domain 查询 rules、frameworks、notes。</li>
+        <li>`GoalContextStore`、`FlywheelWriter` 已存在。</li>
+        <li>主要缺口是 workflow state 还不是一等对象，hand 选择仍偏固定。</li>
+      </ul>
+    </aside>
+
+    <article class="card span-12">
+      <h2>二、State-First Pipeline</h2>
+      <div class="pipeline">
+        <div class="step accent-v"><strong>1. State Select</strong><span>从 BrainState、IntentWiki、GoalContext 选择本次任务的先验上下文。</span></div>
+        <div class="step accent-b"><strong>2. Goal Plan</strong><span>明确 goal、success criteria、rubric 维度、排除项和验收策略。</span></div>
+        <div class="step accent-g"><strong>3. Hand Plan</strong><span>按子任务生成 runtime 或 persistent hand specs，而不是写死四个 hand。</span></div>
+        <div class="step accent-a"><strong>4. Dispatch</strong><span>根据 spec 绑定现有 adapter、SDK hand 或外部 agent 执行。</span></div>
+        <div class="step accent-v"><strong>5. Acceptance Review</strong><span>按 rubric coverage、evidence、source freshness、confidence gaps 验收。</span></div>
+        <div class="step accent-b"><strong>6. Repair Loop</strong><span>缺口明确时生成 follow-up hand task，补齐后再 synthesis。</span></div>
+        <div class="step accent-g"><strong>7. Synthesis</strong><span>输出 stance、confidence、drivers、reversal、watch conditions 和 data product。</span></div>
+        <div class="step accent-a"><strong>8. Persist</strong><span>写入 GoalContext、Flywheel、intent stream agent_output 和 headless run result。</span></div>
+      </div>
+    </article>
+
+    <article class="card span-6">
+      <h2>三、Hand Agent 策略</h2>
+      <div class="decision">
+        <div class="decision-box">
+          <span class="tag tag-blue">Runtime</span>
+          <h3>日常通用任务</h3>
+          <p>不新建长期 hand。Brain 为每个 rubric/sub-question 生成临时 hand spec，绑定现有 adapter 或通用 agent 执行。</p>
+          <ul>
+            <li>适合一次性分析、白板协作、临时研究。</li>
+            <li>结果进入 episode/flywheel，不污染长期 hand registry。</li>
+            <li>hand spec 随 workflow state 返回，便于复盘。</li>
+          </ul>
+        </div>
+        <div class="decision-box">
+          <span class="tag tag-green">Persistent</span>
+          <h3>固定任务域</h3>
+          <p>对用户反复搜寻/执行的固定任务，Brain 可以沉淀 hand/task 定义，用于后续自动化。</p>
+          <ul>
+            <li>适合 `loom-fin`、仓位管理、科研调研。</li>
+            <li>写入受控的 generated hand spec store 或 domain task registry。</li>
+            <li>需要可读配置、版本、capabilities、artifact contract。</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="card span-6">
+      <h2>四、Workflow State 数据形态</h2>
+      <div class="schema">
+{<br>
+&nbsp;&nbsp;<span class="k">"episode_id"</span>: <span class="s">"ep-..."</span>,<br>
+&nbsp;&nbsp;<span class="k">"goal"</span>: { <span class="k">"goal_id"</span>, <span class="k">"title"</span>, <span class="k">"success_criteria"</span> },<br>
+&nbsp;&nbsp;<span class="k">"rubrics"</span>: [{ <span class="k">"dimension"</span>, <span class="k">"requirements"</span>, <span class="k">"acceptance"</span> }],<br>
+&nbsp;&nbsp;<span class="k">"hand_specs"</span>: [{<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">"hand_id"</span>, <span class="k">"base_hand_id"</span>, <span class="k">"lifecycle"</span>: <span class="s">"runtime|persistent"</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">"task"</span>, <span class="k">"capabilities"</span>, <span class="k">"rubrics"</span>, <span class="k">"acceptance"</span><br>
+&nbsp;&nbsp;}],<br>
+&nbsp;&nbsp;<span class="k">"phase_trace"</span>: [{ <span class="k">"phase"</span>, <span class="k">"status"</span>, <span class="k">"duration_ms"</span> }],<br>
+&nbsp;&nbsp;<span class="k">"rubric_coverage"</span>: { <span class="c">"...dimension"</span>: <span class="s">"covered|partial|missing"</span> },<br>
+&nbsp;&nbsp;<span class="k">"quality_gaps"</span>: [],<br>
+&nbsp;&nbsp;<span class="k">"data_product"</span>: { <span class="k">"version"</span>: <span class="s">"brain.data_product.v1"</span> }<br>
+}
+      </div>
+    </article>
+
+    <article class="card span-12">
+      <h2>五、Headless Data Rollout</h2>
+      <p>
+        固定任务不必经过 UI。新增 Brain run API，直接返回 JSON，适合脚本、定时任务、外部 dashboard、移动端摘要和后续自动复盘。
+      </p>
+      <div class="schema">
+<span class="c">POST</span> /brain/runs<br>
+{ <span class="k">"question"</span>, <span class="k">"domain_hint"</span>, <span class="k">"goal_type"</span>, <span class="k">"rollout"</span>: <span class="s">"headless"</span> }<br><br>
+<span class="c">GET</span> /brain/runs/{episode_id}<br>
+返回 synthesis、rubric_coverage、hand_artifacts、workflow_state、data_product、quality_gaps。<br><br>
+<span class="c">GET</span> /brain/runs?domain=finance&amp;status=latest<br>
+用于固定任务的近期结果查询。
+      </div>
+      <p>
+        `/analyze` 继续负责 UI patch 和 presentation；`/brain/runs` 只做数据执行与结构化返回。两者共享同一个 `LoomCoreAgent` pipeline，避免双轨逻辑。
+      </p>
+    </article>
+
+    <article class="card span-6">
+      <h2>六、实施顺序</h2>
+      <ol>
+        <li>在 `LoomCoreAgent` 中引入 workflow state，并让每个 phase 显式读写 state。</li>
+        <li>在 `BrainHarness` 增加 `plan_goal`、`plan_hands`、`review_acceptance`、`build_data_product`。</li>
+        <li>把 resolver 降级为 domain/task-pack resolver，不再直接决定固定 hand fanout。</li>
+        <li>增加 generated hand spec store，用于固定任务持久化。</li>
+        <li>新增 `/brain/runs` headless API，并把 run result 存入 episode/flywheel。</li>
+        <li>补齐 agent_output intent-stream 事件，为后续 CorrectionDetector 做 turn-pair 数据基础。</li>
+      </ol>
+    </article>
+
+    <article class="card span-6">
+      <h2>七、验收标准</h2>
+      <ul>
+        <li>固定域任务返回 persistent hand specs，并能复用到后续同类任务。</li>
+        <li>通用任务只生成 runtime hand specs，不写长期 hand registry。</li>
+        <li>review 按 rubric coverage 验收，缺口明确时会触发 follow-up task。</li>
+        <li>headless API 返回可消费的 `data_product`，不依赖 UI HTML。</li>
+        <li>现有 `/analyze`、presentation、hand artifact UI 不回退。</li>
+        <li>GoalContext/Flywheel 能追踪 episode、phase、hand specs、coverage 和质量缺口。</li>
+      </ul>
+    </article>
+
+    <article class="card span-12">
+      <h2>八、关键边界</h2>
+      <div class="note">
+        持久 hand 创建必须受控：只允许固定任务域或明确用户意图触发，不能让任意 prompt 直接写入长期 hand 目录。Runtime hand 是默认路径，persistent hand 是经过 domain/task-pack 约束后的沉淀路径。
+      </div>
+    </article>
+  </section>
+</main>
+</body>
+</html>

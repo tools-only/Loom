@@ -361,227 +361,221 @@
 
   <script>
     const DEFAULT_TASKS = {
-      market:    '分析当前大盘 regime：宏观背景、板块轮动、主要风险和近期催化剂',
-      sentiment: '评估当前市场情绪定位：fear/greed 读数、AAII/NAAIM 数据、与历史基准的对比',
-      target:    (t) => `分析 ${t || 'SPY'} 的投资 thesis：核心假设、主要催化剂、失效条件`,
-      position:  '根据提供的持仓数据生成持仓报告：市值、P&L、集中度分析',
+      market: 'Analyze current market regime: macro backdrop, sector rotation, key risks, and near-term catalysts.',
+      sentiment: 'Assess current market sentiment using fear/greed, AAII/NAAIM, and historical context.',
+      target: (t) => `Analyze investment thesis for ${t || 'SPY'}: core assumptions, catalysts, and invalidation conditions.`,
+      position: 'Generate a portfolio review from provided positions: market value, P&L, and concentration risk.',
     };
-    const HAND_NAMES  = { market:'市场研判', sentiment:'情绪追踪', target:'标的 Thesis', position:'持仓管理' };
-    const HAND_ICONS  = { market:'📊', sentiment:'🌡️', target:'🎯', position:'💼' };
-    const HANDS       = ['market', 'sentiment', 'target', 'position'];
+    const HAND_NAMES = { market: 'Market', sentiment: 'Sentiment', target: 'Target Thesis', position: 'Portfolio' };
+    const HAND_ICONS = { market: 'M', sentiment: 'S', target: 'T', position: 'P' };
+    const HANDS = ['market', 'sentiment', 'target', 'position'];
+    const BRAIN_URL = 'http://localhost:3002';
 
-    // ── Tabs ────────────────────────────────────────────────────────
     function switchTab(tab) {
       ['analyze', 'config'].forEach(t => {
-        document.getElementById('tab-btn-' + t).classList.toggle('active', t === tab);
-        document.getElementById('sidebar-' + t).style.display = t === tab ? '' : 'none';
-        document.getElementById('main-' + t).style.display    = t === tab ? '' : 'none';
+        document.getElementById('tab-btn-' + t)?.classList.toggle('active', t === tab);
+        const sidebar = document.getElementById('sidebar-' + t);
+        const main = document.getElementById('main-' + t);
+        if (sidebar) sidebar.style.display = t === tab ? '' : 'none';
+        if (main) main.style.display = t === tab ? '' : 'none';
       });
       if (tab === 'config') loadConfig();
     }
 
-    // ── Agent Mount (integrated into config tab) ────────────────────
+    async function fetchJson(url, options = {}) {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      let data = {};
+      if (text) {
+        try { data = JSON.parse(text); } catch (_) { data = { raw: text }; }
+      }
+      if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+      return data;
+    }
+
     async function loadMountStates() {
       for (const h of HANDS) {
+        const st = document.getElementById('ma-st-' + h);
         try {
-          const r = await fetch(`http://localhost:3001/hand/${h}/mount`, { signal: AbortSignal.timeout(2000) });
-          if (!r.ok) continue;
-          const d = await r.json();
-          const st = document.getElementById('ma-st-' + h);
+          const d = await fetchJson(`${BRAIN_URL}/hand/${h}/mount`, { signal: AbortSignal.timeout(2000) });
           if (!st) continue;
           if (d.mounted) {
-            document.getElementById('ma-ep-' + h).value = d.endpoint || '';
-            st.textContent = '✓ 已挂载';
+            const ep = document.getElementById('ma-ep-' + h);
+            if (ep) ep.value = d.endpoint || '';
+            st.textContent = 'mounted';
             st.style.color = '#10b981';
             st.style.fontWeight = '700';
           } else {
-            st.textContent = '—';
+            st.textContent = '-';
             st.style.color = '#9ca3af';
             st.style.fontWeight = '';
           }
-        } catch (_) {}
+        } catch (_) {
+          if (st) { st.textContent = 'offline'; st.style.color = '#dc2626'; }
+        }
       }
     }
 
     async function applyMounts() {
       const msgEl = document.getElementById('mount-msg');
-      msgEl.style.display = '';
-      msgEl.className = 'save-msg';
-      msgEl.textContent = '应用中…';
-      let ok = 0, fail = 0;
+      if (msgEl) { msgEl.style.display = ''; msgEl.className = 'save-msg'; msgEl.textContent = 'Applying...'; }
+      let ok = 0;
+      let fail = 0;
       for (const h of HANDS) {
-        const endpoint = (document.getElementById('ma-ep-' + h)?.value || '').trim();
-        const description = (document.getElementById('ma-desc-' + h)?.value || '').trim();
+        const endpoint = getVal('ma-ep-' + h);
+        const description = getVal('ma-desc-' + h);
         const st = document.getElementById('ma-st-' + h);
         try {
-          const cur = await fetch(`http://localhost:3001/hand/${h}/mount`, { signal: AbortSignal.timeout(2000) });
-          const curData = cur.ok ? await cur.json() : { mounted: false };
-
-          if (endpoint && !curData.mounted) {
-            const r = await fetch(`http://localhost:3001/hand/${h}/mount`, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
+          const cur = await fetchJson(`${BRAIN_URL}/hand/${h}/mount`, { signal: AbortSignal.timeout(2000) }).catch(() => ({ mounted: false }));
+          if (endpoint && (!cur.mounted || cur.endpoint !== endpoint)) {
+            if (cur.mounted) await fetch(`${BRAIN_URL}/hand/${h}/mount`, { method: 'DELETE' });
+            const d = await fetchJson(`${BRAIN_URL}/hand/${h}/mount`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ endpoint, description }),
             });
-            const d = await r.json();
-            if (d.ok) { ok++; st.textContent = '✓ 已挂载'; st.style.color = '#10b981'; st.style.fontWeight = '700'; }
-            else { fail++; st.textContent = '❌ 失败'; st.style.color = '#dc2626'; }
-          } else if (endpoint && curData.mounted && curData.endpoint !== endpoint) {
-            // endpoint changed — remount
-            await fetch(`http://localhost:3001/hand/${h}/mount`, { method: 'DELETE' });
-            const r = await fetch(`http://localhost:3001/hand/${h}/mount`, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ endpoint, description }),
-            });
-            const d = await r.json();
-            if (d.ok) { ok++; st.textContent = '✓ 已挂载'; st.style.color = '#10b981'; st.style.fontWeight = '700'; }
-            else { fail++; st.textContent = '❌ 失败'; st.style.color = '#dc2626'; }
-          } else if (!endpoint && curData.mounted) {
-            await fetch(`http://localhost:3001/hand/${h}/mount`, { method: 'DELETE' });
+            if (!d.ok) throw new Error(d.error || 'mount failed');
             ok++;
-            st.textContent = '—'; st.style.color = '#9ca3af'; st.style.fontWeight = '';
-          } else if (endpoint && curData.mounted) {
-            ok++; // no change needed
+            if (st) { st.textContent = 'mounted'; st.style.color = '#10b981'; st.style.fontWeight = '700'; }
+          } else if (!endpoint && cur.mounted) {
+            await fetch(`${BRAIN_URL}/hand/${h}/mount`, { method: 'DELETE' });
+            ok++;
+            if (st) { st.textContent = '-'; st.style.color = '#9ca3af'; st.style.fontWeight = ''; }
+          } else {
+            ok++;
           }
-        } catch (e) { fail++; if (st) { st.textContent = '❌'; st.style.color = '#dc2626'; } }
+        } catch (e) {
+          fail++;
+          if (st) { st.textContent = 'failed'; st.style.color = '#dc2626'; }
+        }
       }
-      msgEl.className = fail ? 'save-msg err' : 'save-msg ok';
-      msgEl.textContent = fail ? `❌ ${fail} 个失败` : '✓ 已应用';
-      setTimeout(() => msgEl.style.display = 'none', 3000);
+      if (msgEl) {
+        msgEl.className = fail ? 'save-msg err' : 'save-msg ok';
+        msgEl.textContent = fail ? `${fail} mount update(s) failed` : 'Mount config applied';
+        setTimeout(() => { msgEl.style.display = 'none'; }, 3000);
+      }
     }
 
-    // ── Status ──────────────────────────────────────────────────────
     async function checkStatus() {
       try {
         const r = await fetch('/health', { signal: AbortSignal.timeout(3000) });
-        if (r.ok) setStatus('server', true, 'Anchor Server 运行中 (port 3000)');
-      } catch { setStatus('server', false, 'Anchor Server 未运行'); }
-
+        setStatus('server', r.ok, r.ok ? 'Anchor Server running (port 3000)' : 'Anchor Server error');
+      } catch (_) {
+        setStatus('server', false, 'Anchor Server is not running');
+      }
       try {
-        const r = await fetch('http://localhost:3001/health', { signal: AbortSignal.timeout(3000) });
-        if (r.ok) {
-          const d = await r.json();
-          setStatus('brain', true, `Loom Brain 运行中 (${d.hands?.length || 0} hands)`);
-        }
-      } catch { setStatus('brain', false, 'Loom Brain 未运行 → cd loom && python main.py'); }
+        const d = await fetchJson(`${BRAIN_URL}/health`, { signal: AbortSignal.timeout(3000) });
+        setStatus('brain', true, `Loom Brain running (${(d.hands || []).length} hands)`);
+      } catch (_) {
+        setStatus('brain', false, 'Loom Brain is not running -> cd loom && python main.py');
+      }
     }
 
     function setStatus(id, ok, msg) {
-      document.getElementById('dot-' + id).className = 'dot ' + (ok ? 'dot-ok' : 'dot-err');
-      document.getElementById('status-' + id).textContent = msg;
+      const dot = document.getElementById('dot-' + id);
+      const text = document.getElementById('status-' + id);
+      if (dot) dot.className = 'dot ' + (ok ? 'dot-ok' : 'dot-err');
+      if (text) text.textContent = msg;
     }
 
-    // ── Run hand ────────────────────────────────────────────────────
     async function runHand(handId) {
-      const taskInput = document.getElementById('task').value.trim();
-      const ticker    = document.getElementById('ticker').value.trim().toUpperCase();
-      const positions = document.getElementById('positions').value.trim();
-
-      const dt = DEFAULT_TASKS[handId];
-      const task = taskInput || (typeof dt === 'function' ? dt(ticker) : dt);
-
+      const taskInput = getVal('task');
+      const ticker = getVal('ticker').toUpperCase();
+      const positions = getVal('positions');
+      const defaultTask = DEFAULT_TASKS[handId];
+      const task = taskInput || (typeof defaultTask === 'function' ? defaultTask(ticker) : defaultTask);
       const context = { tags: [] };
       if (ticker) { context.ticker = ticker; context.tags.push('equity'); }
       if (handId === 'position' && positions) { context.position_data = positions; context.tags.push('portfolio'); }
 
       const btn = document.getElementById('btn-' + handId);
-      btn.classList.add('loading');
-      btn.querySelector('.icon').textContent = '⏳';
-
-      document.getElementById('main-analyze').innerHTML = `
-        <div class="loading-card">
-          <div class="spinner"></div>
-          <p style="font-weight:700;font-size:16px;margin-bottom:8px">正在分析…</p>
-          <p style="font-size:13px;color:#6b7280">Hand: ${HAND_NAMES[handId]}</p>
-          <p style="font-size:12px;color:#9ca3af;margin-top:4px">${esc(task)}</p>
-        </div>`;
+      if (btn) {
+        btn.classList.add('loading');
+        const icon = btn.querySelector('.icon');
+        if (icon) icon.textContent = '...';
+      }
+      const main = document.getElementById('main-analyze');
+      if (main) {
+        main.innerHTML = `<div class="loading-card"><div class="spinner"></div><p style="font-weight:700;font-size:16px;margin-bottom:8px">Analyzing...</p><p style="font-size:13px;color:#6b7280">Hand: ${esc(HAND_NAMES[handId] || handId)}</p><p style="font-size:12px;color:#9ca3af;margin-top:4px">${esc(task)}</p></div>`;
+      }
 
       try {
-        const res  = await fetch('/loom/run', {
+        const data = await fetchJson('/loom/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ hand_id: handId, task, context }),
         });
-        const data = await res.json();
         showResult(data, handId, task);
       } catch (e) {
-        showError('网络错误', e.message, null);
+        showError('Network error', e.message, null);
       } finally {
-        btn.classList.remove('loading');
-        btn.querySelector('.icon').textContent = HAND_ICONS[handId];
+        if (btn) {
+          btn.classList.remove('loading');
+          const icon = btn.querySelector('.icon');
+          if (icon) icon.textContent = HAND_ICONS[handId] || '';
+        }
       }
     }
 
     function showResult(data, handId, task) {
       if (!data.ok) {
-        const noSvc = data.error?.includes('not running');
-        showError(noSvc ? 'Loom Brain 未运行' : '分析失败', data.error,
-                  noSvc ? 'cd loom && python main.py' : null);
+        const noSvc = String(data.error || '').includes('not running') || String(data.error || '').includes('unreachable');
+        showError(noSvc ? 'Loom Brain is not running' : 'Analysis failed', data.error || 'Unknown error', noSvc ? 'cd loom && python main.py' : null);
         return;
       }
-      const art  = data.artifact || {};
-      const meta = art.metadata  || {};
+      const art = data.artifact || {};
+      const meta = art.metadata || {};
       const shown = meta.resources_shown || [];
-      const used  = meta.resources_used  || [];
-      const gaps  = meta.gaps || [];
+      const used = meta.resources_used || [];
+      const gaps = meta.gaps || [];
       const claims = meta.key_claims || [];
-
-      document.getElementById('main-analyze').innerHTML = `
+      const claimText = c => typeof c === 'string' ? c : (c.claim || c.source || '');
+      const claimTier = c => c && typeof c === 'object' && c.tier ? ` <span class="tier-pill" style="font-size:10px;padding:1px 6px;border-radius:999px;background:#e5e7eb;color:#374151;font-weight:600">${esc(c.tier)}</span>` : '';
+      const claimsHtml = claims.length ? claims.map(c => `<li>${esc(claimText(c))}${claimTier(c)}</li>`).join('') : '<li style="color:#9ca3af">No structured claims</li>';
+      const gapsHtml = gaps.length ? gaps.map(g => `<li>${esc(g)}</li>`).join('') : '<li style="color:#9ca3af">No obvious gaps</li>';
+      const resourcesHtml = shown.map(rid => `<div class="resource-bar"><span class="resource-name">${esc(rid)}</span>${used.includes(rid) ? '<span class="resource-used">used</span>' : '<span class="resource-ignored">not used</span>'}</div>`).join('') || '<p style="color:#9ca3af;font-size:12px">No external resources</p>';
+      const main = document.getElementById('main-analyze');
+      if (!main) return;
+      main.innerHTML = `
         <div class="result-card">
           <div class="result-header">
-            <h2>${HAND_NAMES[handId]} 分析结果</h2>
-            <span class="badge badge-purple">✓ 完成</span>
-            <span class="badge badge-gray">用了 ${used.length}/${shown.length} 个资源</span>
+            <h2>${esc(HAND_NAMES[handId] || handId)} result</h2>
+            <span class="badge badge-purple">complete</span>
+            <span class="badge badge-gray">used ${used.length}/${shown.length} resources</span>
           </div>
-          <h4 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin-bottom:8px">分析叙述</h4>
+          <h4 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7280;margin-bottom:8px">Narrative</h4>
           <div class="narrative">${esc(art.narrative || '')}</div>
           <div class="detail-grid">
-            <div class="detail-block">
-              <h4>关键判断</h4>
-              const claimText = c => typeof c==='string' ? c : (c.claim||c.source||'');
-              const claimTier = c => c&&typeof c==='object'&&c.tier ? ` <span class="tier-pill" style="font-size:10px;padding:1px 6px;border-radius:999px;background:#e5e7eb;color:#374151;font-weight:600">${c.tier}</span>` : '';
-              <ul>${claims.length ? claims.map(c=>`<li>• ${claimText(c)}${claimTier(c)}</li>`).join('') : '<li style="color:#9ca3af">无结构化判断</li>'}</ul>
-            </div>
-            <div class="detail-block">
-              <h4>数据缺口</h4>
-              <ul>${gaps.length ? gaps.map(g=>`<li>⚠️ ${esc(g)}</li>`).join('') : '<li style="color:#9ca3af">无明显缺口</li>'}</ul>
-            </div>
+            <div class="detail-block"><h4>Key claims</h4><ul>${claimsHtml}</ul></div>
+            <div class="detail-block"><h4>Data gaps</h4><ul>${gapsHtml}</ul></div>
           </div>
-          <div style="margin-top:20px">
-            <div class="section-title" style="margin-bottom:10px">资源使用详情</div>
-            ${shown.map(rid=>`<div class="resource-bar"><span class="resource-name">${esc(rid)}</span>${used.includes(rid)?'<span class="resource-used">✓ 已使用</span>':'<span class="resource-ignored">— 未使用</span>'}</div>`).join('') || '<p style="color:#9ca3af;font-size:12px">无外部资源</p>'}
-          </div>
-          <div class="webview-note">✅ 结果已 patch 到主 webview — <a href="http://localhost:3000" target="_blank" style="color:#065f46;font-weight:700">localhost:3000</a></div>
-          <p style="font-size:11px;color:#9ca3af;margin-top:12px">任务：${esc(task)}</p>
+          <div style="margin-top:20px"><div class="section-title" style="margin-bottom:10px">Resource usage</div>${resourcesHtml}</div>
+          <div class="webview-note">Result patched to main webview: <a href="http://localhost:3000" target="_blank" style="color:#065f46;font-weight:700">localhost:3000</a></div>
+          <p style="font-size:11px;color:#9ca3af;margin-top:12px">Task: ${esc(task)}</p>
         </div>`;
     }
 
     function showError(title, msg, cmd) {
-      document.getElementById('main-analyze').innerHTML = `
-        <div class="error-card">
-          <h3>❌ ${esc(title)}</h3>
-          <p>${esc(msg)}</p>
-          ${cmd ? `<p style="margin-top:12px">启动命令：<code>${esc(cmd)}</code></p>` : ''}
-        </div>`;
+      const main = document.getElementById('main-analyze');
+      if (!main) return;
+      main.innerHTML = `<div class="error-card"><h3>${esc(title)}</h3><p>${esc(msg)}</p>${cmd ? `<p style="margin-top:12px">Start command: <code>${esc(cmd)}</code></p>` : ''}</div>`;
     }
 
-    // ── Config ──────────────────────────────────────────────────────
     async function loadConfig() {
       try {
-        const r = await fetch('http://localhost:3001/config', { signal: AbortSignal.timeout(3000) });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const cfg = await r.json();
+        const cfg = await fetchJson(`${BRAIN_URL}/config`, { signal: AbortSignal.timeout(3000) });
         const def = cfg.default || {};
         setVal('def-provider', def.provider || 'anthropic');
-        setVal('def-model',    def.model    || '');
-        setVal('def-apikey',   def.api_key  || '');
-        setVal('def-baseurl',  def.base_url || '');
+        setVal('def-model', def.model || '');
+        setVal('def-apikey', def.api_key || '');
+        setVal('def-baseurl', def.base_url || '');
         const hands = cfg.hands || {};
         HANDS.forEach(h => {
           const hc = hands[h] || {};
           setVal('h-' + h + '-provider', hc.provider || '');
-          setVal('h-' + h + '-model',    hc.model    || '');
-          setVal('h-' + h + '-apikey',   hc.api_key  || '');
-          setVal('h-' + h + '-baseurl',  hc.base_url || '');
+          setVal('h-' + h + '-model', hc.model || '');
+          setVal('h-' + h + '-apikey', hc.api_key || '');
+          setVal('h-' + h + '-baseurl', hc.base_url || '');
         });
       } catch (e) {
         console.warn('loadConfig:', e.message);
@@ -593,50 +587,43 @@
       const cfg = {
         default: {
           provider: getVal('def-provider'),
-          model:    getVal('def-model'),
-          api_key:  getVal('def-apikey'),
+          model: getVal('def-model'),
+          api_key: getVal('def-apikey'),
           base_url: getVal('def-baseurl'),
         },
         hands: Object.fromEntries(HANDS.map(h => [h, {
           provider: getVal('h-' + h + '-provider'),
-          model:    getVal('h-' + h + '-model'),
-          api_key:  getVal('h-' + h + '-apikey'),
+          model: getVal('h-' + h + '-model'),
+          api_key: getVal('h-' + h + '-apikey'),
           base_url: getVal('h-' + h + '-baseurl'),
         }])),
       };
       const el = document.getElementById('save-msg');
-      el.style.display = '';
-      el.className = 'save-msg';
-      el.textContent = '保存中…';
+      if (el) { el.style.display = ''; el.className = 'save-msg'; el.textContent = 'Saving...'; }
       try {
-        const r = await fetch('http://localhost:3001/config', {
+        const d = await fetchJson(`${BRAIN_URL}/config`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(cfg),
         });
-        const d = await r.json();
-        if (!d.ok) throw new Error(d.error || '保存失败');
-        el.className = 'save-msg ok';
-        el.textContent = '✓ 已保存，立即生效';
-        setTimeout(() => el.style.display = 'none', 3000);
+        if (!d.ok) throw new Error(d.error || 'Save failed');
+        if (el) { el.className = 'save-msg ok'; el.textContent = 'Saved'; setTimeout(() => { el.style.display = 'none'; }, 3000); }
       } catch (e) {
-        el.className = 'save-msg err';
-        el.textContent = '❌ ' + e.message;
+        if (el) { el.className = 'save-msg err'; el.textContent = e.message; }
       }
     }
 
     function applyPreset(provider, model) {
       setVal('def-provider', provider);
-      setVal('def-model',    model);
+      setVal('def-model', model);
     }
 
     function getVal(id) { return document.getElementById(id)?.value?.trim() || ''; }
     function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
     function esc(s) {
-      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    // ── Init ────────────────────────────────────────────────────────
     checkStatus();
     setInterval(checkStatus, 15000);
   </script>

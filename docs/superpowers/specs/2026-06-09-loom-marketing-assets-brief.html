@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loom Marketing Assets Brief</title>
+  <style>
+    :root {
+      --ink: #111827;
+      --muted: #64748b;
+      --paper: #ffffff;
+      --bg: #f7f8fc;
+      --line: #e2e8f0;
+      --iris: #7a5af8;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --dark: #0f172a;
+      --radius: 10px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.62 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+
+    header {
+      padding: 42px 28px 34px;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(122, 90, 248, .24), transparent 28%),
+        radial-gradient(circle at 80% 10%, rgba(16, 185, 129, .18), transparent 28%),
+        var(--paper);
+      border-bottom: 1px solid var(--line);
+      text-align: center;
+    }
+
+    main {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 28px 24px 70px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 40px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 34px 0 14px;
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    h3 {
+      margin: 20px 0 8px;
+      font-size: 16px;
+    }
+
+    p { margin: 0 0 12px; }
+
+    .subtitle {
+      max-width: 820px;
+      margin: 0 auto;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 22px;
+      margin-bottom: 18px;
+    }
+
+    .hero-line {
+      display: inline-block;
+      margin-top: 18px;
+      padding: 9px 14px;
+      border-radius: 999px;
+      background: var(--dark);
+      color: #fff;
+      font-weight: 750;
+      font-size: 13px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 15px;
+      background: #fbfcff;
+    }
+
+    .card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      margin-bottom: 10px;
+      color: #fff;
+      font-weight: 900;
+      background: var(--iris);
+    }
+
+    .icon.green { background: var(--green); }
+    .icon.amber { background: var(--amber); }
+    .icon.rose { background: var(--rose); }
+
+    .mock {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 18px;
+      min-height: 360px;
+      border-radius: 18px;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 16% 18%, rgba(122, 90, 248, .22), transparent 26%),
+        radial-gradient(circle at 88% 80%, rgba(16, 185, 129, .18), transparent 28%),
+        #fff;
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 50px rgba(15, 23, 42, .08);
+    }
+
+    .mock-left {
+      align-self: center;
+    }
+
+    .mock-title {
+      font-size: 36px;
+      line-height: 1.08;
+      font-weight: 850;
+      margin-bottom: 12px;
+    }
+
+    .mock-subtitle {
+      color: var(--muted);
+      font-size: 16px;
+      margin-bottom: 18px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      font-size: 12px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .mock-screen {
+      align-self: center;
+      min-height: 270px;
+      border-radius: 16px;
+      border: 1px solid #dbe2ea;
+      background: #f8fafc;
+      padding: 16px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+
+    .screen-bar {
+      width: 42%;
+      height: 10px;
+      border-radius: 999px;
+      background: #cbd5e1;
+      margin-bottom: 15px;
+    }
+
+    .screen-card {
+      border-radius: 13px;
+      background: #fff;
+      border: 1px solid var(--line);
+      padding: 13px;
+      margin-bottom: 10px;
+    }
+
+    .screen-card.active {
+      border-color: var(--iris);
+      box-shadow: 0 0 0 3px rgba(122, 90, 248, .12);
+    }
+
+    .screen-card-title {
+      height: 12px;
+      width: 70%;
+      background: #111827;
+      border-radius: 999px;
+      margin-bottom: 9px;
+    }
+
+    .screen-card-line {
+      height: 8px;
+      background: #cbd5e1;
+      border-radius: 999px;
+      margin: 6px 0;
+    }
+
+    .screen-card-line.short { width: 62%; }
+
+    .ops {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .op {
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: #ede9fe;
+      color: #5b21b6;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    pre {
+      margin: 10px 0 0;
+      padding: 14px;
+      overflow-x: auto;
+      background: var(--dark);
+      color: #e5eef9;
+      border-radius: var(--radius);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+
+    .table th,
+    .table td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .table th {
+      background: #f8fafc;
+      color: #334155;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .do-dont {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .good { border-left: 4px solid var(--green); }
+    .bad { border-left: 4px solid var(--rose); }
+
+    ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    li { margin: 5px 0; }
+
+    @media (max-width: 900px) {
+      .grid, .grid-4, .mock, .do-dont { grid-template-columns: 1fr; }
+      h1 { font-size: 32px; }
+      .mock-title { font-size: 30px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Loom Marketing Assets Brief</h1>
+    <p class="subtitle">
+      A concise launch kit for explaining Loom visually: what to emphasize, how to position it, and what assets to post across GitHub, X, Hacker News, Reddit, LinkedIn, and Product Hunt.
+    </p>
+    <div class="hero-line">Chat starts the work. Loom gives it a surface.</div>
+  </header>
+
+  <main>
+    <section class="section">
+      <h2>1. The Message</h2>
+      <div class="grid-4">
+        <div class="card">
+          <div class="icon">1</div>
+          <strong>Work Gets a Surface</strong>
+          <p>Loom turns AI output from disposable chat into a place you can point at, shape, and keep using.</p>
+        </div>
+        <div class="card">
+          <div class="icon green">2</div>
+          <strong>Touch the Part That Matters</strong>
+          <p>No full rewrite ritual. Click the exact block, then refine, expand, branch, or restructure it.</p>
+        </div>
+        <div class="card">
+          <div class="icon amber">3</div>
+          <strong>Agents With Real Jobs</strong>
+          <p>Brain decides what should happen. Specialist Hands do the work and return changes to the workspace.</p>
+        </div>
+        <div class="card">
+          <div class="icon rose">4</div>
+          <strong>The Workspace Learns</strong>
+          <p>Intent and reward signals turn repeated behavior into durable product memory, not one-off prompts.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>2. Main Visual Concept</h2>
+      <div class="mock">
+        <div class="mock-left">
+          <div class="mock-title">Give AI work a place to live.</div>
+          <div class="mock-subtitle">
+            Turn answers into anchored documents, editable canvases, and agent workflows that remember what matters.
+          </div>
+          <div class="chips">
+            <span class="chip">Anchored blocks</span>
+            <span class="chip">Specialist hands</span>
+            <span class="chip">Intent graph</span>
+            <span class="chip">Reward signals</span>
+          </div>
+        </div>
+        <div class="mock-screen">
+          <div class="screen-bar"></div>
+          <div class="screen-card active">
+            <div class="screen-card-title"></div>
+            <div class="screen-card-line"></div>
+            <div class="screen-card-line short"></div>
+            <div class="ops">
+              <span class="op">refine</span>
+              <span class="op">expand</span>
+              <span class="op">branch</span>
+            </div>
+          </div>
+          <div class="screen-card">
+            <div class="screen-card-title" style="width:56%"></div>
+            <div class="screen-card-line"></div>
+            <div class="screen-card-line short"></div>
+          </div>
+          <div class="screen-card">
+            <div class="screen-card-title" style="width:64%"></div>
+            <div class="screen-card-line"></div>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top:14px;color:var(--muted)">
+        Recommended export size: 1200 x 675 for GitHub social preview, X, LinkedIn, and Product Hunt galleries.
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>3. Creative Directions</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>After Chat</strong>
+          <pre><code>Chat is where ideas start.
+Loom is where they take shape.</code></pre>
+        </div>
+        <div class="card">
+          <strong>Living Work</strong>
+          <pre><code>Documents that stay alive
+after the first answer.</code></pre>
+        </div>
+        <div class="card">
+          <strong>Agentic Surface</strong>
+          <pre><code>A work surface for agents,
+not another chat window.</code></pre>
+        </div>
+        <div class="card">
+          <strong>Precise Control</strong>
+          <pre><code>Don't regenerate the whole thing.
+Touch the part that matters.</code></pre>
+        </div>
+        <div class="card">
+          <strong>Memory That Works</strong>
+          <pre><code>Your preferences should not die
+at the end of a prompt.</code></pre>
+        </div>
+        <div class="card">
+          <strong>Product Hook</strong>
+          <pre><code>The interface after chat.</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>4. What to Show</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>What it should communicate</th>
+            <th>Caption</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Anchored report screenshot</td>
+            <td>AI output is editable by block, not only by full prompt rewrite.</td>
+            <td>Click any section to refine, expand, or branch.</td>
+          </tr>
+          <tr>
+            <td>30 second GIF</td>
+            <td>User clicks one block, asks for a change, and only that block updates.</td>
+            <td>Local edits for AI-generated workspaces.</td>
+          </tr>
+          <tr>
+            <td>Brain-Hand diagram</td>
+            <td>Brain coordinates, Hands specialize, artifacts return to the workspace.</td>
+            <td>Specialist agents, orchestrated around the document.</td>
+          </tr>
+          <tr>
+            <td>Intent graph / reward panel</td>
+            <td>User behavior becomes durable policy signal.</td>
+            <td>The workspace learns what matters from how you work.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>5. One-line Positioning</h2>
+      <div class="grid">
+        <div class="card">
+          <strong>Shortest</strong>
+          <pre><code>The interface after chat.</code></pre>
+        </div>
+        <div class="card">
+          <strong>Most Memorable</strong>
+          <pre><code>Give AI work a place to live.</code></pre>
+        </div>
+        <div class="card">
+          <strong>Product</strong>
+          <pre><code>Loom turns AI answers into editable workspaces where agents can keep working.</code></pre>
+        </div>
+        <div class="card">
+          <strong>Technical</strong>
+          <pre><code>A local-first agentic workspace with anchored HTML, Brain-Hand orchestration, intent memory, and reward-bearing harnesses.</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>6. Platform Copy</h2>
+
+      <h3>X / Twitter Launch Post</h3>
+      <pre><code>Chat is where ideas start.
+It should not be where work gets trapped.
+
+I'm building Loom: the interface after chat.
+
+It turns AI answers into editable workspaces:
+- click the exact block you want to change
+- ask specialist agents to work on it
+- preserve intent across sessions
+- evaluate what worked and improve the next run
+
+GitHub: https://github.com/tools-only/Loom</code></pre>
+
+      <h3>Hacker News / Reddit</h3>
+      <pre><code>Show HN: Loom - the interface after chat
+
+I am building Loom because chat is a poor final surface for serious AI work.
+
+Loom renders AI output as structured, anchored HTML. Every meaningful block can be selected, refined, expanded, branched, or routed to a specialist agent.
+
+The deeper goal is a workspace that learns how you work: Brain orchestrates specialist Hands, captures durable intent, and records reward signals for future policy selection.
+
+Repo: https://github.com/tools-only/Loom
+Demo: https://tools-only.github.io/Loom/demo.html</code></pre>
+
+      <h3>LinkedIn</h3>
+      <pre><code>AI work deserves a better surface than a transcript.
+
+I am building Loom: a local-first workspace that turns AI answers into living documents.
+
+The simple idea:
+Touch the part that matters.
+
+Instead of rewriting a whole report through another prompt, you click one section and ask the right agent to refine, expand, branch, or restructure it.
+
+Under the hood:
+- Brain decides what should happen
+- Hands perform specialist work
+- intent becomes durable product memory
+- reward signals improve future orchestration
+
+GitHub: https://github.com/tools-only/Loom</code></pre>
+
+      <h3>Product Hunt</h3>
+      <pre><code>Tagline:
+The interface after chat.
+
+Short description:
+Loom turns AI answers into editable workspaces. Click any block, route work to specialist agents, and let the workspace remember intent and reward signals across sessions.</code></pre>
+    </section>
+
+    <section class="section">
+      <h2>7. Content Package</h2>
+      <div class="grid">
+        <div class="card good">
+          <strong>Launch pack</strong>
+          <ul>
+            <li>1 hero graphic: Give AI work a place to live.</li>
+            <li>1 GIF: click section -> refine -> local patch.</li>
+            <li>1 architecture image: Workspace -> Brain -> Hands -> Reward.</li>
+            <li>1 README hero update with screenshot and badges.</li>
+            <li>1 X thread, 1 HN post, 1 LinkedIn post, 1 Product Hunt blurb.</li>
+          </ul>
+        </div>
+        <div class="card good">
+          <strong>Follow-up posts</strong>
+          <ul>
+            <li>Post 1: Why chat is the wrong final interface.</li>
+            <li>Post 2: How anchored HTML makes AI output editable.</li>
+            <li>Post 3: Brain-Hand architecture explained visually.</li>
+            <li>Post 4: Intent and reward harness without training LLM weights.</li>
+            <li>Post 5: Building a local-first agentic workspace.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>8. What Not to Lead With</h2>
+      <div class="do-dont">
+        <div class="card bad">
+          <strong>Avoid in first-screen marketing</strong>
+          <ul>
+            <li>Internal port numbers and startup scripts.</li>
+            <li>Too much RL terminology.</li>
+            <li>Adapter implementation details.</li>
+            <li>Investment research as the only use case.</li>
+            <li>Long architectural background before showing the product.</li>
+          </ul>
+        </div>
+        <div class="card good">
+          <strong>Emphasize instead</strong>
+          <ul>
+            <li>The document is the interface.</li>
+            <li>Every block can be clicked and changed.</li>
+            <li>Specialist agents work behind the document.</li>
+            <li>The workspace learns from user behavior.</li>
+            <li>Local-first, inspectable, hackable architecture.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>9. Final Campaign Line</h2>
+      <pre><code>Chat starts the work.
+Loom gives it a surface.</code></pre>
+    </section>
+  </main>
+</body>
+</html>

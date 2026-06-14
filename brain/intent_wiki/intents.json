@@ -17,8 +17,8 @@
       "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
       "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
       "status": "active",
-      "confidence": 0.43,
-      "evidence_count": 1,
+      "confidence": 0.95,
+      "evidence_count": 11,
       "activation_hints": {
         "keywords": [
           "market",
@@ -39,8 +39,39 @@
         "requires_fresh_context": true
       },
       "created_at": "2026-06-09T17:55:31.728583",
-      "updated_at": "2026-06-09T17:55:31.728583",
-      "last_evidence_ts": "2026-06-09T17:55:31.716522"
+      "updated_at": "2026-06-14T00:11:27.165091",
+      "last_evidence_ts": "2026-06-14T00:11:27.160571"
+    },
+    {
+      "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+      "zone": "content_requirements",
+      "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件等等",
+      "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+      "status": "active",
+      "confidence": 0.51,
+      "evidence_count": 2,
+      "activation_hints": {
+        "keywords": [
+          "market",
+          "今日市场简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件等等",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-11T01:45:16.161804",
+      "updated_at": "2026-06-13T01:20:52.807963",
+      "last_evidence_ts": "2026-06-13T01:20:52.807963"
     },
     {
       "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件",
@@ -48,8 +79,8 @@
       "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
       "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
       "status": "active",
-      "confidence": 0.43,
-      "evidence_count": 1,
+      "confidence": 0.95,
+      "evidence_count": 11,
       "activation_hints": {
         "keywords": [
           "market",
@@ -70,8 +101,74 @@
         "requires_fresh_context": true
       },
       "created_at": "2026-06-09T17:55:31.731061",
-      "updated_at": "2026-06-09T17:55:31.728583",
-      "last_evidence_ts": "2026-06-09T17:55:31.716522"
+      "updated_at": "2026-06-14T00:11:27.165091",
+      "last_evidence_ts": "2026-06-14T00:11:27.160571"
+    },
+    {
+      "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+      "zone": "risk_sensitivity",
+      "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件等等",
+      "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+      "status": "active",
+      "confidence": 0.51,
+      "evidence_count": 2,
+      "activation_hints": {
+        "keywords": [
+          "market",
+          "今日市场简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件等等",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-11T01:45:16.162379",
+      "updated_at": "2026-06-13T01:20:52.807963",
+      "last_evidence_ts": "2026-06-13T01:20:52.807963"
+    },
+    {
+      "intent_id": "workflow_preferences.respect_object_scoped_intent_for_initial_render",
+      "zone": "workflow_preferences",
+      "label": "Respect object-scoped intent for initial_render",
+      "principle": "Use the target object and operation as part of task interpretation, not merely the user's text.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "respect",
+          "object",
+          "scoped",
+          "initial",
+          "render",
+          "源泉",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal"
+        ],
+        "anchor_ops": [
+          "initial_render"
+        ],
+        "object_kinds": [
+          "global"
+        ],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-12T01:18:50.079134",
+      "updated_at": "2026-06-12T01:18:50.079134",
+      "last_evidence_ts": "2026-06-12T01:18:50.066625"
     }
   ]
 }

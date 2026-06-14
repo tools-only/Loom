@@ -665,9 +665,55 @@ def _render_raw_items(artifact: dict) -> str:
     )
 
 
+# ── Hand color assignment for participant indicators ──────────────────────
+_HAND_COLORS: dict[str, str] = {
+    "market": "#7A5AF8",
+    "sentiment": "#F59E0B",
+    "target": "#10B981",
+    "position": "#EF4444",
+}
+_RUNTIME_HAND_PALETTE = ["#06B6D4", "#EC4899", "#8B5CF6", "#14B8A6", "#F97316", "#6366F1"]
+
+
+def _hand_color(hand_id: str) -> str:
+    """Deterministic color for any hand_id — known hands get stable colors,
+    runtime-generated hands are assigned from a rotation palette."""
+    if hand_id in _HAND_COLORS:
+        return _HAND_COLORS[hand_id]
+    return _RUNTIME_HAND_PALETTE[hash(hand_id) % len(_RUNTIME_HAND_PALETTE)]
+
+
+def _hand_label(hand_id: str) -> str:
+    """Human-readable short label for a hand."""
+    info = REGISTRY.get(hand_id, {})
+    return info.get("label", info.get("name", hand_id))
+
+
+def _render_hand_participants(hand_artifacts: dict) -> str:
+    """Render a compact participants bar showing which hands contributed."""
+    if not hand_artifacts:
+        return ""
+    dots = "".join(
+        f'<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px">'
+        f'<span style="width:8px;height:8px;border-radius:50%;background:{_hand_color(hid)};'
+        f'display:inline-block;flex-shrink:0"></span>'
+        f'{html.escape(_hand_label(hid))}'
+        f'</span>'
+        for hid in sorted(hand_artifacts.keys())
+    )
+    return (
+        f'<div class="hand-participants" style="display:flex;gap:8px;align-items:center;'
+        f'flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;'
+        f'border-bottom:1px solid rgba(255,255,255,0.15)">'
+        f'<span style="font-size:11px;font-weight:600;opacity:0.7;white-space:nowrap">参与者</span>'
+        f'{dots}</div>'
+    )
+
+
 def _render_brain_synthesis(
     synthesis: dict, workflow: dict, cold_start: bool,
     episode_id: str = "", goal_id: str = "",
+    hand_artifacts: dict | None = None,
 ) -> str:
     """Render Brain synthesis as an Anchor section card above hand cards."""
     stance = synthesis.get("stance", "n/a")
@@ -737,6 +783,7 @@ def _render_brain_synthesis(
         f'<section class="anc-section anc-section--gc anc-section--aurora brain-synthesis" '
         f'data-anc="brain-synthesis" data-handles="refine,expand" data-has-detail="true"{ep_attrs}>'
         f'{cold_html}'
+        f'{_render_hand_participants(hand_artifacts) if hand_artifacts else ""}'
         f'<div class="anc-pill-row">'
         f'<span class="anc-pill anc-pill--gen">Brain 整合</span>'
         f'<span class="anc-pill {stance_class}">{stance_label}</span>'
@@ -1126,7 +1173,8 @@ async def analyze(req: AnalyzeRequest):
         print(f"[brain] flywheel write error: {exc}", flush=True)
         episode_id = ""
 
-    brain_html = _render_brain_synthesis(synthesis, wf, cold, episode_id=episode_id, goal_id=goal_id)
+    brain_html = _render_brain_synthesis(synthesis, wf, cold, episode_id=episode_id, goal_id=goal_id,
+                                         hand_artifacts=result.get("hand_artifacts", {}))
     await patch_webview("brain-synthesis", brain_html)
 
     try:
@@ -2464,6 +2512,7 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
     info = REGISTRY.get(hand_id, {})
     anchor_id = info.get("anchor_id", hand_id)
     label = info.get("label", hand_id)
+    hand_color = _hand_color(hand_id)
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     detail_sections_html = _render_artifact_sections(artifact, narrative, claims_html)
     evidence_html = _render_evidence_section(artifact)
@@ -2476,6 +2525,7 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
         # True summary: pill + title + narrative only visible; detail in aside
         return f"""<section class="anc-section anc-section--gc" data-anc="{anchor_id}" data-handles="refine,expand" data-has-detail="true">
   <div class="anc-pill-row">
+    <span class="hand-indicator" style="width:10px;height:10px;border-radius:50%;background:{hand_color};display:inline-block;flex-shrink:0" title="{html.escape(hand_id)}"></span>
     <span class="anc-pill anc-pill--gen">AI 生成</span>
     <span class="anc-pill {auth_class}">{authority_label}</span>
   </div>
@@ -2501,6 +2551,7 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
 
     return f"""<section class="anc-section anc-section--gc" data-anc="{anchor_id}" data-handles="refine,expand" data-has-detail="true">
   <div class="anc-pill-row">
+    <span class="hand-indicator" style="width:10px;height:10px;border-radius:50%;background:{hand_color};display:inline-block;flex-shrink:0" title="{html.escape(hand_id)}"></span>
     <span class="anc-pill anc-pill--gen">AI 生成</span>
     <span class="anc-pill {auth_class}">{authority_label}</span>
   </div>

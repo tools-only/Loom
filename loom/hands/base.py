@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+import urllib.parse
 from pathlib import Path
 try:
     from bridge import get_connector_data
@@ -143,6 +144,7 @@ class BaseHand:
         shown = [r["resource_id"] for r in resource_menu]
         used: list[str] = []
         raw_sources: list[dict] = []
+        depth = context.get("depth", "normal") if isinstance(context, dict) else "normal"
 
         # web_search is Anthropic-only built-in; OAI-compat providers skip it
         tools: list[dict] = [FETCH_RESOURCE_TOOL, FETCH_URL_TOOL]
@@ -160,7 +162,7 @@ class BaseHand:
             '  "metadata": {\n'
             '    "confidence": 0.0,\n'
             '    "key_claims": [\n'
-            '      {"claim":"specific claim","source":"FRED 30Y","tier":"A","freshness":"2026-06-09"},\n'
+            '      {"claim":"specific claim","source":"FRED 30Y","tier":"A","freshness":"2026-06-09","rubric":"宏观面"},\n'
             '      {"claim":"another claim","source":"Reuters","tier":"C","freshness":"2026-06-08"}\n'
             '    ],\n'
             '    "gaps": ["missing/stale data"],\n'
@@ -175,19 +177,20 @@ class BaseHand:
             "  ],\n"
             '  "raw_items": [\n'
             '    {"item_type":"data_point","label":"10Y Treasury","value":"4.52%","source":"FRED","tier":"A","freshness":"2026-06-10","relevance":"rate regime anchor"},\n'
-            '    {"item_type":"news","title":"Fed holds rates","source":"Reuters","tier":"C","published_at":"2026-06-10","summary":"首句摘要","relevance":"regime signal","url":""},\n'
+            '    {"item_type":"news","title":"Fed holds rates","source":"Reuters","tier":"C","published_at":"2026-06-10","summary":"首句摘要","relevance":"regime signal","url":"https://reuters.com/article/fed-2026-06-10"},\n'
             '    {"item_type":"tweet","author":"@handle","text":"原文","source":"web_search","tier":"E","published_at":"","relevance":"sentiment signal"},\n'
             '    {"item_type":"search_snippet","title":"标题","summary":"snippet","source":"web_search","tier":"C","published_at":"","relevance":"context"}\n'
             "  ]\n"
             "}\n"
-            "Minimum information density:\n"
-            "- metadata.key_claims: 3-5 data-backed claims, each with source and tier.\n"
-            "- metadata.source_notes: at least 3 source notes when any source/data was available.\n"
-            "- layers: at least 4 layers (summary/evidence/analysis/gaps), each with summary plus at least 3 items.\n"
-            "- layers[evidence].items: at least 5 items when data was available.\n"
-            "- raw_items: at least 5 entries covering sources used; data_point must have value; all entries must have relevance.\n"
-            "- If data was unavailable, fill gaps with the exact missing data and explain what could not be expanded.\n"
-            "The visible narrative must be short. Put the deeper support in layers/raw_items."
+            "Information density by level (L0-L3, from surface to raw):\n"
+            "  L3 — Overview (narrative + key_claims): 2-4 sentence narrative, 3-5 sourced claims with source+tier.\n"
+            "  L2 — Analysis (layers/sections): at least 4 layers (summary/analysis/gaps), each with summary plus at least 3 items.\n"
+            "       source_notes: at least 3 covering used resources.\n"
+            "  L1 — Evidence (evidence[]): at least 5 rows when data available, each with claim/support/source/source_tier/freshness.\n"
+            "  L0 — Raw data (raw_items[]): at least 5 entries covering sources; data_point must have value; all entries must have relevance and a populated url field (clickable link).\n"
+            "Optional: tag key_claims, evidence rows, and layer items with a `rubric` field "
+            "(dimension name matching Brain analysis rubrics) for cross-referencing.\n"
+            "The visible L3 narrative must be short. Put deeper support in L2-L0 layers."
         )
 
         messages: list[dict] = [{"role": "user", "content": "\n".join(user_parts)}]
@@ -250,6 +253,7 @@ class BaseHand:
                             "url": url,
                             "fetched_at": _dt.datetime.utcnow().isoformat() + "Z",
                             "content_type": "html",
+                            "summary": BaseHand._summarize_raw(content),
                             "raw": content,
                         })
                         tool_results.append({
@@ -270,9 +274,32 @@ class BaseHand:
                 if tool_results:
                     messages.append({"role": "user", "content": tool_results})
 
+        # Capture web_search queries by companion fetch to preserve source metadata
+        import datetime as _dt2
+        seen_queries = set()
+        for msg in messages:
+            content = msg.get("content") if isinstance(msg, dict) else []
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "web_search":
+                        q = (block.get("input") or {}).get("query", "")
+                        if q and q not in seen_queries:
+                            seen_queries.add(q)
+                            search_url = f"https://www.google.com/search?q={urllib.parse.quote(q)}"
+                            search_content = await _fetch_url(search_url)
+                            raw_sources.append({
+                                "resource_id": "web_search",
+                                "url": search_url,
+                                "query": q,
+                                "fetched_at": _dt2.datetime.utcnow().isoformat() + "Z",
+                                "content_type": "search_results",
+                                "summary": BaseHand._summarize_raw(search_content),
+                                "raw": search_content,
+                            })
+
         artifact = self._parse_artifact(final_text)
         artifact["raw_sources"] = raw_sources
-        density_gaps = self._artifact_density_gaps(artifact, used, shown)
+        density_gaps = self._artifact_density_gaps(artifact, used, shown, depth=depth)
         if density_gaps:
             artifact = await self._repair_low_density_artifact(
                 client=client,
@@ -285,7 +312,7 @@ class BaseHand:
                 used_resources=used,
                 shown_resources=shown,
             )
-            density_gaps = self._artifact_density_gaps(artifact, used, shown)
+            density_gaps = self._artifact_density_gaps(artifact, used, shown, depth=depth)
             if density_gaps:
                 artifact.setdefault("metadata", {}).setdefault("gaps", [])
                 artifact["metadata"]["gaps"].extend(density_gaps)
@@ -315,8 +342,11 @@ class BaseHand:
             f"Density gaps to fix: {json.dumps(density_gaps, ensure_ascii=False)}\n"
             f"Resources shown: {json.dumps(shown_resources, ensure_ascii=False)}\n"
             f"Resources used: {json.dumps(used_resources, ensure_ascii=False)}\n"
-            "Required minimums: 3-5 metadata.key_claims, at least 4 sections, at least 3 bullets per section, "
-            "at least 5 evidence rows when data was available, and source_notes covering used resources.\n"
+            "L0-L3 density targets:\n"
+            "  L3: 3-5 key_claims, narrative of 2+ sentences\n"
+            "  L2: at least 4 sections, at least 3 bullets per section, source_notes covering used resources\n"
+            "  L1: at least 5 evidence rows when data was available\n"
+            "  L0: at least 5 raw_items when data was available\n"
             "Keep narrative short for the visible card. Put expansion material in sections/evidence/source_notes.\n"
             "Return ONLY the corrected JSON object."
         )
@@ -345,35 +375,55 @@ class BaseHand:
         return artifact
 
     @staticmethod
-    def _artifact_density_gaps(artifact: dict, used_resources: list[str], shown_resources: list[str]) -> list[str]:
+    def _artifact_density_gaps(artifact: dict, used_resources: list[str], shown_resources: list[str], depth: str = "normal") -> list[str]:
         gaps: list[str] = []
         meta = artifact.get("metadata", {}) if isinstance(artifact, dict) else {}
         sections = artifact.get("sections", []) if isinstance(artifact, dict) else []
         evidence = artifact.get("evidence", []) if isinstance(artifact, dict) else []
 
+        # Depth-aware thresholds
+        _thresh = {"deep": {"claims": 5, "sections": 6, "bullets": 4, "evidence": 8, "raw_items": 10, "source_notes": 4},
+                   "normal": {"claims": 3, "sections": 4, "bullets": 3, "evidence": 5, "raw_items": 5, "source_notes": 3},
+                   "light":  {"claims": 2, "sections": 3, "bullets": 2, "evidence": 3, "raw_items": 3, "source_notes": 2}}
+        t = _thresh.get(depth, _thresh["normal"])
+
+        # L3: Overview density (narrative + key_claims)
         claims = meta.get("key_claims", []) or []
-        if len(claims) < 3:
-            gaps.append("Artifact density low: fewer than 3 key_claims returned")
+        if len(claims) < t["claims"]:
+            gaps.append(f"L3 density low: fewer than {t['claims']} key_claims")
         else:
             unsourced = [str(i) for i, c in enumerate(claims) if isinstance(c, dict) and not c.get("source")]
             if unsourced:
-                gaps.append(f"Artifact quality: key_claims [{','.join(unsourced[:3])}] missing source annotation")
-        if shown_resources and used_resources and len(meta.get("source_notes", []) or []) < min(3, len(used_resources)):
-            gaps.append("Artifact density low: source_notes did not cover used resources")
-        if len(sections or []) < 4:
-            gaps.append("Artifact density low: fewer than 4 drill-down sections returned")
+                gaps.append(f"L3 quality: key_claims [{','.join(unsourced[:3])}] missing source annotation")
+        if not artifact.get("narrative"):
+            gaps.append("L3 density low: narrative is missing")
+
+        # L2: Analysis density (sections + source_notes)
+        if shown_resources and used_resources and len(meta.get("source_notes", []) or []) < min(t["source_notes"], len(used_resources)):
+            gaps.append("L2 density low: source_notes did not cover used resources")
+        if len(sections or []) < t["sections"]:
+            gaps.append(f"L2 density low: fewer than {t['sections']} drill-down sections")
         else:
             sparse = [
                 str(sec.get("id") or sec.get("title") or idx)
                 for idx, sec in enumerate(sections)
-                if isinstance(sec, dict) and len(sec.get("bullets", []) or []) < 3
+                if isinstance(sec, dict) and len(sec.get("bullets", []) or []) < t["bullets"]
             ]
             if sparse:
-                gaps.append("Artifact density low: sparse section bullets in " + ", ".join(sparse[:4]))
-        if used_resources and len(evidence or []) < 5:
-            gaps.append("Artifact density low: fewer than 5 evidence rows returned despite resource usage")
-        if used_resources and len(artifact.get("raw_items", []) or []) < 5:
-            gaps.append("raw_items density low: fewer than 5 annotated raw items despite resource usage")
+                gaps.append(f"L2 density low: sparse section bullets (min {t['bullets']} each) in " + ", ".join(sparse[:4]))
+
+        # L1: Evidence density
+        if used_resources and len(evidence or []) < t["evidence"]:
+            gaps.append(f"L1 density low: fewer than {t['evidence']} evidence rows despite resource usage")
+
+        # L0: Raw data density
+        raw_items = artifact.get("raw_items", []) or []
+        if used_resources and len(raw_items) < t["raw_items"]:
+            gaps.append(f"L0 density low: fewer than {t['raw_items']} annotated raw items despite resource usage")
+        elif raw_items:
+            urlless = [i for i in raw_items if not i.get("url")]
+            if len(urlless) / len(raw_items) > 0.5:
+                gaps.append("L0 quality: more than 50% of raw_items missing url field")
         return gaps
 
     @staticmethod
@@ -384,15 +434,20 @@ class BaseHand:
         sections = artifact.get("sections", []) if isinstance(artifact.get("sections", []), list) else []
         evidence = artifact.get("evidence", []) if isinstance(artifact.get("evidence", []), list) else []
         claims = meta.get("key_claims", []) or []
-        score = min(len(claims), 3)
-        score += 1 if any(isinstance(c, dict) and c.get("source") for c in claims) else 0
+        # L3: narrative + claims
+        score = (3 if artifact.get("narrative") else 0)
+        score += min(len(claims), 5) * 2
+        # L2: sections weighted highest (carry analytical value)
+        score += min(len(sections), 6) * 3
         score += min(len(meta.get("source_notes", []) or []), 3)
-        score += min(len(sections), 4)
         score += min(
             sum(len(sec.get("bullets", []) or []) for sec in sections if isinstance(sec, dict)),
             12,
         )
-        score += min(len(evidence), 5)
+        # L1: evidence
+        score += min(len(evidence), 8) * 2
+        # L0: raw_items bonus
+        score += min(len(artifact.get("raw_items", []) or []), 8)
         return score
 
     @staticmethod

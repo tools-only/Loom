@@ -2,15 +2,23 @@
 (function () {
   'use strict';
 
-  // ── Density level system ──────────────────────────────────────────────
-  var DENSITY_LEVELS = {
-    L0: ['raw_source', 'raw_item'],
-    L1: ['summary', 'evidence', 'analysis', 'gaps'],
-    L2: ['state_engine'],
+  // ── Density category system (semantic, no L-prefix) ─────────────────────
+  var DENSITY_CATEGORIES = {
+    analysis: { label: '分析', types: ['summary', 'analysis', 'gaps'], defaultOn: true },
+    evidence: { label: '证据', types: ['evidence'], defaultOn: true },
+    raw:      { label: '原始', types: ['raw_source', 'raw_item'], defaultOn: false },
   };
 
   var _density = {
-    level: (typeof localStorage !== 'undefined' && localStorage.getItem('loom.density.level')) || 'L1',
+    activeCategories: (function () {
+      try {
+        var saved = typeof localStorage !== 'undefined' && localStorage.getItem('loom.density.categories');
+        if (saved) return JSON.parse(saved);
+      } catch (_) {}
+      var def = {};
+      for (var k in DENSITY_CATEGORIES) def[k] = DENSITY_CATEGORIES[k].defaultOn;
+      return def;
+    })(),
     overrides: JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem('loom.density.overrides')) || '{}'),
     customLayers: JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem('loom.density.custom_layers')) || '[]'),
   };
@@ -23,11 +31,13 @@
         if (typeof localStorage !== 'undefined') localStorage.setItem('loom.density.custom_layers', JSON.stringify(_density.customLayers));
       }
     },
-    setLevel: function (level) {
-      _density.level = level;
-      if (typeof localStorage !== 'undefined') localStorage.setItem('loom.density.level', level);
+    toggleCategory: function (name) {
+      if (name in DENSITY_CATEGORIES) {
+        _density.activeCategories[name] = !_density.activeCategories[name];
+        if (typeof localStorage !== 'undefined') localStorage.setItem('loom.density.categories', JSON.stringify(_density.activeCategories));
+      }
     },
-    toggle: function (layer_type, visible) {
+    toggleOverride: function (layer_type, visible) {
       _density.overrides[layer_type] = visible;
       if (typeof localStorage !== 'undefined') localStorage.setItem('loom.density.overrides', JSON.stringify(_density.overrides));
     },
@@ -36,11 +46,15 @@
       if (layer_type in _density.overrides) return _density.overrides[layer_type];
       var custom = _density.customLayers.find(function (l) { return l.layer_type === layer_type; });
       if (custom) {
-        var customPreset = DENSITY_LEVELS[custom.default_level] || [];
-        return customPreset.indexOf(layer_type) !== -1;
+        var cat = custom.default_category || 'analysis';
+        return _density.activeCategories[cat] === true;
       }
-      var preset = DENSITY_LEVELS[_density.level] || DENSITY_LEVELS['L1'];
-      return preset.indexOf(layer_type) !== -1;
+      for (var name in DENSITY_CATEGORIES) {
+        if (DENSITY_CATEGORIES[name].types.indexOf(layer_type) !== -1) {
+          return _density.activeCategories[name] === true;
+        }
+      }
+      return true;
     },
   };
   if (typeof window !== 'undefined') window.LoomDensity = LoomDensity;
@@ -53,12 +67,16 @@
   var bodyEl = null;
   var rootEl = null;
   var options = {
-    clickToOpen: true,
+    clickToOpen: false,
     hoverToOpen: true,
-    hoverDelay: 650
+    requireCtrlForHover: true,
+    hoverDelay: 180
   };
   var hoverTimer = null;
   var hoverTarget = null;
+  var activeTarget = null;
+  var closeTimer = null;
+  var dockRaf = null;
 
   var INTERACTIVE_SELECTOR = [
     'a', 'button', 'input', 'textarea', 'select', 'summary',
@@ -103,85 +121,32 @@
     var bar = document.createElement('div');
     bar.className = 'loom-density-bar';
     bar.style.cssText = (
-      'display:flex;align-items:center;gap:6px;padding:8px 16px;' +
-      'border-bottom:1px solid var(--border,#e8e6f0);flex-wrap:wrap;background:var(--surface,#fff)'
+      'display:flex;align-items:center;gap:7px;padding:10px 18px 4px;' +
+      'flex-wrap:wrap;background:transparent'
     );
 
-    ['L0', 'L1', 'L2'].forEach(function (lvl) {
+    Object.keys(DENSITY_CATEGORIES).forEach(function (name) {
+      var cat = DENSITY_CATEGORIES[name];
+      var active = _density.activeCategories[name] === true;
       var btn = document.createElement('button');
-      btn.textContent = lvl;
+      btn.textContent = cat.label;
       btn.type = 'button';
       btn.style.cssText = (
-        'padding:3px 10px;border-radius:999px;border:1.5px solid #e8e6f0;' +
-        'font-size:11px;font-weight:700;cursor:pointer;' +
-        'background:' + (_density.level === lvl ? '#7A5AF8' : 'transparent') + ';' +
-        'color:' + (_density.level === lvl ? '#fff' : '#6b7280')
+        'padding:5px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.48);' +
+        'font-size:11px;font-weight:750;cursor:pointer;backdrop-filter:blur(14px);' +
+        'background:' + (active ? 'rgba(122,90,248,.24)' : 'rgba(255,255,255,.22)') + ';' +
+        'color:' + (active ? 'var(--accent-iris,#6f4ef6)' : 'var(--fg-2,#555)')
       );
-      btn.addEventListener('click', function () {
-        LoomDensity.setLevel(lvl);
+      function selectCategory() {
+        if (_density.activeCategories[name] === true) return;
+        LoomDensity.toggleCategory(name);
         _renderDensityBar(overlayEl);
         _filterSectionsByDensity(overlayEl);
-      });
+      }
+      btn.addEventListener('mouseenter', selectCategory);
+      btn.addEventListener('focus', selectCategory);
       bar.appendChild(btn);
     });
-
-    var sep = document.createElement('span');
-    sep.style.cssText = 'width:1px;height:16px;background:#e8e6f0;margin:0 4px;flex-shrink:0';
-    bar.appendChild(sep);
-
-    var allTypes = Object.keys(DENSITY_LEVELS).reduce(function (a, k) {
-      return a.concat(DENSITY_LEVELS[k].filter(function (t) { return a.indexOf(t) === -1; }));
-    }, []);
-    _density.customLayers.forEach(function (cl) {
-      if (allTypes.indexOf(cl.layer_type) === -1) allTypes.push(cl.layer_type);
-    });
-    var LABELS = {
-      raw_source: '原始数据', raw_item: '媒体/推文',
-      summary: 'Hand 归纳', evidence: '证据行',
-      analysis: '深度分析', gaps: '数据缺口',
-      state_engine: 'Brain 分析',
-    };
-
-    var customPanel = document.createElement('div');
-    customPanel.style.cssText = (
-      'display:none;position:absolute;background:#fff;border:1px solid #e8e6f0;' +
-      'border-radius:10px;padding:12px;box-shadow:0 4px 16px rgba(80,60,160,.10);' +
-      'z-index:100;min-width:190px;top:100%;left:0;margin-top:4px;' +
-      'flex-direction:column;gap:8px'
-    );
-    allTypes.forEach(function (lt) {
-      var row = document.createElement('label');
-      row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer';
-      var cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = LoomDensity.isVisible(lt);
-      cb.addEventListener('change', function () {
-        LoomDensity.toggle(lt, cb.checked);
-        _filterSectionsByDensity(overlayEl);
-      });
-      row.appendChild(cb);
-      row.appendChild(document.createTextNode(LABELS[lt] || lt));
-      customPanel.appendChild(row);
-    });
-
-    var customBtn = document.createElement('button');
-    customBtn.textContent = '自定义 ▾';
-    customBtn.type = 'button';
-    customBtn.style.cssText = (
-      'padding:3px 10px;border-radius:999px;border:1.5px solid #e8e6f0;' +
-      'font-size:11px;font-weight:600;cursor:pointer;background:transparent;color:#6b7280'
-    );
-    customBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      customPanel.style.display = customPanel.style.display === 'none' ? 'flex' : 'none';
-    });
-    document.addEventListener('click', function () { customPanel.style.display = 'none'; }, { once: true });
-
-    var wrap = document.createElement('div');
-    wrap.style.cssText = 'position:relative';
-    wrap.appendChild(customBtn);
-    wrap.appendChild(customPanel);
-    bar.appendChild(wrap);
 
     var header = overlayEl.querySelector('.loom-detail-header');
     if (header && header.nextSibling) {
@@ -195,6 +160,7 @@
     config = config || {};
     options.clickToOpen = config.clickToOpen !== undefined ? !!config.clickToOpen : options.clickToOpen;
     options.hoverToOpen = config.hoverToOpen !== undefined ? !!config.hoverToOpen : options.hoverToOpen;
+    options.requireCtrlForHover = config.requireCtrlForHover !== undefined ? !!config.requireCtrlForHover : options.requireCtrlForHover;
     options.hoverDelay = Number(config.hoverDelay || options.hoverDelay);
     rootEl = config.root || rootEl || document;
 
@@ -217,7 +183,7 @@
     });
 
     root.addEventListener('mouseover', function (event) {
-      if (!options.hoverToOpen || shouldIgnore(event)) return;
+      if (!canHoverOpen(event) || shouldIgnore(event)) return;
       var target = findDetailTarget(event.target);
       if (!target || target.contains(event.relatedTarget)) return;
       clearHover();
@@ -233,6 +199,19 @@
       if (!target || target.contains(event.relatedTarget)) return;
       target.classList.remove('loom-detail-hover');
       clearHover();
+      scheduleClose();
+    });
+
+    root.addEventListener('mousemove', function (event) {
+      if (!canHoverOpen(event) || shouldIgnore(event)) return;
+      var target = findDetailTarget(event.target);
+      if (!target || hoverTarget === target || activeTarget === target) return;
+      clearHover();
+      hoverTarget = target;
+      target.classList.add('loom-detail-hover');
+      hoverTimer = window.setTimeout(function () {
+        if (hoverTarget === target && canHoverOpen(event)) open(target);
+      }, options.hoverDelay);
     });
 
     if (window.MutationObserver) {
@@ -253,7 +232,7 @@
     var candidates = [];
     if (root.nodeType === 1 && isDetailTarget(root)) candidates.push(root);
     if (root.querySelectorAll) {
-      root.querySelectorAll('[data-detail-root], [data-has-detail="true"], aside.anc-detail, .blog-card, .anc-section--gc').forEach(function (el) {
+      root.querySelectorAll('[data-detail-root], [data-has-detail="true"], aside.anc-detail').forEach(function (el) {
         if (overlay && overlay.contains(el)) return;
         var target = el.matches('aside.anc-detail') ? el.closest('[data-anc], [data-detail-root]') : el;
         if (target && candidates.indexOf(target) === -1 && isDetailTarget(target)) candidates.push(target);
@@ -274,7 +253,6 @@
       '      <h2 id="loom-detail-title" class="loom-detail-title"></h2>',
       '      <div class="loom-detail-subtitle"></div>',
       '    </div>',
-      '    <button class="loom-detail-close" type="button" aria-label="Close detail"><i class="ph-bold ph-x"></i></button>',
       '  </header>',
       '  <div class="loom-detail-pills"></div>',
       '  <nav class="loom-detail-tabs" role="tablist"></nav>',
@@ -289,10 +267,29 @@
     tabsEl = overlay.querySelector('.loom-detail-tabs');
     bodyEl = overlay.querySelector('.loom-detail-body');
 
-    overlay.querySelector('.loom-detail-backdrop').addEventListener('click', close);
-    overlay.querySelector('.loom-detail-close').addEventListener('click', close);
+    var card = overlay.querySelector('.loom-detail-card');
+    card.addEventListener('mouseenter', cancelClose);
+    card.addEventListener('mouseleave', function () {
+      resetDockTabs();
+      scheduleClose();
+    });
+    document.addEventListener('mousemove', function (event) {
+      if (!overlay.classList.contains('loom-detail--open')) return;
+      if (options.requireCtrlForHover && !event.ctrlKey) {
+        close();
+        return;
+      }
+      if (isPointerInActiveArea(event)) {
+        cancelClose();
+      } else {
+        scheduleClose();
+      }
+    });
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape' && overlay.classList.contains('loom-detail--open')) close();
+    });
+    document.addEventListener('keyup', function (event) {
+      if (event.key === 'Control' && overlay.classList.contains('loom-detail--open')) close();
     });
   }
 
@@ -302,9 +299,12 @@
     if (!target) return false;
 
     clearHover();
+    cancelClose();
+    activeTarget = target;
     renderTarget(target, targetOrId);
     _renderDensityBar(overlay);
     _filterSectionsByDensity(overlay);
+    centerCard();
     requestAnimationFrame(function () {
       overlay.classList.add('loom-detail--open');
     });
@@ -314,6 +314,8 @@
   function close() {
     if (!overlay) return;
     overlay.classList.remove('loom-detail--open');
+    activeTarget = null;
+    cancelClose();
   }
 
   function renderTarget(target, fallbackId) {
@@ -326,6 +328,7 @@
 
     var pillRow = target.querySelector('.anc-pill-row, .blog-card-tags');
     pillsEl.innerHTML = pillRow ? pillRow.innerHTML : '';
+    pillsEl.insertAdjacentHTML('beforeend', renderAgentBadge(target));
 
     var sections = collectSections(target);
     if (!sections.length) {
@@ -354,6 +357,10 @@
       if (sections.some(function (item) { return item.source === section; })) return;
       sections.push(sectionFromElement(section));
     });
+
+    if (!sections.some(function (item) { return item.id === 'agents'; })) {
+      sections.push(ensureAgentSection(target, sections));
+    }
 
     if (!sections.length) {
       sections.push({ id: 'detail', label: 'Detail', html: aside.innerHTML, source: aside });
@@ -389,9 +396,66 @@
       sections.push({ id: 'support', label: 'Supporting Data', html: support });
     }
 
+    sections.push(ensureAgentSection(target, sections));
+
     var clone = cloneSummary(target);
     sections.push({ id: 'full', label: 'Full Section', html: clone.innerHTML });
     return sections;
+  }
+
+  function inferAgentMeta(target) {
+    var anchor = target.getAttribute('data-anc') || target.getAttribute('data-detail-root') || '';
+    var domain = target.getAttribute('data-agent-domain') || anchor.split('.')[0] || 'workspace';
+    var hand = target.getAttribute('data-agent-hand') || (domain && domain !== 'card' ? domain : 'loom-renderer');
+    var executor = target.getAttribute('data-agent-executor') || hand;
+    var role = target.getAttribute('data-agent-role') || '';
+    var kind = target.getAttribute('data-agent-kind') || '';
+    var roles = {
+      market: 'Tracks market regime, macro signals, risk catalysts, and source-backed evidence.',
+      position: 'Reviews portfolio exposure, concentration, P/L drivers, and position-level risk.',
+      target: 'Assesses target-specific thesis, catalysts, triggers, and invalidation conditions.',
+      sentiment: 'Reads sentiment, crowding, positioning tone, and contrarian risk.',
+      'loom-renderer': 'Renders this card and exposes available detail layers for review.'
+    };
+    return {
+      hand: hand,
+      executor: executor,
+      domain: domain,
+      kind: kind,
+      role: role || roles[hand] || roles[domain] || roles['loom-renderer']
+    };
+  }
+
+  function ensureAgentSection(target, sections) {
+    var meta = inferAgentMeta(target);
+    var bits = [meta.executor, meta.domain, meta.kind].filter(Boolean).map(escapeHtml).join(' / ');
+    var html = [
+      '<h3>Hand Agent</h3>',
+      '<p>Current card processing hand agent and its compact responsibility.</p>',
+      '<ul class="anc-source-list">',
+      '<li>',
+      '<strong>' + escapeHtml(meta.hand) + '</strong>',
+      bits ? '<small>' + bits + '</small>' : '',
+      '<p>' + escapeHtml(meta.role) + '</p>',
+      '</li>',
+      '</ul>'
+    ].join('');
+    return {
+      id: 'agents',
+      label: 'Hand Agent',
+      html: html,
+      layerType: ''
+    };
+  }
+
+  function renderAgentBadge(target) {
+    var meta = inferAgentMeta(target);
+    var bits = [meta.executor, meta.domain, meta.kind].filter(Boolean).join(' / ');
+    return [
+      '<span class="anc-tier-pill anc-tier-pill--b">Hand Agent: ' + escapeHtml(meta.hand) + '</span>',
+      '<span class="anc-tier-pill anc-tier-pill--c">' + escapeHtml(bits || meta.domain) + '</span>',
+      meta.role ? '<span class="anc-tier-pill anc-tier-pill--c">' + escapeHtml(meta.role) + '</span>' : ''
+    ].join('');
   }
 
   function sectionFromElement(section, fallbackLabel) {
@@ -413,6 +477,10 @@
     tab.textContent = label;
     if (layerType) tab.setAttribute('data-layer-type', layerType);
     tab.addEventListener('click', function () { activateTab(id); });
+    tab.addEventListener('mouseenter', function () { activateTab(id); });
+    tab.addEventListener('focus', function () { activateTab(id); });
+    tab.addEventListener('mousemove', updateDockTabs);
+    tab.addEventListener('mouseleave', resetDockTabs);
     tabsEl.appendChild(tab);
 
     var panel = document.createElement('section');
@@ -456,10 +524,9 @@
 
   function isDetailTarget(el) {
     if (!el || el.nodeType !== 1) return false;
+    if (el.closest('[data-detail-disabled="true"], .portfolio-hub')) return false;
     return el.hasAttribute('data-detail-root') ||
       el.getAttribute('data-has-detail') === 'true' ||
-      el.classList.contains('blog-card') ||
-      el.classList.contains('anc-section--gc') ||
       !!el.querySelector('aside.anc-detail');
   }
 
@@ -492,6 +559,83 @@
     hoverTarget = null;
   }
 
+  function canHoverOpen(event) {
+    if (!options.hoverToOpen) return false;
+    return !options.requireCtrlForHover || !!(event && event.ctrlKey);
+  }
+
+  function cancelClose() {
+    if (closeTimer) window.clearTimeout(closeTimer);
+    closeTimer = null;
+  }
+
+  function scheduleClose() {
+    cancelClose();
+    closeTimer = window.setTimeout(function () {
+      if (!overlay || !overlay.classList.contains('loom-detail--open')) return;
+      close();
+    }, 360);
+  }
+
+  function isPointerInActiveArea(event) {
+    if (!event || !event.target) return false;
+    var card = overlay && overlay.querySelector('.loom-detail-card');
+    if (card && card.contains(event.target)) return true;
+    return !!(activeTarget && activeTarget.contains && activeTarget.contains(event.target));
+  }
+
+  function centerCard() {
+    var card = overlay && overlay.querySelector('.loom-detail-card');
+    if (!card) return;
+    var vw = window.innerWidth || document.documentElement.clientWidth || 1200;
+    var vh = window.innerHeight || document.documentElement.clientHeight || 800;
+    var cardW = Math.min(920, Math.max(320, vw * 0.62));
+    var cardH = Math.min(760, Math.max(360, vh * 0.78));
+    var gutter = 18;
+    var finalW = Math.min(cardW, vw - gutter * 2);
+    var finalH = Math.min(cardH, vh - gutter * 2);
+    var x = Math.max(gutter, (vw - finalW) / 2);
+    var y = Math.max(gutter, (vh - finalH) / 2);
+    overlay.style.setProperty('--loom-detail-x', Math.round(x) + 'px');
+    overlay.style.setProperty('--loom-detail-y', Math.round(y) + 'px');
+    overlay.style.setProperty('--loom-detail-w', Math.round(finalW) + 'px');
+    overlay.style.setProperty('--loom-detail-max-h', Math.round(finalH) + 'px');
+  }
+
+  function updateDockTabs(event) {
+    if (!tabsEl) return;
+    var x = event.clientX;
+    if (dockRaf) window.cancelAnimationFrame(dockRaf);
+    dockRaf = window.requestAnimationFrame(function () {
+      dockRaf = null;
+      tabsEl.querySelectorAll('.loom-detail-tab').forEach(function (tab) {
+        var rect = tab.getBoundingClientRect();
+        var center = rect.left + rect.width / 2;
+        var distance = Math.abs(x - center);
+        var influence = Math.max(0, 1 - distance / 150);
+        var scale = 1 + influence * 0.22;
+        var lift = influence * -5;
+        var glow = influence * 0.18;
+        tab.style.setProperty('--dock-scale', scale.toFixed(3));
+        tab.style.setProperty('--dock-lift', lift.toFixed(1) + 'px');
+        tab.style.setProperty('--dock-glow', glow.toFixed(3));
+      });
+    });
+  }
+
+  function resetDockTabs() {
+    if (!tabsEl) return;
+    if (dockRaf) {
+      window.cancelAnimationFrame(dockRaf);
+      dockRaf = null;
+    }
+    tabsEl.querySelectorAll('.loom-detail-tab').forEach(function (tab) {
+      tab.style.removeProperty('--dock-scale');
+      tab.style.removeProperty('--dock-lift');
+      tab.style.removeProperty('--dock-glow');
+    });
+  }
+
   function getTitle(target) {
     var explicit = target.getAttribute('data-detail-title');
     if (explicit) return explicit;
@@ -522,6 +666,6 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     var isCanvas = !!document.getElementById('canvas-stage');
-    init({ root: document, clickToOpen: !isCanvas, hoverToOpen: true });
+    init({ root: document, clickToOpen: false, hoverToOpen: true, requireCtrlForHover: true });
   });
 })();

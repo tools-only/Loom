@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loom Rollout Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+  :root {
+    --bg: #f5f1ea;
+    --panel: rgba(255, 255, 255, 0.86);
+    --panel-strong: #ffffff;
+    --ink: #12131a;
+    --muted: #5f6472;
+    --line: rgba(18, 19, 26, 0.1);
+    --line-strong: rgba(18, 19, 26, 0.18);
+    --violet: #7557ff;
+    --violet-soft: rgba(117, 87, 255, 0.12);
+    --cyan: #1596d6;
+    --cyan-soft: rgba(21, 150, 214, 0.12);
+    --mint: #11966f;
+    --mint-soft: rgba(17, 150, 111, 0.12);
+    --amber: #c88511;
+    --amber-soft: rgba(200, 133, 17, 0.12);
+    --rose: #d45278;
+    --rose-soft: rgba(212, 82, 120, 0.12);
+    --shadow: 0 20px 60px rgba(26, 29, 37, 0.08);
+    --radius-xl: 28px;
+    --radius-lg: 20px;
+    --radius-md: 14px;
+    --font-body: "Plus Jakarta Sans", system-ui, sans-serif;
+    --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    color: var(--ink);
+    background:
+      radial-gradient(circle at top left, rgba(117, 87, 255, 0.08), transparent 28%),
+      radial-gradient(circle at top right, rgba(21, 150, 214, 0.09), transparent 26%),
+      linear-gradient(180deg, #f7f3ec 0%, #f1ece3 100%);
+    line-height: 1.6;
+  }
+
+  .page {
+    width: min(1220px, calc(100% - 40px));
+    margin: 0 auto;
+    padding: 40px 0 80px;
+  }
+
+  .section {
+    margin-top: 28px;
+    background: var(--panel);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(16px);
+  }
+
+  .section-inner {
+    padding: 28px;
+  }
+
+  .eyebrow,
+  .chip,
+  .mini-label,
+  code {
+    font-family: var(--font-mono);
+  }
+
+  .hero {
+    position: relative;
+    overflow: hidden;
+    padding: 34px;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.78), rgba(255,255,255,0.64)),
+      linear-gradient(130deg, rgba(117, 87, 255, 0.13), rgba(21, 150, 214, 0.11));
+  }
+
+  .hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(18, 19, 26, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(18, 19, 26, 0.04) 1px, transparent 1px);
+    background-size: 26px 26px;
+    pointer-events: none;
+    mask-image: linear-gradient(180deg, rgba(0,0,0,0.45), transparent);
+  }
+
+  .hero-grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+    gap: 22px;
+    align-items: stretch;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--violet);
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(117, 87, 255, 0.16);
+    border-radius: 999px;
+    padding: 8px 12px;
+    margin-bottom: 18px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: clamp(34px, 5vw, 62px);
+    line-height: 0.96;
+    letter-spacing: 0;
+    max-width: 10.5em;
+  }
+
+  .hero-copy p {
+    margin-top: 18px;
+    max-width: 680px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  .hero-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .metric-card {
+    padding: 14px 14px 16px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.76);
+    border: 1px solid rgba(18, 19, 26, 0.08);
+    min-height: 118px;
+  }
+
+  .metric-card strong {
+    display: block;
+    font-size: 23px;
+    line-height: 1;
+    margin: 14px 0 8px;
+  }
+
+  .metric-card span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .metric-card i {
+    font-size: 18px;
+  }
+
+  .hero-aside {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .aside-panel {
+    flex: 1;
+    border-radius: 24px;
+    padding: 20px;
+    background: rgba(16, 18, 27, 0.92);
+    color: #f5f7fb;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .aside-panel h2 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    margin-bottom: 14px;
+  }
+
+  .status-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .status-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .status-item:first-child { border-top: none; padding-top: 0; }
+
+  .status-dot {
+    width: 12px;
+    height: 12px;
+    margin-top: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-dot.violet { background: var(--violet); }
+  .status-dot.cyan { background: var(--cyan); }
+  .status-dot.mint { background: var(--mint); }
+
+  .status-copy strong {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+
+  .status-copy span {
+    color: rgba(245, 247, 251, 0.68);
+    font-size: 12px;
+  }
+
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(18, 19, 26, 0.08);
+  }
+
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-end;
+    margin-bottom: 18px;
+  }
+
+  .section-head h2 {
+    font-family: var(--font-display);
+    font-size: 28px;
+    line-height: 1;
+  }
+
+  .section-head p {
+    max-width: 640px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .legend-pill {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    padding: 7px 11px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .legend-pill .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .swatch-violet { background: var(--violet); }
+  .swatch-cyan { background: var(--cyan); }
+  .swatch-mint { background: var(--mint); }
+  .swatch-amber { background: var(--amber); }
+  .swatch-rose { background: var(--rose); }
+
+  .system-map {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) 180px minmax(0, 1.1fr);
+    gap: 18px;
+    align-items: stretch;
+  }
+
+  .flow-lane,
+  .map-center {
+    border-radius: 24px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(18, 19, 26, 0.08);
+  }
+
+  .lane-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 16px;
+  }
+
+  .lane-header h3 {
+    font-family: var(--font-display);
+    font-size: 20px;
+  }
+
+  .lane-header span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .stack {
+    display: grid;
+    gap: 12px;
+  }
+
+  .flow-box {
+    position: relative;
+    padding: 14px 14px 14px 16px;
+    border-radius: 18px;
+    background: var(--panel-strong);
+    border: 1px solid var(--line);
+  }
+
+  .flow-box::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    border-radius: 18px 0 0 18px;
+  }
+
+  .flow-box.violet::before { background: var(--violet); }
+  .flow-box.cyan::before { background: var(--cyan); }
+  .flow-box.mint::before { background: var(--mint); }
+  .flow-box.amber::before { background: var(--amber); }
+  .flow-box.rose::before { background: var(--rose); }
+
+  .mini-label {
+    display: inline-block;
+    margin-bottom: 8px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .flow-box h4 {
+    font-size: 15px;
+    line-height: 1.25;
+    margin-bottom: 5px;
+  }
+
+  .flow-box p {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .arrow-rail {
+    position: relative;
+    display: flex;
+    justify-content: center;
+  }
+
+  .arrow-rail::before,
+  .arrow-rail::after {
+    content: "";
+    position: absolute;
+    width: 42px;
+    height: 2px;
+    background: var(--line-strong);
+    top: 50%;
+  }
+
+  .arrow-rail::before { left: -18px; }
+  .arrow-rail::after { right: -18px; }
+
+  .map-center {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 14px;
+    background:
+      linear-gradient(180deg, rgba(17, 150, 111, 0.07), rgba(117, 87, 255, 0.08)),
+      rgba(255,255,255,0.78);
+  }
+
+  .center-core {
+    width: 100%;
+    border-radius: 22px;
+    padding: 16px;
+    background: rgba(16, 18, 27, 0.95);
+    color: #f6f8fc;
+  }
+
+  .center-core strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 22px;
+    margin-bottom: 10px;
+  }
+
+  .center-core p {
+    font-size: 12px;
+    color: rgba(246, 248, 252, 0.72);
+  }
+
+  .core-list {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .core-pill {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px dashed rgba(18, 19, 26, 0.14);
+    background: rgba(255,255,255,0.88);
+  }
+
+  .core-pill strong {
+    display: block;
+    font-size: 13px;
+  }
+
+  .core-pill span {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .store-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .store-card {
+    padding: 18px;
+    border-radius: 22px;
+    background: rgba(255,255,255,0.88);
+    border: 1px solid var(--line);
+    display: grid;
+    gap: 12px;
+  }
+
+  .store-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .store-card h3 {
+    font-size: 17px;
+    line-height: 1.2;
+  }
+
+  .pill {
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pill.violet { background: var(--violet-soft); color: var(--violet); }
+  .pill.cyan { background: var(--cyan-soft); color: var(--cyan); }
+  .pill.mint { background: var(--mint-soft); color: var(--mint); }
+
+  .store-desc {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .kv {
+    display: grid;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .kv-row {
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    gap: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(18, 19, 26, 0.06);
+  }
+
+  .kv-row strong {
+    color: var(--ink);
+  }
+
+  code {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    color: var(--violet);
+    background: rgba(117, 87, 255, 0.08);
+  }
+
+  .paths-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .path-card {
+    padding: 22px;
+    border-radius: 24px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,0.84);
+  }
+
+  .path-card.violet {
+    box-shadow: inset 0 0 0 1px rgba(117, 87, 255, 0.08);
+  }
+
+  .path-card.cyan {
+    box-shadow: inset 0 0 0 1px rgba(21, 150, 214, 0.08);
+  }
+
+  .path-card header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .path-card h3 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    line-height: 1;
+  }
+
+  .path-card ul {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+  }
+
+  .path-card li {
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.74);
+    border: 1px solid rgba(18, 19, 26, 0.06);
+  }
+
+  .path-card li strong {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .path-card li span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .score-band {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .score {
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: rgba(16,18,27,0.94);
+    color: #f5f7fb;
+  }
+
+  .score strong {
+    display: block;
+    font-size: 12px;
+  }
+
+  .score span {
+    display: block;
+    margin-top: 6px;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .loop-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+    gap: 18px;
+  }
+
+  .loop-stack {
+    display: grid;
+    gap: 14px;
+  }
+
+  .loop-step {
+    position: relative;
+    padding: 16px 18px 16px 52px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.86);
+    border: 1px solid var(--line);
+  }
+
+  .loop-index {
+    position: absolute;
+    left: 16px;
+    top: 16px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(16,18,27,0.92);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .loop-step h3 {
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+
+  .loop-step p {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .loop-side {
+    border-radius: 24px;
+    padding: 20px;
+    background: rgba(16, 18, 27, 0.96);
+    color: #f5f7fb;
+  }
+
+  .loop-side h3 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    margin-bottom: 14px;
+  }
+
+  .loop-side ul {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+  }
+
+  .loop-side li {
+    padding: 12px 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .loop-side li:first-child { border-top: none; padding-top: 0; }
+
+  .loop-side strong {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 3px;
+  }
+
+  .loop-side span {
+    font-size: 12px;
+    color: rgba(245, 247, 251, 0.7);
+  }
+
+  .rail {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .rail-card {
+    min-height: 190px;
+    padding: 18px;
+    border-radius: 22px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,0.9);
+    display: grid;
+    align-content: start;
+    gap: 10px;
+  }
+
+  .rail-tag {
+    width: fit-content;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .rail-tag.done { background: var(--mint-soft); color: var(--mint); }
+  .rail-tag.now { background: var(--amber-soft); color: var(--amber); }
+  .rail-tag.next { background: var(--violet-soft); color: var(--violet); }
+  .rail-tag.later { background: var(--cyan-soft); color: var(--cyan); }
+
+  .rail-card h3 {
+    font-size: 17px;
+    line-height: 1.15;
+  }
+
+  .rail-card p {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .check-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .check-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.88);
+    border: 1px solid var(--line);
+  }
+
+  .check-item i {
+    font-size: 18px;
+    margin-top: 2px;
+    color: var(--violet);
+  }
+
+  .check-item strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 3px;
+  }
+
+  .check-item span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .footer-note {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 1080px) {
+    .hero-grid,
+    .system-map,
+    .loop-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .arrow-rail {
+      min-height: 80px;
+    }
+
+    .arrow-rail::before,
+    .arrow-rail::after {
+      width: 2px;
+      height: 34px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .arrow-rail::before {
+      top: -10px;
+    }
+
+    .arrow-rail::after {
+      top: auto;
+      bottom: -10px;
+    }
+
+    .store-grid,
+    .rail,
+    .check-grid,
+    .hero-metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 760px) {
+    .page {
+      width: min(100% - 24px, 1220px);
+      padding-top: 20px;
+    }
+
+    .hero,
+    .section-inner {
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 34px;
+    }
+
+    .hero-metrics,
+    .store-grid,
+    .paths-grid,
+    .score-band,
+    .rail,
+    .check-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .section-head {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .flow-box,
+    .path-card,
+    .store-card,
+    .rail-card,
+    .check-item {
+      border-radius: 18px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="section hero">
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <span class="eyebrow"><i class="ph-bold ph-cpu"></i> Loom rollout architecture / 2026-06-11</span>
+        <h1>把用户纠正、自动检测与学习更新收敛到同一条反馈闭环</h1>
+        <p>
+          这页不是单纯的数据字段清单，而是 Loom 如何把显式反馈、隐式纠正、共享存储、检测器和 learner
+          串成一张可落地的系统图。它既要能支撑工程实现，也要能在汇报里快速讲清楚这套机制为什么成立。
+        </p>
+        <div class="hero-metrics">
+          <div class="metric-card">
+            <i class="ph-bold ph-files"></i>
+            <strong>Shared Files</strong>
+            <span>所有路径最终写到统一 store，消费方按 source 加权，不按入口分叉。</span>
+          </div>
+          <div class="metric-card">
+            <i class="ph-bold ph-git-merge"></i>
+            <strong>Dual Paths</strong>
+            <span>UI 路径负责高精度，自动路径负责高覆盖，两条路在 detector 之前就对齐数据结构。</span>
+          </div>
+          <div class="metric-card">
+            <i class="ph-bold ph-arrow-arc-left"></i>
+            <strong>Closed Loop</strong>
+            <span>反馈被写回 learned notes、ranking、prompt policy，避免同类错误重复出现。</span>
+          </div>
+        </div>
+      </div>
+      <div class="hero-aside">
+        <div class="aside-panel">
+          <h2>What This Page Answers</h2>
+          <div class="status-list">
+            <div class="status-item">
+              <span class="status-dot violet"></span>
+              <div class="status-copy">
+                <strong>信号从哪里来</strong>
+                <span>显式点击与隐式纠正分别如何触发、记录与归档。</span>
+              </div>
+            </div>
+            <div class="status-item">
+              <span class="status-dot cyan"></span>
+              <div class="status-copy">
+                <strong>为什么必须共享 store</strong>
+                <span>让 learner、updater、resource ranking 不需要理解入口差异。</span>
+              </div>
+            </div>
+            <div class="status-item">
+              <span class="status-dot mint"></span>
+              <div class="status-copy">
+                <strong>如何 rollout</strong>
+                <span>哪些基础层已存在，哪些环节需要补齐，先后顺序是什么。</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="chip-row">
+          <span class="chip"><i class="ph ph-database"></i> append-only stores</span>
+          <span class="chip"><i class="ph ph-arrow-fat-lines-up"></i> source-weighted learning</span>
+          <span class="chip"><i class="ph ph-timer"></i> scheduled detector scan</span>
+          <span class="chip"><i class="ph ph-stack"></i> implementation-first narrative</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner">
+      <div class="section-head">
+        <div>
+          <h2>System Map</h2>
+          <p>这一屏只讲一件事：两条采集路径如何汇合到同一套共享数据层，再被 detector 和 learner 消费，最后反向改进 hand 行为。</p>
+        </div>
+        <div class="legend">
+          <span class="legend-pill"><span class="swatch swatch-violet"></span> UI path</span>
+          <span class="legend-pill"><span class="swatch swatch-cyan"></span> Auto path</span>
+          <span class="legend-pill"><span class="swatch swatch-mint"></span> Shared stores</span>
+          <span class="legend-pill"><span class="swatch swatch-amber"></span> Learning outputs</span>
+          <span class="legend-pill"><span class="swatch swatch-rose"></span> Detector logic</span>
+        </div>
+      </div>
+      <div class="system-map">
+        <div class="flow-lane">
+          <div class="lane-header">
+            <h3>Path A / Explicit UI Feedback</h3>
+            <span>precision-first</span>
+          </div>
+          <div class="stack">
+            <div class="flow-box violet">
+              <span class="mini-label">trigger</span>
+              <h4>Thumbs up/down, correction click, structured feedback input</h4>
+              <p>来自 Loom webview 的用户主动操作，语义明确，精度高，但覆盖很低。</p>
+            </div>
+            <div class="flow-box amber">
+              <span class="mini-label">transport</span>
+              <h4><code>POST /feedback</code></h4>
+              <p>前端只负责发结构化事件，不在入口层做学习逻辑。</p>
+            </div>
+            <div class="flow-box mint">
+              <span class="mini-label">write</span>
+              <h4><code>feedback.jsonl</code></h4>
+              <p>source 标明为 UI feedback，后续消费者统一读取，不关心入口组件。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="arrow-rail">
+          <div class="map-center">
+            <div class="center-core">
+              <strong>Shared Store Layer</strong>
+              <p>所有下游组件围绕统一事件格式工作。入口不同，但读路径一致，source 只用于置信度和权重分层。</p>
+            </div>
+            <div class="core-list">
+              <div class="core-pill">
+                <strong><code>feedback.jsonl</code></strong>
+                <span>统一反馈事件日志</span>
+              </div>
+              <div class="core-pill">
+                <strong><code>intent-stream.jsonl</code></strong>
+                <span>turn-level context stream</span>
+              </div>
+              <div class="core-pill">
+                <strong><code>flywheel/*.json</code></strong>
+                <span>episode-level learning record</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-lane">
+          <div class="lane-header">
+            <h3>Path B / Implicit Correction Scan</h3>
+            <span>coverage-first</span>
+          </div>
+          <div class="stack">
+            <div class="flow-box cyan">
+              <span class="mini-label">source</span>
+              <h4><code>intent-stream.jsonl</code> plus adjacent turn pairs</h4>
+              <p>前提是 agent output 与 human next input 都进入 stream，才能形成可比较的相邻样本。</p>
+            </div>
+            <div class="flow-box rose">
+              <span class="mini-label">detector</span>
+              <h4>CorrectionDetector scans for “user is correcting prior answer”</h4>
+              <p>小模型只做分类和抽取，不直接改写策略；输出 correction event 与 confidence。</p>
+            </div>
+            <div class="flow-box mint">
+              <span class="mini-label">write</span>
+              <h4><code>feedback.jsonl</code> with source = correction_detector</h4>
+              <p>和 UI path 写入同一 store，差别只留在 source 与 confidence 字段。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner">
+      <div class="section-head">
+        <div>
+          <h2>Storage Layer</h2>
+          <p>这一层是 rollout 的稳定地基。页面不再只说“有哪些文件”，而是明确每个文件的角色、读写方和在闭环中的位置。</p>
+        </div>
+      </div>
+      <div class="store-grid">
+        <article class="store-card">
+          <div class="store-top">
+            <h3><code>logs/feedback.jsonl</code></h3>
+            <span class="pill mint">shared</span>
+          </div>
+          <p class="store-desc">统一反馈事件日志。显式 UI 反馈与 detector 产出的 correction event 最终都进入这里。</p>
+          <div class="kv">
+            <div class="kv-row"><strong>Producer</strong><span>webview feedback endpoint, CorrectionDetector</span></div>
+            <div class="kv-row"><strong>Consumer</strong><span>learner, skill updater, ranking logic, analytics</span></div>
+            <div class="kv-row"><strong>Schema</strong><span><code>{ hand_id, signal, source, confidence, ts, ... }</code></span></div>
+          </div>
+        </article>
+
+        <article class="store-card">
+          <div class="store-top">
+            <h3><code>brain/context/intent-stream.jsonl</code></h3>
+            <span class="pill cyan">context stream</span>
+          </div>
+          <p class="store-desc">按 turn 记录用户输入、agent 输出与意图上下文。它不是反馈 store，而是 detector 的原始比较源。</p>
+          <div class="kv">
+            <div class="kv-row"><strong>Producer</strong><span>brain/runtime pipeline</span></div>
+            <div class="kv-row"><strong>Consumer</strong><span>CorrectionDetector, future transcript analysis</span></div>
+            <div class="kv-row"><strong>Key gap</strong><span>必须补齐 agent output turn，否则无法形成 correction pair</span></div>
+          </div>
+        </article>
+
+        <article class="store-card">
+          <div class="store-top">
+            <h3><code>brain/flywheel/records.jsonl</code></h3>
+            <span class="pill violet">episode</span>
+          </div>
+          <p class="store-desc">每个 brain episode 的汇总记录。它负责沉淀一次学习周期中的评估、纠正和反馈摘要。</p>
+          <div class="kv">
+            <div class="kv-row"><strong>Producer</strong><span>BrainStateEngine / flywheel logic</span></div>
+            <div class="kv-row"><strong>Consumer</strong><span>episode review, learner, retrospection tooling</span></div>
+            <div class="kv-row"><strong>Role</strong><span>把零散事件提升为可复盘的 learning unit</span></div>
+          </div>
+        </article>
+
+        <article class="store-card">
+          <div class="store-top">
+            <h3><code>brain/intent_wiki/evidence.jsonl</code></h3>
+            <span class="pill cyan">evidence</span>
+          </div>
+          <p class="store-desc">承接反例与补充证据，避免错误 claim 在后续回合里被重复强化。</p>
+          <div class="kv">
+            <div class="kv-row"><strong>Producer</strong><span>detector follow-up, evaluator, human-reviewed fixes</span></div>
+            <div class="kv-row"><strong>Consumer</strong><span>intent wiki synthesis, claim weighting</span></div>
+            <div class="kv-row"><strong>Role</strong><span>让 correction 不只停留在事件层，而进入知识层</span></div>
+          </div>
+        </article>
+
+        <article class="store-card">
+          <div class="store-top">
+            <h3><code>logs/loom-eval-log.jsonl</code></h3>
+            <span class="pill amber">behavior trace</span>
+          </div>
+          <p class="store-desc">记录 hand 对资源的展示、使用和忽略情况，为资源排序和 disclosure 改进提供依据。</p>
+          <div class="kv">
+            <div class="kv-row"><strong>Producer</strong><span>hand execution path</span></div>
+            <div class="kv-row"><strong>Consumer</strong><span>resource ranking, prompt tuning</span></div>
+            <div class="kv-row"><strong>Role</strong><span>补足“行为层”反馈，不只看用户显式评价</span></div>
+          </div>
+        </article>
+
+        <article class="store-card">
+          <div class="store-top">
+            <h3><code>hands/&lt;id&gt;/personal/learned-notes.md</code></h3>
+            <span class="pill mint">downstream output</span>
+          </div>
+          <p class="store-desc">不是采集源，而是 learner 的输出面。它把高价值 correction 总结成 hand 可直接读取的经验条目。</p>
+          <div class="kv">
+            <div class="kv-row"><strong>Producer</strong><span>Stage 5.5 learner / summarizer</span></div>
+            <div class="kv-row"><strong>Consumer</strong><span>hand prompt injection, operator review</span></div>
+            <div class="kv-row"><strong>Role</strong><span>把反馈闭环落到下次执行前的行为约束</span></div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner">
+      <div class="section-head">
+        <div>
+          <h2>Collection Paths</h2>
+          <p>这两条路径不是竞争关系，而是刻意互补。A 路提供少量高精度种子，B 路扩大扫描覆盖，再通过 source 和 confidence 做权重分层。</p>
+        </div>
+      </div>
+      <div class="paths-grid">
+        <article class="path-card violet">
+          <header>
+            <div>
+              <h3>Path A</h3>
+              <p>Explicit user feedback</p>
+            </div>
+            <span class="pill violet">high precision</span>
+          </header>
+          <ul>
+            <li>
+              <strong>触发方式</strong>
+              <span>thumbs up/down、纠正按钮、结构化评论输入。</span>
+            </li>
+            <li>
+              <strong>优势</strong>
+              <span>用户意图最明确，误判空间最小，适合做 seed labels 与 golden cases。</span>
+            </li>
+            <li>
+              <strong>限制</strong>
+              <span>大部分用户不会主动点击，天然低覆盖，不能独立承担学习闭环。</span>
+            </li>
+            <li>
+              <strong>工程要求</strong>
+              <span>只需要稳定的反馈 API 和明确事件 schema，不要把学习逻辑塞进 UI 层。</span>
+            </li>
+          </ul>
+          <div class="score-band">
+            <div class="score">
+              <strong>Precision</strong>
+              <span>&gt;95%</span>
+            </div>
+            <div class="score">
+              <strong>Coverage</strong>
+              <span>Low</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="path-card cyan">
+          <header>
+            <div>
+              <h3>Path B</h3>
+              <p>Implicit correction scan</p>
+            </div>
+            <span class="pill cyan">high coverage</span>
+          </header>
+          <ul>
+            <li>
+              <strong>触发方式</strong>
+              <span>定时扫描 turn pairs，判断 human next input 是否在纠正上一轮 agent 输出。</span>
+            </li>
+            <li>
+              <strong>优势</strong>
+              <span>能覆盖用户没有点击反馈控件的绝大多数场景，更适合大规模发现错误模式。</span>
+            </li>
+            <li>
+              <strong>限制</strong>
+              <span>存在假阳性，需要 confidence、去重和后验评估，不适合直接替代人工确认。</span>
+            </li>
+            <li>
+              <strong>工程要求</strong>
+              <span>intent stream 必须同时记录 agent output 与 human input，detector 只负责判别与抽取。</span>
+            </li>
+          </ul>
+          <div class="score-band">
+            <div class="score">
+              <strong>Precision</strong>
+              <span>~70%</span>
+            </div>
+            <div class="score">
+              <strong>Coverage</strong>
+              <span>High</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner">
+      <div class="section-head">
+        <div>
+          <h2>Detection and Learning Loop</h2>
+          <p>真正的系统价值不在“收集到反馈”，而在“反馈如何稳定进入下次行为”。这一段把 detector、flywheel 和 learner 的边界讲清楚。</p>
+        </div>
+      </div>
+      <div class="loop-grid">
+        <div class="loop-stack">
+          <div class="loop-step">
+            <span class="loop-index">1</span>
+            <h3>Detect</h3>
+            <p>CorrectionDetector 从相邻 turn 对中判断是否存在“用户纠正上一步输出”的信号，并提取 correction、agent claim、confidence。</p>
+          </div>
+          <div class="loop-step">
+            <span class="loop-index">2</span>
+            <h3>Normalize</h3>
+            <p>无论来自 UI 还是 detector，事件都被整理为统一 feedback schema，差异只落在 source、confidence 和可追踪上下文。</p>
+          </div>
+          <div class="loop-step">
+            <span class="loop-index">3</span>
+            <h3>Aggregate</h3>
+            <p>flywheel records 把单个 feedback event 聚合为 episode 级学习材料，方便后续做总结、比较和人工审阅。</p>
+          </div>
+          <div class="loop-step">
+            <span class="loop-index">4</span>
+            <h3>Apply</h3>
+            <p>learner 把高价值结论写回 learned notes、资源排序或 prompt policy，让 hand 在下一轮执行前真正读到这些变化。</p>
+          </div>
+        </div>
+
+        <aside class="loop-side">
+          <h3>Boundary Rules</h3>
+          <ul>
+            <li>
+              <strong>Detector does not update policy directly</strong>
+              <span>它只产生带置信度的结构化信号，避免单次误判直接污染 hand 行为。</span>
+            </li>
+            <li>
+              <strong>Shared stores stay append-only</strong>
+              <span>所有原始事件都应保留，后续权重、过滤与总结放在消费者层完成。</span>
+            </li>
+            <li>
+              <strong>Learning outputs must be operator-readable</strong>
+              <span>只写隐含状态不够，至少 learned notes 或 episode record 必须可复盘。</span>
+            </li>
+            <li>
+              <strong>Confidence affects weighting, not persistence</strong>
+              <span>低置信度事件也值得保留，但不应与显式用户纠正等权处理。</span>
+            </li>
+          </ul>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner">
+      <div class="section-head">
+        <div>
+          <h2>Rollout Plan</h2>
+          <p>这里不再用松散的 next steps 列表，而是按阶段说明已经有的基础层、当前缺口和建议推进顺序。</p>
+        </div>
+      </div>
+      <div class="rail">
+        <article class="rail-card">
+          <span class="rail-tag done">already there</span>
+          <h3>Stage 0 / Shared persistence base</h3>
+          <p>反馈 store、flywheel records、learned notes 这类持久化基础已经存在，说明系统地基不是问题。</p>
+        </article>
+        <article class="rail-card">
+          <span class="rail-tag now">current gap</span>
+          <h3>Stage 1 / Complete turn capture</h3>
+          <p>给 <code>intent-stream.jsonl</code> 补齐 agent output turn。没有这一步，就没有可比较的 correction pairs。</p>
+        </article>
+        <article class="rail-card">
+          <span class="rail-tag next">next build</span>
+          <h3>Stage 2 / Add CorrectionDetector</h3>
+          <p>复用现有 scheduler 机制，先做保守版 detector，把结果写回 <code>feedback.jsonl</code>，再跑交集评估。</p>
+        </article>
+        <article class="rail-card">
+          <span class="rail-tag later">downstream leverage</span>
+          <h3>Stage 3 / Close the learner loop</h3>
+          <p>把高价值 correction 自动沉淀到 learned notes、evidence 库和 resource ranking，让 hand 行为真正被下一轮读取。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner">
+      <div class="section-head">
+        <div>
+          <h2>Implementation Checklist</h2>
+          <p>最后一屏给工程同学一个能直接开干的清单。每条都对应清晰边界，避免“做个 detector”这种空泛任务。</p>
+        </div>
+      </div>
+      <div class="check-grid">
+        <div class="check-item">
+          <i class="ph-bold ph-check-circle"></i>
+          <div>
+            <strong>校验 intent stream 内容边界</strong>
+            <span>确认每个 turn 至少能区分 human input 与 agent output，并能建立相邻 pair。</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <i class="ph-bold ph-check-circle"></i>
+          <div>
+            <strong>定义 correction event schema</strong>
+            <span>补齐 source、confidence、agent_claim、correction_text、cursor 等字段，避免 detector 与 learner 对不齐。</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <i class="ph-bold ph-check-circle"></i>
+          <div>
+            <strong>实现 detector scan cursor</strong>
+            <span>记录已处理 pair 的位置，防止重复扫描同一相邻 turn 并产生重复 feedback。</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <i class="ph-bold ph-check-circle"></i>
+          <div>
+            <strong>建立 A/B signal overlap review</strong>
+            <span>用 UI path 的高精度样本校验 detector，按周看 precision 与 false positive 类型。</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <i class="ph-bold ph-check-circle"></i>
+          <div>
+            <strong>把 learner 输出落到可读介质</strong>
+            <span>至少写回 learned notes 或 episode summary，确保 operator 和 hand 都能消费结果。</span>
+          </div>
+        </div>
+        <div class="check-item">
+          <i class="ph-bold ph-check-circle"></i>
+          <div>
+            <strong>保持 UI 层简单</strong>
+            <span>前端只发事件，不承担 detector、学习或聚合逻辑，减少后续 schema 变更成本。</span>
+          </div>
+        </div>
+      </div>
+      <p class="footer-note">File: <code>bridge/webview/rollout.html</code> · narrative rebuilt for technical presentation + implementation review</p>
+    </div>
+  </section>
+</div>
+</body>
+</html>

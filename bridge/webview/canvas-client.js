@@ -366,6 +366,7 @@ function addCard(id, outerHtml, x, y, w, h, rot, scale, z) {
   };
   state.cards.set(id, entry);
   bindCardEvents(id, host, entry);
+  return entry;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -394,6 +395,11 @@ function buildHandles(id) {
 var _drag = null;
 
 function bindCardEvents(id, host, entry) {
+  host.addEventListener('mouseenter', function () {
+    if (_drag || _connectMode || _editingId) return;
+    clearSelection();
+    selectCard(id);
+  });
   // Double-click → enter direct edit mode
   host.addEventListener('dblclick', function (e) {
     if (e.target.closest('.card-handles')) return;
@@ -674,7 +680,14 @@ function applyPatches(patches) {
       var rot   = parseFloat(el.getAttribute('data-anc-rot')   || '0');
       var scale = parseFloat(el.getAttribute('data-anc-scale') || '1');
       var z     = parseInt(  el.getAttribute('data-anc-z')     || '1', 10);
-      addCard(p.anchor_id, p.html_fragment, x, y, w, h, rot, scale, z);
+      var cardEntry = addCard(p.anchor_id, p.html_fragment, x, y, w, h, rot, scale, z);
+      // Stamp episode_id + goal_id from HTML fragment attributes onto host element
+      if (cardEntry) {
+        var epId = el.getAttribute('data-episode-id') || p.episode_id || '';
+        var goalId = el.getAttribute('data-goal-id') || p.goal_id || '';
+        if (epId)   cardEntry.el.dataset.episodeId = epId;
+        if (goalId) cardEntry.el.dataset.goalId    = goalId;
+      }
       return;
     }
 
@@ -685,6 +698,12 @@ function applyPatches(patches) {
     if (!newCard) return;
 
     entry.contentEl.innerHTML = newCard.innerHTML;
+
+    // Stamp episode_id on card host element (most recent episode wins)
+    var epId2 = (newCard && newCard.getAttribute('data-episode-id')) || p.episode_id || '';
+    var goalId2 = (newCard && newCard.getAttribute('data-goal-id')) || p.goal_id || '';
+    if (epId2)   entry.el.dataset.episodeId = epId2;
+    if (goalId2) entry.el.dataset.goalId    = goalId2;
 
     // Only update position if user hasn't moved this card locally
     if (!entry.localMoved && newCard.getAttribute('data-anc-x')) {
@@ -698,6 +717,21 @@ function applyPatches(patches) {
   });
   updateEmptyState();
   if (state.connections.size) renderConnections();
+}
+
+// Submit human feedback for the episode linked to a card
+function submitCardFeedback(anchorId, signal, comment) {
+  var entry = state.cards.get(anchorId);
+  if (!entry || !entry.el.dataset.episodeId) return;
+  fetch('http://localhost:3002/flywheel/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      episode_id: entry.el.dataset.episodeId,
+      signal: signal || 'thumbs_up',
+      comment: comment || ''
+    })
+  }).catch(function() {});
 }
 
 // ─────────────────────────────────────────────────────────────────────

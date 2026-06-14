@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "policies": [
+    {
+      "policy_id": "policy.satisfy_content_requirements",
+      "label": "Satisfy active content requirements",
+      "when_zones": [
+        "content_requirements",
+        "domain_principles"
+      ],
+      "actions": [
+        "translate active content intents into explicit output requirements",
+        "add or revise sections so the generated page visibly satisfies the requirement"
+      ],
+      "reward_targets": [
+        "intent_coverage",
+        "relevance"
+      ],
+      "weight": 0.62,
+      "enabled": true,
+      "updated_at": "2026-06-10T18:08:43.062340",
+      "reward_count": 0,
+      "average_reward": 0.0
+    },
+    {
+      "policy_id": "policy.retrieve_or_surface_fresh_context",
+      "label": "Retrieve or surface fresh context when required",
+      "when_zones": [
+        "content_requirements",
+        "source_preferences"
+      ],
+      "actions": [
+        "identify whether the active intent requires recent context",
+        "ask relevant hands/tools for fresh context or mark freshness gaps explicitly"
+      ],
+      "reward_targets": [
+        "freshness",
+        "decision_usefulness"
+      ],
+      "weight": 0.58,
+      "enabled": true,
+      "updated_at": "2026-06-10T18:08:43.062340",
+      "reward_count": 0,
+      "average_reward": 0.0
+    },
+    {
+      "policy_id": "policy.respect_object_scoped_operations",
+      "label": "Respect object-scoped user behavior",
+      "when_zones": [
+        "object_behavior",
+        "workflow_preferences"
+      ],
+      "actions": [
+        "ground the task in the target anchor/card/object before interpreting the instruction",
+        "avoid applying local edits globally unless the user asks for global changes"
+      ],
+      "reward_targets": [
+        "intent_coverage",
+        "relevance"
+      ],
+      "weight": 0.66,
+      "enabled": true,
+      "updated_at": "2026-06-10T18:08:43.062340",
+      "reward_count": 0,
+      "average_reward": 0.0
+    },
+    {
+      "policy_id": "policy.add_risk_and_reversal_checks",
+      "label": "Add risk and reversal checks",
+      "when_zones": [
+        "risk_sensitivity",
+        "decision_style"
+      ],
+      "actions": [
+        "include counterarguments, uncertainty, downside triggers, or reversal conditions",
+        "avoid generic risks; tie each risk to the current object or decision"
+      ],
+      "reward_targets": [
+        "risk_coverage",
+        "decision_usefulness"
+      ],
+      "weight": 0.55,
+      "enabled": true,
+      "updated_at": "2026-06-10T18:08:43.062340",
+      "reward_count": 0,
+      "average_reward": 0.0
+    },
+    {
+      "policy_id": "policy.preserve_user_style",
+      "label": "Preserve user style and granularity",
+      "when_zones": [
+        "personal_style"
+      ],
+      "actions": [
+        "match the user's preferred density, language, and structure",
+        "prefer reusable formatting choices that have received positive reward"
+      ],
+      "reward_targets": [
+        "style_fit",
+        "relevance"
+      ],
+      "weight": 0.48,
+      "enabled": true,
+      "updated_at": "2026-06-10T18:08:43.062340",
+      "reward_count": 0,
+      "average_reward": 0.0
+    }
+  ]
+}

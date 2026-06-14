@@ -1,4 +1,4 @@
-// Anchor Client — injects interactive handles and captures user ops
+﻿// Anchor Client —injects interactive handles and captures user ops
 // Uses WebSocket for receiving HTML and sending ops
 
 const Anchor = {
@@ -15,8 +15,8 @@ const Anchor = {
   _allowIncomingHtml: false,
   _selectedPromptRoute: '',
   _pendingPromptRoute: '',
-  _staticMode: false,  // #sta — static display, no interaction overlays
-  _domainContent: {},   // {domain: html} — cached AI-generated content per domain, survives tab switches
+  _staticMode: false,  // #sta —static display, no interaction overlays
+  _domainContent: {},   // {domain: html} —cached AI-generated content per domain, survives tab switches
 
   _timing: null,  // per-interaction timing { t0_click, t1_built, t2_sent, t3_ack, t4_thinking, t5_patch, t6_dom }
 
@@ -32,7 +32,7 @@ const Anchor = {
     restructure: { label: 'Restructure', icon: 'ph-squares-four',          needsInput: true, inputLabel: 'What to restructure?' },
   },
 
-  // Fixed platform handles — always available regardless of model output.
+  // Fixed platform handles —always available regardless of model output.
   // The model may extend via data-handles, but can never reduce below this set.
   defaultHandles: ['refine', 'expand', 'shorten', 'annotate', 'branch', 'edit'],
 
@@ -70,7 +70,7 @@ const Anchor = {
     this._initAnchorSelect();
   },
 
-  // Parse hash: "#sta/market" → {static:true, route:"market"}
+  // Parse hash: "#sta/market" →{static:true, route:"market"}
   _parseHash(hash) {
     if (hash.startsWith('sta/')) return { static: true, route: hash.slice(4) };
     return { static: false, route: hash };
@@ -100,13 +100,28 @@ const Anchor = {
       this.container.innerHTML = '';
       this._syncHomeVisibility();
       this._updateToolbarTabs('');
+    } else if (route === 'targeted') {
+      this._showRouteShell(route);
+      if (window.TargetDebatePage) window.TargetDebatePage.renderInto(this);
+      this._syncHomeVisibility();
+      this._updateToolbarTabs(route);
     } else if (['market','position','target','sentiment'].includes(route)) {
+      this._showRouteShell(route);
       this._loadBlogDomain(route);
     } else {
       this.currentHtml = '';
       this.container.innerHTML = '';
       this._syncHomeVisibility();
     }
+  },
+
+  _showRouteShell(route) {
+    const next = String(route || '').trim();
+    const home = document.getElementById('anchor-home');
+    const shell = document.getElementById('anchor-shell');
+    if (home) home.classList.add('is-hidden');
+    if (shell) shell.classList.add('has-content');
+    this._updateToolbarTabs(next);
   },
 
   _initHashRouting() {
@@ -123,6 +138,7 @@ const Anchor = {
     // Restore cached AI-generated content if available (survives tab switches)
     if (this._domainContent[domain]) {
       this.render(this._domainContent[domain]);
+      if (domain === 'position') this._hydratePortfolioHub();
       this._syncHomeVisibility();
       this._updateToolbarTabs(domain);
       return;
@@ -132,9 +148,10 @@ const Anchor = {
       const resp = await fetch('/current-html');
       if (resp.ok) {
         const html = await resp.text();
-        if (html && html.includes('data-anc="' + domain)) {
+        if (html && (html.includes('data-anc="' + domain + '"') || html.includes('data-anc="' + domain + '.')) && html.includes('anc-detail')) {
           this._domainContent[domain] = html;
           this.render(html);
+          if (domain === 'position') this._hydratePortfolioHub();
           this._syncHomeVisibility();
           this._updateToolbarTabs(domain);
           return;
@@ -151,16 +168,19 @@ const Anchor = {
       this._updateToolbarTabs(domain);
     } catch (e) {
       console.error('[_loadBlogDomain]', e);
+      this._renderBlogPage(domain, [], {});
+      this._syncHomeVisibility();
+      this._updateToolbarTabs(domain);
     }
   },
 
   _renderBlogPage(domain, items, counts) {
     const icon = (name) => '<i class="ph-bold ' + name + '"></i>';
     const META = {
-      market:    { icon: icon('ph-newspaper'), label: '市场情报', color: 'aurora' },
-      position:  { icon: icon('ph-briefcase'), label: '仓位管理', color: 'cool'   },
-      target:    { icon: icon('ph-crosshair'), label: '标的跟踪', color: 'warm'   },
-      sentiment: { icon: icon('ph-pulse'), label: '市场情绪', color: 'flame'  }
+      market:    { icon: icon('ph-newspaper'), label: 'Market', color: 'aurora' },
+      position:  { icon: icon('ph-briefcase'), label: 'Positions', color: 'cool'   },
+      target:    { icon: icon('ph-crosshair'), label: 'Targets', color: 'warm'   },
+      sentiment: { icon: icon('ph-pulse'), label: 'Sentiment', color: 'flame'  }
     };
     const meta = META[domain] || META.market;
     const count = counts[domain] || 0;
@@ -178,13 +198,45 @@ const Anchor = {
       const d = new Date(ts);
       const now = Date.now();
       const diff = now - d.getTime();
-      if (diff < 60000) return '刚刚';
-      if (diff < 3600000) return Math.floor(diff/60000)+'m前';
-      if (diff < 86400000) return Math.floor(diff/3600000)+'h前';
+      if (diff < 60000) return 'just now';
+      if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+      if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
       return d.toLocaleDateString('zh-CN', { month:'short', day:'numeric' });
     };
 
-    // ── Domain-specific card builders ──────────────────────────────
+    const domainAgentMeta = (domain, payload) => {
+      const kind = payload?.kind || 'inbox item';
+      const map = {
+        market: {
+          hand: 'market',
+          executor: 'market',
+          role: 'Tracks market regime, macro signals, risk catalysts, and source-backed evidence.'
+        },
+        position: {
+          hand: 'position',
+          executor: 'position',
+          role: 'Reviews portfolio exposure, concentration, P/L drivers, and position-level risk.'
+        },
+        target: {
+          hand: 'target',
+          executor: 'target',
+          role: 'Assesses target-specific thesis, catalysts, triggers, and invalidation conditions.'
+        },
+        sentiment: {
+          hand: 'sentiment',
+          executor: 'sentiment',
+          role: 'Reads sentiment, crowding, positioning tone, and contrarian risk.'
+        }
+      };
+      return { ...(map[domain] || { hand: domain || 'loom-renderer', executor: domain || 'loom-renderer', role: 'Provides focused supporting analysis for this card.' }), kind };
+    };
+
+    const agentAttrs = (it) => {
+      const agentMeta = domainAgentMeta(domain, it?.payload || {});
+      return ` data-agent-hand="${_escHtml(agentMeta.hand)}" data-agent-executor="${_escHtml(agentMeta.executor)}" data-agent-domain="${_escHtml(domain)}" data-agent-kind="${_escHtml(agentMeta.kind)}" data-agent-role="${_escHtml(agentMeta.role)}"`;
+    };
+
+    // 鈹€鈹€ Domain-specific card builders 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
     const renderMarketCards = (items) => {
       const filings = items.filter(i => i.payload?.kind === 'filing');
       const macros  = items.filter(i => i.payload?.kind === 'macro');
@@ -192,9 +244,9 @@ const Anchor = {
       const alerts  = items.filter(i => i.payload?.kind === 'price_alert' || i.payload?.kind === 'analyst');
 
       return `
-      <div class="blog-section-label"><i class="ph-bold ph-file-text"></i> 重要文件</div>
+      <div class="blog-section-label"><i class="ph-bold ph-file-text"></i> Key filings</div>
       <div class="blog-card-grid">${filings.slice(0,3).map(it => `
-        <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
+        <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch" data-has-detail="true"${agentAttrs(it)}>
           <div class="blog-card-header">
             <span class="blog-card-icon">${icon('ph-file-text')}</span>
             <div>
@@ -203,12 +255,12 @@ const Anchor = {
             </div>
           </div>
           <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
-          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">查看原文 ↗</a>' : ''}
-        </div>`).join('')}${filings.length === 0 ? '<div class="blog-empty-row">暂无 SEC 文件</div>' : ''}</div>
+          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">Read source →</a>' : ''}
+        </div>`).join('')}${filings.length === 0 ? '<div class="blog-empty-row">No SEC filings</div>' : ''}</div>
 
-      <div class="blog-section-label"><i class="ph-bold ph-chart-line-up"></i> 宏观 & 新闻</div>
+      <div class="blog-section-label"><i class="ph-bold ph-chart-line-up"></i> Macro & News</div>
       <div class="blog-card-grid">${macros.slice(0,2).concat(news.slice(0,2)).map(it => `
-        <div class="anc-section anc-section--gc anc-section--arctic blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
+        <div class="anc-section anc-section--gc anc-section--arctic blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch" data-has-detail="true"${agentAttrs(it)}>
           <div class="blog-card-header">
             <span class="blog-card-icon">${it.payload?.kind === 'macro' ? icon('ph-chart-line-up') : icon('ph-newspaper')}</span>
             <div>
@@ -217,12 +269,12 @@ const Anchor = {
             </div>
           </div>
           <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
-          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">查看原文 ↗</a>' : ''}
-        </div>`).join('')}${(macros.length + news.length) === 0 ? '<div class="blog-empty-row">暂无新闻</div>' : ''}</div>
+          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">Read source →</a>' : ''}
+        </div>`).join('')}${(macros.length + news.length) === 0 ? '<div class="blog-empty-row">No news</div>' : ''}</div>
 
-      <div class="blog-section-label"><i class="ph-bold ph-crosshair"></i> 分析师观点</div>
+      <div class="blog-section-label"><i class="ph-bold ph-crosshair"></i> Analyst views</div>
       <div class="blog-card-grid">${alerts.slice(0,3).map(it => `
-        <div class="anc-section anc-section--gc anc-section--warm blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
+        <div class="anc-section anc-section--gc anc-section--warm blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch" data-has-detail="true"${agentAttrs(it)}>
           <div class="blog-card-header">
             <span class="blog-card-icon">${icon('ph-crosshair')}</span>
             <div>
@@ -231,18 +283,82 @@ const Anchor = {
             </div>
           </div>
           <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
-          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">查看原文 ↗</a>' : ''}
-        </div>`).join('')}${alerts.length === 0 ? '<div class="blog-empty-row">暂无分析师更新</div>' : ''}</div>`;
+          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">Read source →</a>' : ''}
+        </div>`).join('')}${alerts.length === 0 ? '<div class="blog-empty-row">No analyst updates yet</div>' : ''}</div>`;
     };
 
+    const renderPositionHubShell = () => `
+      <section class="anc-section anc-section--gc anc-section--cool portfolio-hub" data-anc="position.brain-portfolio-hub" data-detail-disabled="true">
+        <div class="anc-pill-row">
+          <span class="anc-pill anc-pill--gen">Brain owned</span>
+          <span class="anc-pill anc-pill--review" id="portfolio-hub-status">Sync pending</span>
+        </div>
+        <div class="portfolio-hub-head">
+          <div>
+            <h2>Portfolio Data Hub</h2>
+            <p>Brain keeps credentials, raw files, and long-lived portfolio memory. Hands receive only redacted summaries.</p>
+          </div>
+          <button class="btn btn--sm btn--brand" type="button" id="portfolio-refresh-btn">Refresh</button>
+        </div>
+        <div class="portfolio-tracking" id="portfolio-tracking-view">
+          <div class="portfolio-panel portfolio-panel--wide">
+            <div class="portfolio-panel-title">Position Tracking</div>
+            <div id="portfolio-metrics" class="portfolio-metrics"></div>
+            <div id="portfolio-watch-targets" class="portfolio-watch-targets"></div>
+          </div>
+        </div>
+        <div class="portfolio-setup" id="portfolio-setup-view" hidden>
+          <div class="portfolio-app-list" id="portfolio-provider-grid">
+            <button class="portfolio-app-row" data-provider="google_docs" type="button">
+              <span class="portfolio-provider-status" id="prov-status-google_docs" hidden></span>
+              <span class="portfolio-app-icon portfolio-app-icon--sheets"><i class="ph-bold ph-table"></i></span>
+              <span class="portfolio-app-text">
+                <span class="portfolio-app-title">Google Docs / Sheets</span>
+                <span class="portfolio-app-subtitle">Import position tables from Google workspace</span>
+              </span>
+              <span class="portfolio-connect-pill">Connect</span>
+            </button>
+            <button class="portfolio-app-row" data-provider="notion" type="button">
+              <span class="portfolio-provider-status" id="prov-status-notion" hidden></span>
+              <span class="portfolio-app-icon portfolio-app-icon--notion"><i class="ph-bold ph-note-blank"></i></span>
+              <span class="portfolio-app-text">
+                <span class="portfolio-app-title">Notion</span>
+                <span class="portfolio-app-subtitle">Read portfolio data from a Notion database</span>
+              </span>
+              <span class="portfolio-connect-pill">Connect</span>
+            </button>
+            <button class="portfolio-app-row" data-provider="local_file" type="button">
+              <span class="portfolio-provider-status" id="prov-status-local_file" hidden></span>
+              <span class="portfolio-app-icon portfolio-app-icon--file"><i class="ph-bold ph-file-arrow-up"></i></span>
+              <span class="portfolio-app-text">
+                <span class="portfolio-app-title">Local file</span>
+                <span class="portfolio-app-subtitle">Upload CSV, JSON, Excel, Word, or screenshots</span>
+              </span>
+              <span class="portfolio-connect-pill">Connect</span>
+            </button>
+            <button class="portfolio-app-row" data-provider="manual" type="button">
+              <span class="portfolio-provider-status" id="prov-status-manual" hidden></span>
+              <span class="portfolio-app-icon portfolio-app-icon--manual"><i class="ph-bold ph-clipboard-text"></i></span>
+              <span class="portfolio-app-text">
+                <span class="portfolio-app-title">Manual paste</span>
+                <span class="portfolio-app-subtitle">Paste CSV-style position records directly</span>
+              </span>
+              <span class="portfolio-connect-pill">Connect</span>
+            </button>
+          </div>
+          <div class="portfolio-config-panel" id="portfolio-config-panel" hidden></div>
+        </div>
+        <div class="portfolio-source-dock" id="portfolio-source-dock"></div>
+      </section>`;
+
     const renderPositionCards = (items) => {
-      if (items.length === 0) return '<div class="blog-empty">暂无仓位记录 · 使用 #position 新增仓位</div>';
+      if (items.length === 0) return '<div class="blog-empty">No positions yet · use #position to add</div>';
       return '<div class="blog-card-grid">' + items.map(it => {
         const pnl = it.payload?.pnl_pct;
         const pnlColor = pnl > 0 ? '#16a34a' : pnl < 0 ? '#dc2626' : 'var(--fg-2)';
         const pnlSign = pnl > 0 ? '+' : '';
         return `
-        <div class="anc-section anc-section--gc anc-section--ocean blog-card blog-card--position" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
+        <div class="anc-section anc-section--gc anc-section--ocean blog-card blog-card--position" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch" data-has-detail="true"${agentAttrs(it)}>
           <div class="blog-card-header">
             <span class="blog-card-icon">${icon('ph-briefcase')}</span>
             <div>
@@ -259,10 +375,20 @@ const Anchor = {
       }).join('') + '</div>';
     };
 
+    const renderTargetSelectorBand = (items) => {
+      const selectedTickers = Array.from(new Set(items.flatMap(it => it.payload?.tickers || []))).filter(Boolean);
+      const targetSelectorHtml = window.TargetDebatePage
+        ? window.TargetDebatePage.renderTargetSelector({ tickers: selectedTickers })
+        : '';
+      return targetSelectorHtml
+        ? `<section class="blog-target-selector-shell">${targetSelectorHtml}</section>`
+        : '';
+    };
+
     const renderTargetCards = (items) => {
-      if (items.length === 0) return '<div class="blog-empty">暂无标的跟踪 · 使用 #target 新增标的</div>';
+      if (items.length === 0) return '<div class="blog-empty">No targets tracked · use #target to add</div>';
       return '<div class="blog-card-grid">' + items.map(it => `
-        <div class="anc-section anc-section--gc anc-section--warm blog-card blog-card--target" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
+        <div class="anc-section anc-section--gc anc-section--warm blog-card blog-card--target" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch" data-has-detail="true"${agentAttrs(it)}>
           <div class="blog-card-header">
             <span class="blog-card-icon">${icon('ph-crosshair')}</span>
             <div>
@@ -274,7 +400,7 @@ const Anchor = {
           <div class="blog-card-tags">
             ${(it.payload?.tickers || []).map(t => '<span class="blog-ticker-tag">'+_escHtml(t)+'</span>').join('')}
           </div>
-          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">查看详情 ↗</a>' : ''}
+          ${it.payload?.url ? '<a class="blog-card-link" href="'+_escHtml(it.payload.url)+'" target="_blank" rel="noopener">Open detail →</a>' : ''}
         </div>`).join('') + '</div>';
     };
 
@@ -286,75 +412,75 @@ const Anchor = {
       const aaii   = items.filter(i => i.source?.includes('aaii'));
 
       return `
-      <div class="blog-section-label"><i class="ph-bold ph-pulse"></i> 市场情绪综合</div>
+      <div class="blog-section-label"><i class="ph-bold ph-pulse"></i> Market sentiment</div>
       <div class="blog-card-grid">${fear.slice(0,2).map(it => `
-        <div class="anc-section anc-section--gc anc-section--flame blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
+        <div class="anc-section anc-section--gc anc-section--flame blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch" data-has-detail="true"${agentAttrs(it)}>
           <div class="blog-card-header">
             <span class="blog-card-icon">${icon('ph-pulse')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
-              <div class="blog-card-meta">CNN 恐慌贪婪指数 · ${timeAgo(it.timestamp)}</div>
+              <div class="blog-card-meta">CNN Fear & Greed Index · ${timeAgo(it.timestamp)}</div>
             </div>
           </div>
           <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
-        </div>`).join('')}${fear.length === 0 ? '<div class="blog-empty-row">暂无数据</div>' : ''}</div>
+        </div>`).join('')}${fear.length === 0 ? '<div class="blog-empty-row">No data</div>' : ''}</div>
 
-      <div class="blog-section-label"><i class="ph-bold ph-chart-donut"></i> StockTwits 情绪异动</div>
+      <div class="blog-section-label"><i class="ph-bold ph-chart-donut"></i> StockTwits moves</div>
       <div class="blog-card-grid">${st.slice(0,3).map(it => `
-        <div class="anc-section anc-section--gc anc-section--cool blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
+        <div class="anc-section anc-section--gc anc-section--cool blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch" data-has-detail="true"${agentAttrs(it)}>
           <div class="blog-card-header">
             <span class="blog-card-icon">${it.payload?.bull_ratio > 0.5 ? icon('ph-trend-up') : icon('ph-trend-down')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
-              <div class="blog-card-meta">StockTwits · ${timeAgo(it.timestamp)}</div>
+              <div class="blog-card-meta">StockTwits ·  ${timeAgo(it.timestamp)}</div>
             </div>
           </div>
           <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
           <div class="sentiment-bar">
             <div class="sentiment-bar-fill" style="width:${Math.round((it.payload?.bull_ratio||0.5)*100)}%;background:${it.payload?.bull_ratio > 0.5 ? '#16a34a' : '#dc2626'}"></div>
           </div>
-          <div class="sentiment-bar-labels"><span>看多 ${Math.round((it.payload?.bull_ratio||0.5)*100)}%</span><span>看空 ${Math.round((1-(it.payload?.bull_ratio||0.5))*100)}%</span></div>
-        </div>`).join('')}${st.length === 0 ? '<div class="blog-empty-row">暂无情绪异动</div>' : ''}</div>
+          <div class="sentiment-bar-labels"><span>Bullish  ${Math.round((it.payload?.bull_ratio||0.5)*100)}%</span><span>%</span><span>Bearish  ${Math.round((1-(it.payload?.bull_ratio||0.5))*100)}%</span></div>
+        </div>`).join('')}${st.length === 0 ? '<div class="blog-empty-row">No sentiment moves</div>' : ''}</div>
 
-      <div class="blog-section-label"><i class="ph-bold ph-chat-circle-text"></i> 社区热帖</div>
+      <div class="blog-section-label"><i class="ph-bold ph-chat-circle-text"></i> Community threads</div>
       <div class="blog-card-grid">${reddit.slice(0,3).map(it => `
-        <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
+        <div class="anc-section anc-section--gc anc-section--aurora blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch" data-has-detail="true"${agentAttrs(it)}>
           <div class="blog-card-header">
             <span class="blog-card-icon">${icon('ph-chat-circle-text')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
-              <div class="blog-card-meta">r/${_escHtml(it.payload?.subreddit||'')} · 👍 ${(it.payload?.upvotes||0).toLocaleString()} · ${timeAgo(it.timestamp)}</div>
+              <div class="blog-card-meta">r/${_escHtml(it.payload?.subreddit||'')} · 👍 ${(it.payload?.upvotes||0).toLocaleString()} ·  ${timeAgo(it.timestamp)}</div>
             </div>
           </div>
           <p class="blog-card-summary">${_escHtml(it.summary || '')}</p>
           <div class="blog-card-tags">${(it.payload?.tickers||[]).map(t => '<span class="blog-ticker-tag">$'+_escHtml(t)+'</span>').join('')}</div>
-        </div>`).join('')}${reddit.length === 0 ? '<div class="blog-empty-row">暂无社区帖子</div>' : ''}</div>
+        </div>`).join('')}${reddit.length === 0 ? '<div class="blog-empty-row">No community posts</div>' : ''}</div>
 
-      <div class="blog-section-label"><i class="ph-bold ph-clipboard-text"></i> AAII 散户调查</div>
+      <div class="blog-section-label"><i class="ph-bold ph-clipboard-text"></i> AAII retail survey</div>
       <div class="blog-card-grid">${aaii.slice(0,1).map(it => `
-        <div class="anc-section anc-section--gc anc-section--berry blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
+        <div class="anc-section anc-section--gc anc-section--berry blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch" data-has-detail="true"${agentAttrs(it)}>
           <div class="blog-card-header">
             <span class="blog-card-icon">${icon('ph-clipboard-text')}</span>
             <div>
               <div class="blog-card-title">${_escHtml(it.title)}</div>
-              <div class="blog-card-meta">AAII · ${timeAgo(it.timestamp)}</div>
+              <div class="blog-card-meta">AAII ·  ${timeAgo(it.timestamp)}</div>
             </div>
           </div>
           <div class="aaii-bars">
-            <div class="aaii-row"><span>看涨</span><div class="aaii-bar"><div class="aaii-fill" style="width:${it.payload?.bullish_pct||0}%"></div></div><span>${it.payload?.bullish_pct||0}%</span></div>
-            <div class="aaii-row"><span>看跌</span><div class="aaii-bar"><div class="aaii-fill aaii-fill--bear" style="width:${it.payload?.bearish_pct||0}%"></div></div><span>${it.payload?.bearish_pct||0}%</span></div>
-            <div class="aaii-row"><span>中性</span><div class="aaii-bar"><div class="aaii-fill aaii-fill--neutral" style="width:${it.payload?.neutral_pct||0}%"></div></div><span>${it.payload?.neutral_pct||0}%</span></div>
+            <div class="aaii-row"><span>Bullish</span><div class="aaii-bar"><div class="aaii-fill" style="width:${it.payload?.bullish_pct||0}%"></div></div><span>${it.payload?.bullish_pct||0}%</span></div>
+            <div class="aaii-row"><span>Bearish</span><div class="aaii-bar"><div class="aaii-fill aaii-fill--bear" style="width:${it.payload?.bearish_pct||0}%"></div></div><span>${it.payload?.bearish_pct||0}%</span></div>
+            <div class="aaii-row"><span>Neutral</span></div>
           </div>
-        </div>`).join('')}${aaii.length === 0 ? '<div class="blog-empty-row">暂无 AAII 数据</div>' : ''}</div>`;
+        </div>`).join('')}${aaii.length === 0 ? '<div class="blog-empty-row">No AAII data</div>' : ''}</div>`;
     };
 
     let cardsHtml = '';
     if (domain === 'market')    cardsHtml = renderMarketCards(items);
-    else if (domain === 'position') cardsHtml = renderPositionCards(items);
-    else if (domain === 'target')  cardsHtml = renderTargetCards(items);
+    else if (domain === 'position') cardsHtml = renderPositionHubShell() + renderPositionCards(items);
+    else if (domain === 'target')  cardsHtml = renderTargetSelectorBand(items) + renderTargetCards(items);
     else if (domain === 'sentiment') cardsHtml = renderSentimentCards(items);
-    else cardsHtml = items.length === 0 ? '<div class="blog-empty">暂无内容</div>' : items.map(it => `
-      <div class="anc-section anc-section--gc anc-section--arctic blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch">
+    else cardsHtml = items.length === 0 ? '<div class="blog-empty">No content</div>' : items.map(it => `
+      <div class="anc-section anc-section--gc anc-section--arctic blog-card" data-anc="${domain}.card.${_escHtml(it.id)}" data-handles="refine,expand,shorten,longer,edit,annotate,branch" data-has-detail="true"${agentAttrs(it)}>
         <div class="blog-card-title">${_escHtml(it.title)}</div>
         <p class="blog-card-summary">${_escHtml(it.summary||'')}</p>
         <div class="blog-card-meta">${sourceTag(it.source)} · ${timeAgo(it.timestamp)}</div>
@@ -370,7 +496,7 @@ const Anchor = {
       <span class="blog-domain-icon">${meta.icon}</span>
       <div>
         <h1 class="blog-domain-title" data-anc="${domain}.title" data-handles="edit,refine">${meta.label}</h1>
-        <p class="blog-domain-count" data-anc="${domain}.count" data-handles="edit,refine">共 <strong>${count}</strong> 条推送 · ${items.length} 条已加载</p>
+        <p class="blog-domain-count" data-anc="${domain}.count" data-handles="edit,refine">${count} total · ${items.length} loaded</p>
       </div>
     </div>
   </header>
@@ -386,6 +512,8 @@ const Anchor = {
     const template = document.createElement('template');
     template.innerHTML = html;
     document.getElementById('anchor-content').appendChild(template.content.cloneNode(true));
+    if (domain === 'position') this._hydratePortfolioHub();
+    if (domain === 'target' && window.TargetDebatePage) window.TargetDebatePage.hydrate(this.container);
   },
 
   _updateToolbarTabs(activeDomain) {
@@ -394,13 +522,263 @@ const Anchor = {
     });
   },
 
+  async _hydratePortfolioHub() {
+    const root = document.querySelector('.portfolio-hub');
+    if (!root) return;
+    const api = 'http://127.0.0.1:3002';
+    const status = root.querySelector('#portfolio-hub-status');
+    const metrics = root.querySelector('#portfolio-metrics');
+    const watch = root.querySelector('#portfolio-watch-targets');
+    const setupView = root.querySelector('#portfolio-setup-view');
+    const trackingView = root.querySelector('#portfolio-tracking-view');
+    const sourceDock = root.querySelector('#portfolio-source-dock');
+    const configPanel = root.querySelector('#portfolio-config-panel');
+    const fmt = (n) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+    const setStatus = (text, ok) => {
+      if (!status) return;
+      status.textContent = text;
+      status.className = 'anc-pill ' + (ok ? 'anc-pill--active' : 'anc-pill--warn');
+    };
+
+    let _oauthClients = {};
+    const loadOAuthClients = async () => {
+      try {
+        const r = await fetch(api + '/oauth/clients');
+        if (r.ok) _oauthClients = (await r.json()).clients || {};
+      } catch (e) { _oauthClients = {}; }
+    };
+
+    const load = async () => {
+      try {
+        const [sourcesResp, snapshotResp] = await Promise.all([
+          fetch(api + '/portfolio/sources').then(r => r.json()),
+          fetch(api + '/portfolio/snapshot').then(r => r.json())
+        ]);
+        const sources = sourcesResp.sources || [];
+        const snapshot = snapshotResp.snapshot || {};
+        const hasPortfolioData = !!(snapshot.position_count || sources.length || (snapshot.watch_targets || []).length);
+        setStatus(snapshot.position_count ? 'Brain synced' : 'No positions yet', true);
+        if (setupView) setupView.hidden = hasPortfolioData;
+        if (trackingView) trackingView.hidden = !hasPortfolioData;
+
+        // Mark connected provider cards
+        const connectedTypes = new Set(sources.map(s => s.type));
+        for (const provType of ['google_docs', 'notion', 'local_file', 'manual']) {
+          const dot = root.querySelector(`#prov-status-${provType}`);
+          const card = root.querySelector(`[data-provider="${provType}"]`);
+          if (dot) dot.hidden = !connectedTypes.has(provType);
+          if (card) card.classList.toggle('portfolio-app-row--connected', connectedTypes.has(provType));
+        }
+
+        const totals = snapshot.totals || {};
+        if (metrics) {
+          metrics.innerHTML = `
+            <div><span>Total value</span><strong>${fmt(totals.market_value)}</strong></div>
+            <div><span>Cost basis</span><strong>${fmt(totals.cost_basis)}</strong></div>
+            <div><span>Unrealized P&L</span><strong>${fmt(totals.unrealized_pnl)}</strong></div>
+            <div><span>Positions</span><strong>${snapshot.position_count || 0}</strong></div>`;
+        }
+        if (watch) {
+          const tickers = snapshot.watch_targets || [];
+          watch.innerHTML = tickers.length
+            ? tickers.map(t => '<span class="blog-ticker-tag">' + _escHtml(t) + '</span>').join('')
+            : '<div class="portfolio-empty-mini">Tracked tickers appear after import</div>';
+        }
+        if (sourceDock) {
+          sourceDock.innerHTML = sources.length ? sources.map(src =>
+            `<span class="portfolio-source-chip">${_escHtml(src.type)} ·  ${_escHtml(src.name || src.id)}</span>`
+          ).join('') : '';
+        }
+      } catch (e) {
+        setStatus('Brain offline', false);
+      }
+    };
+
+    const renderConfigPanel = (provider) => {
+      if (!configPanel) return;
+      const isOAuth = provider === 'google_docs' || provider === 'notion';
+      const provKey = provider === 'google_docs' ? 'google' : provider === 'notion' ? 'notion' : null;
+      const provLabel = provider === 'google_docs' ? 'Google' : provider === 'notion' ? 'Notion' : '';
+      const oauthReady = isOAuth && !!_oauthClients[provKey]?.configured;
+
+      let html = '<div class="portfolio-config-form">';
+      if (isOAuth) {
+        html += ``;
+        if (!oauthReady) {
+          const consoleUrl = provider === 'google_docs' ? 'https://console.cloud.google.com' : 'https://www.notion.so/my-integrations';
+          html += `
+          <div class="portfolio-oauth-setup">
+            <p class="portfolio-config-help">First-time setup: configure ${provLabel} OAuth credentials (one-time):</p>
+            <input id="pconf-client-id" class="portfolio-input" type="text" placeholder="Client ID">
+            <input id="pconf-client-secret" class="portfolio-input" type="password" placeholder="Client Secret">
+            <a class="portfolio-config-link" href="${consoleUrl}" target="_blank" rel="noopener">→ Get credentials from ${provLabel}</a>
+            <button class="btn btn--sm btn--ghost" type="button" id="pconf-save-creds">Save credentials</button>
+          </div>`;
+        }
+        html += `
+          <div class="portfolio-config-actions">
+            <button class="btn btn--sm btn--brand" type="button" id="pconf-oauth-btn"${!oauthReady ? ' disabled' : ''}>
+              <i class="ph-bold ph-key"></i> Authorize ${provLabel} →
+            </button>
+            <span class="portfolio-oauth-status" id="pconf-oauth-status" hidden>
+              <i class="ph-bold ph-check-circle"></i> Connected
+            </span>
+          </div>`;
+      } else if (provider === 'local_file') {
+        html += `
+          <label class="portfolio-file-label" for="pconf-file-input">
+            <i class="ph-bold ph-file-arrow-up"></i>
+            <span>Choose file (CSV / JSON / Excel)</span>
+          </label>
+          <input id="pconf-file-input" type="file" accept=".csv,.txt,.tsv,.md,.json,.doc,.docx,.png,.jpg,.jpeg">
+          <textarea id="pconf-import-text" class="portfolio-textarea" placeholder="Or paste CSV content here (optional)"></textarea>
+          <button class="btn btn--sm btn--brand" type="button" id="pconf-import-btn">
+            <i class="ph-bold ph-upload-simple"></i> Import to Brain
+          </button>`;
+      } else {
+        html += `
+          <textarea id="pconf-import-text" class="portfolio-textarea portfolio-textarea--tall" placeholder="Paste CSV-style position records:"></textarea>
+          <button class="btn btn--sm btn--brand" type="button" id="pconf-import-btn">
+            <i class="ph-bold ph-upload-simple"></i> Import to Brain
+          </button>`;
+      }
+      html += '</div>';
+      configPanel.innerHTML = html;
+      configPanel.hidden = false;
+      bindConfigEvents(provider, provKey, provLabel);
+    };
+
+    const bindConfigEvents = (provider, provKey, provLabel) => {
+      // Save OAuth credentials
+      configPanel.querySelector('#pconf-save-creds')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        const clientId = configPanel.querySelector('#pconf-client-id')?.value.trim();
+        const clientSecret = configPanel.querySelector('#pconf-client-secret')?.value.trim();
+        if (!clientId || !clientSecret) return;
+        btn.textContent = 'Saving...';
+        try {
+          await fetch(api + '/oauth/clients', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider: provKey, client_id: clientId, client_secret: clientSecret })
+          });
+          await loadOAuthClients();
+          renderConfigPanel(provider);
+        } catch (_) { btn.textContent = 'Save failed, retry'; }
+      });
+
+      // OAuth authorize
+      configPanel.querySelector('#pconf-oauth-btn')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        const nameVal = configPanel.querySelector('#pconf-name')?.value.trim() || provKey;
+        const refVal = configPanel.querySelector('#pconf-ref')?.value.trim() || '';
+        const srcResp = await fetch(api + '/portfolio/sources', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: provider, name: nameVal, document_id: refVal, database_id: refVal })
+        });
+        const srcData = await srcResp.json();
+        const sourceId = srcData.source?.id || nameVal;
+        const popup = window.open(
+          `${api}/oauth/${provKey}/start?source_id=${encodeURIComponent(sourceId)}`,
+          'oauth-popup',
+          'width=620,height=700,left=200,top=100,noopener=no'
+        );
+        btn.innerHTML = '<i class="ph-bold ph-spinner"></i> Waiting for authorization...';
+        btn.disabled = true;
+        const onMsg = (event) => {
+          if (event.origin !== api.replace('127.0.0.1', 'localhost').replace(':3002', '') && event.origin !== 'http://localhost:3002' && event.origin !== 'http://127.0.0.1:3002') return;
+          if (!event.data?.ok || event.data?.provider !== provKey) return;
+          window.removeEventListener('message', onMsg);
+          clearInterval(closedTimer);
+          const statusEl = configPanel.querySelector('#pconf-oauth-status');
+          if (statusEl) statusEl.hidden = false;
+          btn.innerHTML = '<i class="ph-bold ph-arrows-clockwise"></i> Reauthorize';
+          btn.disabled = false;
+          load();
+        };
+        window.addEventListener('message', onMsg);
+        const closedTimer = setInterval(() => {
+          if (popup?.closed) {
+            clearInterval(closedTimer);
+            window.removeEventListener('message', onMsg);
+            if (btn.disabled) {
+              btn.innerHTML = '<i class="ph-bold ph-key"></i> Authorize ' + provLabel;
+              btn.disabled = false;
+            }
+          }
+        }, 800);
+      });
+
+      // File upload
+      configPanel.querySelector('#pconf-file-input')?.addEventListener('change', async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        bytes.forEach(b => { binary += String.fromCharCode(b); });
+        await fetch(api + '/portfolio/import-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file_name: file.name,
+            mime_type: file.type || 'application/octet-stream',
+            content_base64: btoa(binary),
+            source_id: 'file-' + file.name.replace(/[^a-zA-Z0-9_-]+/g, '-').toLowerCase()
+          })
+        });
+        const textArea = configPanel.querySelector('#pconf-import-text');
+        if (textArea) {
+          if (/text|csv|json|tsv|markdown/.test(file.type) || /\.(csv|txt|tsv|md|json)$/i.test(file.name)) {
+            textArea.value = await file.text();
+          } else {
+            textArea.value = '# File sent to Brain: ' + file.name;
+          }
+        }
+        await load();
+      });
+
+      // Text import
+      configPanel.querySelector('#pconf-import-btn')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        const text = configPanel.querySelector('#pconf-import-text')?.value || '';
+        if (!text.trim()) return;
+        btn.innerHTML = '<i class="ph-bold ph-spinner"></i> Importing...';
+        await fetch(api + '/portfolio/import-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, source_id: configPanel.querySelector('#pconf-name')?.value.trim() || provider })
+        });
+        btn.innerHTML = '<i class="ph-bold ph-upload-simple"></i> Import to Brain';
+        await load();
+      });
+    };
+
+    // Provider card selection
+    root.querySelector('#portfolio-provider-grid')?.addEventListener('click', (e) => {
+      const card = e.target.closest('[data-provider]');
+      if (!card) return;
+      root.querySelectorAll('.portfolio-app-row').forEach(c =>
+        c.classList.toggle('portfolio-app-row--selected', c === card)
+      );
+      renderConfigPanel(card.dataset.provider);
+    });
+
+    root.querySelector('#portfolio-refresh-btn')?.addEventListener('click', load);
+
+    await loadOAuthClients();
+    await load();
+  },
+
   _navigateToRoute(route) {
     const next = String(route || '').trim();
     if (!next) return;
     // Guard: don't allow branch switch while an op is processing
     const BRANCH_DOMAINS = ['market', 'position', 'target', 'sentiment'];
     if (BRANCH_DOMAINS.includes(next) && this._isProcessing) {
-      this.toast('请等待当前操作完成后再切换');
+      this.toast('Please wait for the current action to finish before switching.');
       return;
     }
     // Activate branch on server (fire-and-forget; navigation proceeds immediately)
@@ -418,6 +796,7 @@ const Anchor = {
       return;
     }
     window.location.hash = next;
+    this._routeHash(next);
   },
 
   _bindGeneratedPageRoute(route) {
@@ -468,6 +847,7 @@ const Anchor = {
             this._selectedPromptRoute = '';
           }
           input.focus();
+          if (route) this._navigateToRoute(route);
         }
       });
     });
@@ -475,21 +855,22 @@ const Anchor = {
 
   _inferRoute(text) {
     const t = (text || '').toLowerCase();
-    if (/持仓|仓位|portfolio|position|复盘/.test(t)) return 'position';
-    if (/标的|target|tracker|nvda|aapl|tsla|触发/.test(t)) return 'target';
-    if (/情绪|sentiment|fear.?greed|reddit|stocktwits/.test(t)) return 'sentiment';
-    if (/宏观|市场|today|market|overview|风险/.test(t)) return 'market';
+    if (/鎸佷粨|浠撲綅|portfolio|position|澶嶇洏/.test(t)) return 'position';
+    if (/鏍囩殑|target|tracker|nvda|aapl|tsla|瑙﹀彂/.test(t)) return 'target';
+    if (/鎯呯华|sentiment|fear.?greed|reddit|stocktwits/.test(t)) return 'sentiment';
+    if (/瀹忚|甯傚満|today|market|overview|椋庨櫓/.test(t)) return 'market';
     return 'market';
   },
 
   submitPrompt(text, route = '') {
-    if (this._staticMode) { this.toast('Static mode — prompts disabled'); return; }
+    if (this._staticMode) { this.toast('Static mode —prompts disabled'); return; }
+    const effectiveRoute = String(route || '').trim() || this._inferRoute(text);
+    this._navigateToRoute(effectiveRoute);
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.toast('Not connected — please wait');
+      this.toast('Not connected —please wait');
       return;
     }
     this._allowIncomingHtml = true;
-    const effectiveRoute = String(route || '').trim() || this._inferRoute(text);
     this._pendingPromptRoute = effectiveRoute;
     // Initialize timing for prompt-based generation
     this._timing = {
@@ -499,17 +880,10 @@ const Anchor = {
       t1_built: performance.now(),
       _agentContext: this._activeBranch ? 'branch:' + this._activeBranch : 'content-agent',
     };
-    // Navigate immediately without waiting for hashchange (avoids async flicker over home)
-    history.pushState(null, '', '#' + effectiveRoute);
-    const home = document.getElementById('anchor-home');
-    const shell = document.getElementById('anchor-shell');
-    if (home) home.classList.add('is-hidden');
-    if (shell) shell.classList.add('has-content');
     this.container.innerHTML = '';
-    this._updateToolbarTabs(effectiveRoute);
     this.ws.send(JSON.stringify({ type: 'prompt', text, route: effectiveRoute, ts: Date.now() }));
     this._captureIntent('query', text, 'route:' + effectiveRoute);
-    this.showProcessing('Generating…');
+    this.showProcessing('Generating...');
     this.toast('Prompt sent');
   },
 
@@ -584,7 +958,7 @@ const Anchor = {
     logo?.addEventListener('click', goHome);
     brand?.addEventListener('click', goHome);
 
-    // Toolbar domain tabs — hash routing
+    // Toolbar domain tabs —hash routing
     document.querySelectorAll('.domain-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         const d = tab.dataset.domain;
@@ -604,7 +978,7 @@ const Anchor = {
       });
     });
 
-    // Floating trigger tabs — hover to expand, mouseleave to collapse
+    // Floating trigger tabs —hover to expand, mouseleave to collapse
     this._initFloatingTrigger('trigger-context', 'anchor-context-panel');
     this._initFloatingTrigger('trigger-timeline', 'anchor-timeline-panel');
     this._initFloatingTrigger('trigger-inbox', 'anchor-inbox-panel');
@@ -631,7 +1005,7 @@ const Anchor = {
       trigger.style.pointerEvents = '';
     };
 
-    // Hover trigger tab → show; leave trigger or panel → hide
+    // Hover trigger tab →show; leave trigger or panel →hide
     trigger.addEventListener('mouseenter', () => {
       if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
       showPanel();
@@ -847,20 +1221,20 @@ const Anchor = {
     if (kind === 'agent.thinking' || kind === 'agent.decision' || kind === 'agent.tool_call') {
       this.showProcessing(payload.target_anchor || payload.summary || 'AI working...');
     } else if (kind === 'agent.complete' || kind === 'agent.error' || kind === 'agent.partial_render') {
-      // Don't clear yet — wait for the final html message
+      // Don't clear yet —wait for the final html message
       if (kind === 'agent.error') {
         this.showProcessing('Error: ' + (payload.message || 'unknown'), true);
       }
     }
   },
 
-  // ── Processing state ─────────────────────────────────────────────
+  // 鈹€鈹€ Processing state 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   showProcessing(label, isError) {
     if (!this.processingEl) return;
     this._isProcessing = true;
     this.processingEl.style.display = 'flex';
-    this.processingLabel.textContent = label || 'AI 处理中';
+    this.processingLabel.textContent = label || 'AI processing...';
     this.processingTarget.textContent = '';
     this.processingEl.className = 'toolbar-processing' + (isError ? ' is-error' : '');
     var self = this;
@@ -902,7 +1276,7 @@ const Anchor = {
       if (el) el.classList.remove('anc-processing');
     });
     this._processingAnchors.clear();
-    // Trigger timing panel on processing end — regardless of message type
+    // Trigger timing panel on processing end —regardless of message type
     if (this._timing && !this._timing.t6_dom) {
       this._timing.t6_dom = performance.now();
     }
@@ -920,11 +1294,13 @@ const Anchor = {
     }
     this.currentHtml = html;
     if (window.OpBars) OpBars.clearAll();
+    if (window.LoomDetailOverlay) window.LoomDetailOverlay.close();
     this.container.innerHTML = html;
     if (!this._staticMode) {
       this.injectHandles();
       this.injectCollapse();
     }
+    if (window.LoomDetailOverlay) window.LoomDetailOverlay.refresh(this.container);
     this.infoEl.textContent = this.countAnchors() + ' anchors';
     if (window.WorkspacePanel) WorkspacePanel.persistCurrentHtml(html);
     if (window.PromptPanel) PromptPanel.clearSelection();
@@ -979,6 +1355,7 @@ const Anchor = {
           this.injectHandlesIn(newEl);
           this.injectCollapseIn(newEl);
         }
+        if (window.LoomDetailOverlay) window.LoomDetailOverlay.refresh(newEl);
         this._mountAnnotations(p.anchor_id);
         this._clearStreamingOverlay(p.anchor_id);
       }
@@ -1009,7 +1386,7 @@ const Anchor = {
     if (window.PromptPanel) PromptPanel.clearSelection();
     this.clearProcessing();
 
-    // Record t6_dom here — the moment the patched DOM is visible and processing indicators are cleared
+    // Record t6_dom here —the moment the patched DOM is visible and processing indicators are cleared
     if (this._timing) {
       this._timing.t6_dom = performance.now();
       this._timing._patch_detail = {
@@ -1195,12 +1572,12 @@ const Anchor = {
     const blockCfg = this._getBlockConfig(anchorId);
     const defaultCfg = this._defaultProcessor;
     if (blockCfg && blockCfg.subagent_id) {
-      return '⚙ ' + blockCfg.subagent_id + ' / ' + (blockCfg.context_mode || 'none') + ' ▾';
+      return 'agent ' + blockCfg.subagent_id + ' / ' + (blockCfg.context_mode || 'none');
     }
     if (defaultCfg && defaultCfg.subagent_id) {
-      return '⚙ (默认) ' + defaultCfg.subagent_id + ' ▾';
+      return 'default agent ' + defaultCfg.subagent_id;
     }
-    return '⚙ 主线程 ▾';
+    return 'main thread';
   },
 
   _renderProcessorOverride(popup, chip, anchorId) {
@@ -1214,11 +1591,11 @@ const Anchor = {
 
     const hdr = document.createElement('div');
     hdr.style.cssText = 'font-size:11px;font-weight:600;color:var(--fg-2,#555);margin-bottom:4px;';
-    hdr.textContent = '块级 Subagent 覆盖';
+    hdr.textContent = 'Block subagent override';
     view.appendChild(hdr);
 
     const subagents = (window.ContextPanel && ContextPanel.manifest && ContextPanel.manifest.subagents) ? ContextPanel.manifest.subagents : [];
-    const allOptions = [{ id: null, name: '主线程（默认）', can_patch: true }, ...subagents];
+    const allOptions = [{ id: null, name: 'Main thread default', can_patch: true }, ...subagents];
 
     let selectedId = currentId;
     let selectedMode = currentMode;
@@ -1234,7 +1611,7 @@ const Anchor = {
       const nm = document.createElement('span');
       nm.textContent = ag.name || ag.id;
       if (ag.can_patch === false) {
-        nm.insertAdjacentHTML('beforeend', ' <span title="此 agent 可能无法调用 anchor_patch" style="color:var(--amber,#f59e0b)">⚠</span>');
+        nm.insertAdjacentHTML('beforeend', ' <span title="This agent may not be able to call anchored ops" style="color:var(--amber,#f59e0b)">⚠/span>');
       }
       row.appendChild(rb);
       row.appendChild(nm);
@@ -1257,9 +1634,9 @@ const Anchor = {
     modeSection.style.display = selectedId ? '' : 'none';
     const modeHdr = document.createElement('div');
     modeHdr.style.cssText = 'font-size:11px;font-weight:600;color:var(--fg-2,#555);margin:6px 0 2px;';
-    modeHdr.textContent = '上下文模式';
+    modeHdr.textContent = 'Context mode';
     modeSection.appendChild(modeHdr);
-    [['none', '无上下文（最快）'], ['summarized', '摘要式压缩'], ['full', '完整上下文']].forEach(([id, label]) => {
+    [['none', 'No context (fastest)'], ['summarized', 'Summarized context'], ['full', 'Full context']].forEach(([id, label]) => {
       const row = document.createElement('label');
       row.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;padding:1px 0;cursor:pointer;';
       const rb = document.createElement('input');
@@ -1285,7 +1662,7 @@ const Anchor = {
     btnRow.style.cssText = 'display:flex;gap:4px;margin-top:6px;';
     const saveBtn = document.createElement('button');
     saveBtn.className = 'btn btn--sm btn--brand';
-    saveBtn.textContent = '保存';
+    saveBtn.textContent = 'Save';
     saveBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const cfg = selectedId ? { subagent_id: selectedId, context_mode: selectedMode } : null;
@@ -1296,7 +1673,7 @@ const Anchor = {
     });
     const resetBtn = document.createElement('button');
     resetBtn.className = 'btn btn--sm btn--ghost';
-    resetBtn.textContent = '重置为默认';
+    resetBtn.textContent = 'Reset to default';
     resetBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this._setBlockConfig(anchorId, null);
@@ -1323,7 +1700,7 @@ const Anchor = {
     if (handles.length === 0) return;
     const popup = document.createElement('div');
     popup.className = 'anc-handle-popup open';
-    // Position fixed relative to viewport — always on top
+    // Position fixed relative to viewport —always on top
     const triggerRect = trigger.getBoundingClientRect();
     popup.style.position = 'fixed';
     popup.style.top = (triggerRect.bottom + 4) + 'px';
@@ -1334,7 +1711,7 @@ const Anchor = {
     header.textContent = anchorId;
     popup.appendChild(header);
 
-    // B.1.7 — Context override chip
+    // B.1.7 —Context override chip
     const chip = document.createElement('span');
     chip.className = 'context-chip';
     chip.textContent = this._formatContextChipText();
@@ -1357,7 +1734,7 @@ const Anchor = {
     procChip.className = 'context-chip';
     procChip.style.marginLeft = '4px';
     procChip.textContent = this._formatProcessorChipText(anchorId);
-    procChip.title = '配置此块的 Subagent';
+    procChip.title = "Configure this block's Subagent";
     let procOverrideOpen = false;
     procChip.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1374,7 +1751,7 @@ const Anchor = {
     handles.forEach(opName => {
       const def = this.opDefs[opName];
       if (!def) return;
-      // All operations show an input step — required or optional
+      // All operations show an input step —required or optional
       const btn = document.createElement('button');
       btn.className = 'anc-op-btn';
       const iconHtml = def.icon ? `<i class="ph-bold ${def.icon} anc-op-icon"></i>` : '';
@@ -1426,7 +1803,7 @@ const Anchor = {
       e.stopPropagation();
     }.bind(this));
     var executeBtn = document.createElement('button');
-    executeBtn.textContent = '执行';
+    executeBtn.textContent = 'Execute';
     executeBtn.className = 'btn-execute-now';
     executeBtn.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -1437,9 +1814,9 @@ const Anchor = {
       }
     }.bind(this));
     var queueBtn = document.createElement('button');
-    queueBtn.textContent = '暂存';
+    queueBtn.textContent = 'Stage';
     queueBtn.className = 'btn-queue';
-    queueBtn.title = '加入批量执行队列';
+    queueBtn.title = 'Add to batch queue';
     queueBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       var instruction = input.value.trim();
@@ -1461,7 +1838,7 @@ const Anchor = {
     const ac = (b.subagent_ids || (b.subagents || [])).length;
     const rc = (b.resource_ids || (b.resources || [])).length;
     const total = mc + sc + ac + rc;
-    return 'Context: ' + (total || 'default') + ' (' + mc + 'm ' + sc + 's ' + ac + 'a ' + rc + 'r) ▾';
+    return 'Context: ' + (total || 'default') + ' (' + mc + 'm ' + sc + 's ' + ac + 'a ' + rc + 'r)';
   },
 
   _renderMiniContext(popup, chip) {
@@ -1526,7 +1903,7 @@ const Anchor = {
     }
   },
 
-  // ── Phase 2: Envelope construction & dispatch ─────────────────────
+  // 鈹€鈹€ Phase 2: Envelope construction & dispatch 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   _positionPopup(popup, trigger) {
     const margin = 10;
@@ -1552,7 +1929,7 @@ const Anchor = {
     if (target_ref && target_kind === 'anchor') {
       renderState.relevant_subtree = this._collectRelevantSubtree(target_ref);
     }
-    // Resolve per-block → global default → null (main thread)
+    // Resolve per-block →global default →null (main thread)
     const blockCfg = target_ref ? this._getBlockConfig(target_ref) : null;
     const effectiveCfg = blockCfg || this._defaultProcessor || null;
     const bundle = Object.assign({
@@ -1565,7 +1942,7 @@ const Anchor = {
     }
     bundle.file_id = (window.WorkspacePanel && WorkspacePanel.currentFileId) || this.currentFileId || null;
 
-    // Trading domain extension — detect target anchor's domain
+    // Trading domain extension —detect target anchor's domain
     var domain = null;
     var targetEl = target_ref ? document.querySelector('[data-anc="' + target_ref.replace(/"/g, '\\"') + '"]') : null;
     if (targetEl && targetEl.getAttribute('data-domain') === 'trading.private') {
@@ -1669,7 +2046,7 @@ const Anchor = {
     }
   },
 
-  // Multi-select card anchors — click to toggle context reference
+  // Multi-select card anchors —click to toggle context reference
   _initAnchorSelect() {
     this.container.addEventListener('click', (e) => {
       if (e.target.closest('.anc-handle, .anc-handle-popup, .anc-op-btn, ' +
@@ -1736,13 +2113,13 @@ const Anchor = {
       if (targetRef) {
         this.markAnchorProcessing(targetRef);
         this.showProcessing(targetRef);
-        // Instant OpBar — user sees feedback before CC cold-start finishes
+        // Instant OpBar —user sees feedback before CC cold-start finishes
         if (window.OpBars) OpBars.preCreate(targetRef);
       }
       if (this._timing) this._timing.t2_sent = performance.now();
       this.ws.send(JSON.stringify({ type: 'envelope', envelope }));
-      this.toast('Sent: ' + envelope.intent.op + ' → ' + targetRef);
-      // Intent capture: map anchor op → intent type
+      this.toast('Sent: ' + envelope.intent.op + ' →' + targetRef);
+      // Intent capture: map anchor op →intent type
       var _op = envelope.intent && envelope.intent.op || '';
       var _instr = envelope.intent && envelope.intent.instruction || '';
       if (_instr) {
@@ -1756,7 +2133,7 @@ const Anchor = {
         });
       }
     } else {
-      this.toast('Connection lost — reconnecting...');
+      this.toast('Connection lost —reconnecting...');
     }
   },
 
@@ -1827,7 +2204,7 @@ const Anchor = {
           const pill = document.createElement('span');
           pill.className = 'anc-annotation-pill';
           pill.innerHTML = _escHtml(ann.text) +
-            '<span class="remove-anno" data-ann-id="' + _escHtml(ann.id) + '" title="删除注解">×</span>';
+            '<span class="remove-anno" data-ann-id="' + _escHtml(ann.id) + '" title="Remove annotation">×</span>';
           pill.querySelector('.remove-anno').addEventListener('click', (e) => {
             e.stopPropagation();
             fetch('/annotations/' + ann.id, { method: 'DELETE' })
@@ -1865,7 +2242,7 @@ const Anchor = {
     }
   },
 
-  // ── Queue management ─────────────────────────────────────────────
+  // 鈹€鈹€ Queue management 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   queueOp(opName, anchorId, instruction) {
     this.pendingOps.push({
@@ -1875,7 +2252,7 @@ const Anchor = {
       timestamp: Date.now()
     });
     this.updateQueueBadge();
-    this.toast('Queued: ' + opName + ' → ' + anchorId + ' (' + this.pendingOps.length + ' total)');
+    this.toast('Queued: ' + opName + ' →' + anchorId + ' (' + this.pendingOps.length + ' total)');
   },
 
   executeAll() {
@@ -1933,7 +2310,7 @@ const Anchor = {
     }
   },
 
-  // Op dispatch via WebSocket — now builds envelope when context is active
+  // Op dispatch via WebSocket —now builds envelope when context is active
   sendOp(opName, anchorId, args) {
     const _t_click = performance.now();
     const sel = window.getSelection();
@@ -1969,17 +2346,17 @@ const Anchor = {
     this._tempOverride = null;  // reset per-op override
   },
 
-  // ── Timing waterfall ─────────────────────────────────────────────
+  // 鈹€鈹€ Timing waterfall 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   _timingAgentHtml(ctx) {
     if (!ctx) return '';
     const labels = {
-      'branch:market':    { label: '市场研判', color: '#5B8FF9' },
-      'branch:position':  { label: '仓位管理', color: '#F6AD55' },
-      'branch:target':    { label: '投资逻辑', color: '#68D391' },
-      'branch:sentiment': { label: '情绪追踪', color: '#FC8181' },
-      'content-agent':    { label: '通用内容', color: '#A0AEC0' },
-      'spawned-cc':       { label: 'CC 子进程', color: '#B794F4' },
+      'branch:market':    { label: 'Market', color: '#5B8FF9' },
+      'branch:position':  { label: 'Portfolio', color: '#F6AD55' },
+      'branch:target':    { label: 'Targets', color: '#68D391' },
+      'branch:sentiment': { label: 'Sentiment', color: '#FC8181' },
+      'content-agent':    { label: 'Content', color: '#A0AEC0' },
+      'spawned-cc':       { label: 'Subprocess', color: '#B794F4' },
     };
     const entry = labels[ctx] || { label: ctx, color: '#666' };
     return `<span style="display:inline-block;font-size:9px;font-weight:600;padding:2px 8px;border-radius:999px;background:${entry.color}22;color:${entry.color};border:1px solid ${entry.color}44">${entry.label}</span>`;
@@ -2043,7 +2420,7 @@ const Anchor = {
       }
 
       let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span style="font-size:11px;font-weight:700;color:#7A5AF8;letter-spacing:.06em">交互时序分析</span>
+        <span style="font-size:11px;font-weight:700;color:#7A5AF8;letter-spacing:0.04em">AI TIMING</span>
         <button onclick="document.getElementById('anc-timing-panel').remove()" style="background:none;border:none;color:#999;cursor:pointer;font-size:18px;padding:0 2px;line-height:1">×</button>
       </div>
       <div style="color:#888;font-size:10px;margin-bottom:10px">op: <b style="color:#666">${op}</b> · target: <b style="color:#666">${target}</b></div>
@@ -2110,14 +2487,14 @@ const Anchor = {
   }
 };
 
-// ────────────────────────────────────────────────────────────────────
-// OpBars — per-cell streaming output bar
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// OpBars —per-cell streaming output bar
 // Attaches a floating pill to the anchor element currently being processed
 // by an agent thread. Streams agent_event payloads (thinking / tool_call /
 // decision / partial_render / complete / error). Click bar to expand log.
 //
-// States: processing (yellow/amber) → done (green) | error (red)
-// ────────────────────────────────────────────────────────────────────
+// States: processing (yellow/amber) →done (green) | error (red)
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 window.OpBars = {
   bars: new Map(),  // anchorId -> { el, logEl, summaryEl, dotEl, dismissBtn, events, done, error, cleanupTimer }
@@ -2173,7 +2550,7 @@ window.OpBars = {
 
     const summary = document.createElement('span');
     summary.className = 'anc-opbar-summary';
-    summary.textContent = '处理中…';
+    summary.textContent = 'Processing...';
     el.appendChild(summary);
 
     // Dismiss button (hidden until terminal state)
@@ -2191,7 +2568,7 @@ window.OpBars = {
 
     const caret = document.createElement('span');
     caret.className = 'anc-opbar-caret';
-    caret.textContent = '▾';
+    caret.textContent = '>';
     el.appendChild(caret);
 
     const log = document.createElement('div');
@@ -2259,7 +2636,7 @@ window.OpBars = {
     if (!p) return '';
     if (p.summary) return p.summary;
     if (p.choice) return p.choice;
-    if (p.tool) return p.tool + (p.status ? ' (' + p.status + ')' : '') + (p.input_summary ? ' — ' + p.input_summary : '') + (p.result_summary ? ' → ' + p.result_summary : '');
+    if (p.tool) return p.tool + (p.status ? ' (' + p.status + ')' : '') + (p.input_summary ? ' —' + p.input_summary : '') + (p.result_summary ? ' →' + p.result_summary : '');
     if (p.message) return p.message;
     if (p.input_summary) return p.input_summary;
     if (p.result_summary) return p.result_summary;
@@ -2276,7 +2653,7 @@ window.OpBars = {
     } else if (kind === 'decision' && text) {
       entry.summaryEl.textContent = '🎯 ' + String(text).slice(0, 70);
     } else if (kind === 'partial_render') {
-      entry.summaryEl.textContent = '📄 部分渲染' + (evt.payload?.target_anchor ? ': ' + evt.payload.target_anchor : '');
+      entry.summaryEl.textContent = '📄 Partial render' + (evt.payload?.target_anchor ? ': ' + evt.payload.target_anchor : '');
     } else {
       entry.summaryEl.textContent = kind + (text ? ': ' + String(text).slice(0, 70) : '');
     }
@@ -2306,7 +2683,7 @@ window.OpBars = {
     if (!entry) return;
     entry.done = true;
     entry.el.dataset.kind = 'complete';
-    entry.summaryEl.textContent = '✓ 完成';
+    entry.summaryEl.textContent = '✓ Done';
     entry.dismissBtn.style.display = '';
     // Auto-dismiss after 12s
     if (entry.cleanupTimer) clearTimeout(entry.cleanupTimer);
@@ -2318,7 +2695,7 @@ window.OpBars = {
     if (!entry) return;
     entry.error = true;
     entry.el.dataset.kind = 'error';
-    entry.summaryEl.textContent = '✗ ' + String(message).slice(0, 70);
+    entry.summaryEl.textContent = '✓' + String(message).slice(0, 70);
     entry.dismissBtn.style.display = '';
     // Stay visible longer (30s) for user to read error
     if (entry.cleanupTimer) clearTimeout(entry.cleanupTimer);
@@ -2350,9 +2727,9 @@ window.OpBars = {
   }
 };
 
-// ────────────────────────────────────────────────────────────────────
-// Phase 1 — ContextPanel: 4-group multi-select (memory/skills/subagents/resources)
-// ────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// Phase 1 —ContextPanel: 4-group multi-select (memory/skills/subagents/resources)
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 window.WorkspacePanel = {
   anchor: null,
@@ -2769,8 +3146,8 @@ window.ContextPanel = {
     det.setAttribute('data-group', 'default-processor');
     const summary = document.createElement('summary');
     const dp = this._defaultProcessor;
-    const activeLabel = dp && dp.subagent_id ? dp.subagent_id : '主线程';
-    summary.innerHTML = `默认处理器 <span class="group-count">${activeLabel}</span>`;
+    const activeLabel = dp && dp.subagent_id ? dp.subagent_id : 'Main thread';
+    summary.innerHTML = `Default processor <span class="group-count">${activeLabel}</span>`;
     det.appendChild(summary);
 
     const content = document.createElement('div');
@@ -2783,7 +3160,7 @@ window.ContextPanel = {
     content.appendChild(agentHdr);
 
     const subagents = this.manifest.subagents || [];
-    const allOptions = [{ id: null, name: '主线程（默认）', can_patch: true }, ...subagents];
+    const allOptions = [{ id: null, name: 'Main thread default', can_patch: true }, ...subagents];
     let selectedId = (dp && dp.subagent_id) || null;
     let selectedMode = (dp && dp.context_mode) || 'none';
 
@@ -2802,7 +3179,7 @@ window.ContextPanel = {
       nm.className = 'item-name';
       nm.textContent = ag.name || ag.id;
       if (ag.can_patch === false) {
-        nm.insertAdjacentHTML('beforeend', ' <span title="可能无法调用 anchor_patch" style="color:var(--amber,#f59e0b)">⚠</span>');
+        nm.insertAdjacentHTML('beforeend', ' <span title="May not support anchor_patch" style="color:var(--amber,#f59e0b)">!</span>');
       }
       meta.appendChild(nm);
       row.appendChild(rb);
@@ -2818,9 +3195,9 @@ window.ContextPanel = {
     modeSection.style.display = selectedId ? '' : 'none';
     const modeHdr = document.createElement('div');
     modeHdr.style.cssText = 'font-size:11px;font-weight:600;color:var(--fg-2,#555);margin:8px 0 4px;';
-    modeHdr.textContent = '上下文模式';
+    modeHdr.textContent = 'Context mode';
     modeSection.appendChild(modeHdr);
-    [['none', '无上下文（最快）'], ['summarized', '摘要式压缩'], ['full', '完整上下文']].forEach(([id, label]) => {
+    [['none', 'No context (fastest)'], ['summarized', 'Summarized context'], ['full', 'Full context']].forEach(([id, label]) => {
       const row = document.createElement('label');
       row.className = 'context-item';
       const rb = document.createElement('input');
@@ -2844,21 +3221,21 @@ window.ContextPanel = {
     const saveBtn = document.createElement('button');
     saveBtn.className = 'btn btn--sm btn--brand';
     saveBtn.style.marginTop = '8px';
-    saveBtn.textContent = '保存默认';
+    saveBtn.textContent = 'Save default';
     saveBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const cfg = selectedId ? { subagent_id: selectedId, context_mode: selectedMode } : null;
       this._saveDefaultProcessor(cfg);
       const countEl = det.querySelector('.group-count');
-      if (countEl) countEl.textContent = cfg ? cfg.subagent_id : '主线程';
-      this.anchor && this.anchor.toast('默认处理器已更新: ' + (cfg ? cfg.subagent_id + ' / ' + cfg.context_mode : '主线程'));
+      if (countEl) countEl.textContent = cfg ? cfg.subagent_id : 'Main thread';
+      this.anchor && this.anchor.toast('Default processor updated: ' + (cfg ? cfg.subagent_id + ' / ' + cfg.context_mode : 'Main thread'));
     });
     content.appendChild(saveBtn);
 
     // Custom subagent creation form
     const newHdr = document.createElement('div');
     newHdr.style.cssText = 'font-size:11px;font-weight:600;color:var(--fg-2,#555);margin-top:12px;margin-bottom:4px;border-top:1px solid var(--border-1,#e5e5e5);padding-top:8px;';
-    newHdr.textContent = '+ 新建 Subagent';
+    newHdr.textContent = '+ New Subagent';
     newHdr.style.cursor = 'pointer';
     content.appendChild(newHdr);
 
@@ -2877,27 +3254,27 @@ window.ContextPanel = {
       return el;
     };
 
-    const nameInput = mkInput('agent 名称 (a-z0-9_-)');
-    const descInput = mkInput('描述（一行）');
-    const promptInput = mkInput('系统提示词 (system prompt)', 'textarea');
+    const nameInput = mkInput('agent name (a-z0-9_-)');
+    const descInput = mkInput('description');
+    const promptInput = mkInput('system prompt', 'textarea');
     const allToolsCb = document.createElement('input');
     allToolsCb.type = 'checkbox';
     allToolsCb.checked = true;
     const cbLabel = document.createElement('label');
     cbLabel.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;margin-bottom:6px;cursor:pointer;';
-    const cbText = document.createTextNode(' 使用所有工具（含 MCP）');
+    const cbText = document.createTextNode(' Use all tools, including MCP');
     cbLabel.appendChild(allToolsCb);
     cbLabel.appendChild(cbText);
 
     const submitBtn = document.createElement('button');
     submitBtn.className = 'btn btn--sm btn--brand';
-    submitBtn.textContent = '创建';
+    submitBtn.textContent = 'Create';
     submitBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const agentName = nameInput.value.trim();
-      if (!agentName) { this.anchor && this.anchor.toast('请输入 agent 名称'); return; }
+      if (!agentName) { this.anchor && this.anchor.toast('Please enter an agent name'); return; }
       submitBtn.disabled = true;
-      submitBtn.textContent = '保存中...';
+      submitBtn.textContent = 'Saving...';
       try {
         const res = await fetch('/agents/save', {
           method: 'POST',
@@ -2911,17 +3288,17 @@ window.ContextPanel = {
         });
         const data = await res.json();
         if (data.ok) {
-          this.anchor && this.anchor.toast('已创建 subagent: ' + agentName);
+          this.anchor && this.anchor.toast('Created subagent: ' + agentName);
           nameInput.value = ''; descInput.value = ''; promptInput.value = '';
           // manifest_updated broadcast will trigger refresh
         } else {
-          this.anchor && this.anchor.toast('错误: ' + data.error);
+          this.anchor && this.anchor.toast('Error: ' + data.error);
         }
       } catch (err) {
-        this.anchor && this.anchor.toast('请求失败: ' + err.message);
+        this.anchor && this.anchor.toast('Request failed: ' + err.message);
       }
       submitBtn.disabled = false;
-      submitBtn.textContent = '创建';
+      submitBtn.textContent = 'Create';
     });
 
     [nameInput, descInput, promptInput, cbLabel, submitBtn].forEach(el => formWrap.appendChild(el));
@@ -3183,9 +3560,9 @@ window.ContextPanel = {
   }
 };
 
-// ────────────────────────────────────────────────────────────────────
-// Phase 3 — SelectionToolbar: free text selection → floating op buttons
-// ────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// Phase 3 —SelectionToolbar: free text selection →floating op buttons
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 window.SelectionToolbar = {
   toolbar: null,
@@ -3264,7 +3641,7 @@ window.SelectionToolbar = {
     const targetKind = meta.ancestor_anchor ? 'selection' : 'global';
     const targetRef = targetKind === 'global' ? 'global' : ('selection:' + meta.ancestor_anchor + ':' + this._hash(text));
 
-    // ops that need instruction → show inline input row
+    // ops that need instruction →show inline input row
     if (['refine','branch','annotate','ask'].includes(op)) {
       this._showInstructionPrompt(op, targetKind, targetRef, meta);
     } else {
@@ -3374,9 +3751,9 @@ window.SelectionToolbar = {
   }
 };
 
-// ────────────────────────────────────────────────────────────────────
-// Phase 4 — TimelinePanel: render agent_event stream
-// ────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// Phase 4 —TimelinePanel: render agent_event stream
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 window.TimelinePanel = {
   panel: null,
@@ -3503,9 +3880,9 @@ window.TimelinePanel = {
   }
 };
 
-// ────────────────────────────────────────────────────────────────────
-// HistoryPanel — version history with rollback
-// ────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// HistoryPanel —version history with rollback
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 window.HistoryPanel = {
   MAX_ENTRIES: 50,
@@ -3581,7 +3958,7 @@ window.HistoryPanel = {
       });
       row.appendChild(meta);
       row.appendChild(restoreBtn);
-      // Click row to preview (tooltip style — just restore for now)
+      // Click row to preview (tooltip style —just restore for now)
       row.addEventListener('click', () => this.restore(entry.id));
       row.style.cursor = 'pointer';
       root.appendChild(row);
@@ -3601,7 +3978,7 @@ window.HistoryPanel = {
     try {
       const key = this.fileId ? 'anchor.history.' + this.fileId : 'anchor.history';
       localStorage.setItem(key, JSON.stringify(this.entries.slice(0, 20)));
-    } catch { /* quota exceeded — silently ignore */ }
+    } catch { /* quota exceeded —silently ignore */ }
   },
 
   _saveToServer(entry) {
@@ -3614,9 +3991,9 @@ window.HistoryPanel = {
   }
 };
 
-// ────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Inbox Panel
-// ────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 const InboxPanel = {
   _panel: null,
@@ -3648,7 +4025,7 @@ const InboxPanel = {
       }).catch(() => {});
     });
 
-    // item click → mark read + toggle inline detail
+    // item click →mark read + toggle inline detail
     this._list.addEventListener('click', (e) => {
       if (e.target.closest('.inbox-item-detail')) return;
       const item = e.target.closest('.inbox-item');
@@ -3671,7 +4048,7 @@ const InboxPanel = {
           detail.innerHTML =
             `<div class="inbox-detail-meta">${_escHtml(found.source || '')} · ${_escHtml(ts)}</div>` +
             `<pre class="inbox-detail-payload">${_escHtml(payloadStr)}</pre>` +
-            (domain ? `<button class="btn btn--sm btn--ghost inbox-detail-nav" data-domain="${_escHtml(domain)}">查看详情页 →</button>` : '');
+            (domain ? `<button class="btn btn--sm btn--ghost inbox-detail-nav" data-domain="${_escHtml(domain)}">View details →</button>` : '');
           detail.querySelector('.inbox-detail-nav')?.addEventListener('click', (ev) => {
             ev.stopPropagation();
             _openDomain(domain);
@@ -3729,7 +4106,7 @@ const InboxPanel = {
       : this._items;
 
     if (filtered.length === 0) {
-      this._list.innerHTML = '<div class="inbox-empty">暂无消息</div>';
+      this._list.innerHTML = '<div class="inbox-empty">No messages</div>';
       return;
     }
 
@@ -3749,9 +4126,9 @@ const InboxPanel = {
   }
 };
 
-// ────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Domain card wiring
-// ────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function _initDomainCards() {
   document.querySelectorAll('.home-domain-card').forEach(card => {
@@ -3778,7 +4155,7 @@ function _escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// Settings panel — provider & model config
+// Settings panel —provider & model config
 const SettingsPanel = {
   init(anchor) {
     this._anchor = anchor;
@@ -3791,7 +4168,7 @@ const SettingsPanel = {
     this._baseUrlInput = document.getElementById('settings-baseurl');
     this._activeEl = document.getElementById('settings-active');
 
-    if (!this._saveBtn) return;  // panel removed — settings now in modal
+    if (!this._saveBtn) return;  // panel removed —settings now in modal
 
     this._saveBtn.addEventListener('click', () => this._save());
     this._resetBtn.addEventListener('click', () => this._reset());
@@ -3888,8 +4265,8 @@ const SettingsPanel = {
 };
 window.SettingsPanel = SettingsPanel;
 
-// ────────────────────────────────────────────────────────────────────
-// Schedule & Connector panel — list and toggle background tasks
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// Schedule & Connector panel —list and toggle background tasks
 const SchedulePanel = {
   init(anchor) {
     this._anchor = anchor;
@@ -3908,14 +4285,14 @@ const SchedulePanel = {
       const connectors = connRes.connectors || [];
       this._render(schedules, connectors);
     } catch (e) {
-      if (this._listEl) this._listEl.innerHTML = '<div class="schedule-empty">加载失败</div>';
+      if (this._listEl) this._listEl.innerHTML = '<div class="schedule-empty">No scheduled tasks</div>';
     }
   },
 
   _render(schedules, connectors) {
     if (!this._listEl) return;
     if (!schedules.length && !connectors.length) {
-      this._listEl.innerHTML = '<div class="schedule-empty">暂无定时任务</div>';
+      this._listEl.innerHTML = '<div class="schedule-empty">No scheduled tasks</div>';
       return;
     }
 
@@ -3927,7 +4304,7 @@ const SchedulePanel = {
         <div class="schedule-info">
           <div class="schedule-name">${c.name || c.id}</div>
           <div class="schedule-purpose">${c.purpose || ''}</div>
-          <div class="schedule-cron">${c.running ? '运行中' : '已停止'}${c.error ? ' · ' + c.error : ''}</div>
+          <div class="schedule-cron">${c.running ? 'Running' : 'Stopped'}${c.error ? ' - ' + c.error : ''}</div>
         </div>
         <button class="schedule-toggle ${isOn ? 'is-on' : ''}" data-type="connector" data-id="${c.id}"></button>
       </div>`;
@@ -3969,9 +4346,9 @@ const SchedulePanel = {
 };
 window.SchedulePanel = SchedulePanel;
 
-// ────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
-// Settings modal — Brain / Hands / Connector tabs
+// Settings modal —Brain / Hands / Connector tabs
 const LoomHandsModal = {
   _HANDS_API: 'http://localhost:3000/loom',
   _HANDS: ['market', 'sentiment', 'target', 'position'],
@@ -4047,9 +4424,9 @@ const LoomHandsModal = {
     if (tab === 'connector') this._loadConnectors();
   },
 
-  // ── Brain ────────────────────────────────────────────────────────────
+  // 鈹€鈹€ Brain 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   async _loadBrain() {
-    this._setStatus('loading', '加载中…');
+    this._setStatus('loading', 'Loading...');
     try {
       const r = await fetch('/config', { signal: AbortSignal.timeout(3000) });
       const cfg = await r.json();
@@ -4059,9 +4436,9 @@ const LoomHandsModal = {
       const active = document.getElementById('br-active');
       if (active) active.textContent = (cfg.provider || '') + ' / ' + (cfg.model || '');
       this._onBrainProviderChange();
-      this._setStatus('ok', 'Brain 已连接');
+      this._setStatus('ok', 'Brain connected');
     } catch {
-      this._setStatus('err', 'Brain 服务未响应');
+      this._setStatus('err', 'Brain service unavailable');
     }
   },
 
@@ -4088,12 +4465,12 @@ const LoomHandsModal = {
       if (cfg.ok) {
         const active = document.getElementById('br-active');
         if (active) active.textContent = cfg.provider + ' / ' + cfg.model;
-        if (brMsg) { brMsg.textContent = '✓ 已保存'; brMsg.className = 'loom-modal-msg loom-msg-ok'; }
+        if (brMsg) { brMsg.textContent = 'Saved'; brMsg.className = 'loom-modal-msg loom-msg-ok'; }
       } else {
-        if (brMsg) { brMsg.textContent = cfg.error || '保存失败'; brMsg.className = 'loom-modal-msg loom-msg-err'; }
+        if (brMsg) { brMsg.textContent = cfg.error || 'Save failed'; brMsg.className = 'loom-modal-msg loom-msg-err'; }
       }
     } catch (e) {
-      if (brMsg) { brMsg.textContent = '❌ ' + e.message; brMsg.className = 'loom-modal-msg loom-msg-err'; }
+      if (brMsg) { brMsg.textContent = 'Error: ' + e.message; brMsg.className = 'loom-modal-msg loom-msg-err'; }
     } finally {
       if (saveBtn) saveBtn.disabled = false;
     }
@@ -4110,7 +4487,7 @@ const LoomHandsModal = {
       const active = document.getElementById('br-active');
       if (active) active.textContent = cfg.provider + ' / ' + cfg.model;
       this._onBrainProviderChange();
-      if (brMsg) { brMsg.textContent = '重置完成: ' + cfg.provider + ' / ' + cfg.model; brMsg.className = 'loom-modal-msg loom-msg-ok'; }
+      if (brMsg) { brMsg.textContent = 'Reset done: ' + cfg.provider + ' / ' + cfg.model; brMsg.className = 'loom-modal-msg loom-msg-ok'; }
     } catch (e) {
       if (brMsg) { brMsg.textContent = '❌ ' + e.message; brMsg.className = 'loom-modal-msg loom-msg-err'; }
     }
@@ -4122,7 +4499,7 @@ const LoomHandsModal = {
     if (sel && grp) grp.style.display = sel.value !== 'anthropic' ? '' : 'none';
   },
 
-  // ── Hands ────────────────────────────────────────────────────────────
+  // 鈹€鈹€ Hands 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   _setHandMode(hand, mode) {
     const sel = document.getElementById('hmode-' + hand);
     if (sel) sel.value = mode;
@@ -4139,7 +4516,7 @@ const LoomHandsModal = {
   },
 
   async _loadHands() {
-    this._setStatus('loading', '正在连接 Loom Brain…');
+    this._setStatus('loading', 'Connecting to Loom Brain...');
     try {
       // Load SDK config
       const r = await fetch(this._HANDS_API + '/config', { signal: AbortSignal.timeout(3000) });
@@ -4158,7 +4535,7 @@ const LoomHandsModal = {
         this._set('lm-' + h + '-apikey',   hc.api_key  || '');
         this._set('lm-' + h + '-baseurl',  hc.base_url || '');
       });
-      // Load mount states — set mode toggle based on current mount
+      // Load mount states —set mode toggle based on current mount
       await Promise.all(this._HANDS.map(async h => {
         try {
           const mr = await fetch(this._HANDS_API + '/hand/' + h + '/mount', { signal: AbortSignal.timeout(2000) });
@@ -4172,15 +4549,15 @@ const LoomHandsModal = {
           }
         } catch (_) { this._setHandMode(h, 'api'); }
       }));
-      this._setStatus('ok', 'Loom Brain 已连接 · 修改后点击保存立即生效');
+      this._setStatus('ok', 'Loom Brain connected. Save changes to apply.');
     } catch {
-      this._setStatus('err', 'Loom Brain 未运行 — 启动: scripts\\start-anchor.bat');
+      this._setStatus('err', 'Loom Brain is not running. Start scripts\\start-anchor.bat');
     }
   },
 
   async _saveHands() {
     if (this._saveBtn) this._saveBtn.disabled = true;
-    this._setMsg('保存中…');
+    this._setMsg('Saving...');
     try {
       // Save SDK config for API-mode hands
       const cfg = {
@@ -4201,7 +4578,7 @@ const LoomHandsModal = {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg),
       });
       const d = await r.json();
-      if (!d.ok) throw new Error(d.error || 'SDK 配置保存失败');
+      if (!d.ok) throw new Error(d.error || 'SDK config save failed');
 
       // Handle agent mounts per hand
       await Promise.all(this._HANDS.map(async h => {
@@ -4223,20 +4600,20 @@ const LoomHandsModal = {
         }
       }));
 
-      this._setMsg('✓ 已保存，立即生效', 'ok');
+      this._setMsg('Saved. Changes are active.', 'ok');
       setTimeout(() => this.close(), 1800);
     } catch (e) {
-      this._setMsg('❌ ' + e.message, 'err');
+      this._setMsg('Error: ' + e.message, 'err');
     } finally {
       if (this._saveBtn) this._saveBtn.disabled = false;
     }
   },
 
-  // ── Connector ─────────────────────────────────────────────────────────
+  // 鈹€鈹€ Connector 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   async _loadConnectors() {
     const listEl = document.getElementById('loom-connector-list');
     if (!listEl) return;
-    listEl.innerHTML = '<div class="schedule-empty">加载中...</div>';
+    listEl.innerHTML = '<div class="schedule-empty">Loading...</div>';
     try {
       const [schedRes, connRes] = await Promise.all([
         fetch('/schedules').then(r => r.json()),
@@ -4245,7 +4622,7 @@ const LoomHandsModal = {
       const schedules  = schedRes.schedules  || [];
       const connectors = connRes.connectors  || [];
       if (!schedules.length && !connectors.length) {
-        listEl.innerHTML = '<div class="schedule-empty">暂无定时任务</div>';
+        listEl.innerHTML = '<div class="schedule-empty">No scheduled tasks</div>';
         return;
       }
       let html = '';
@@ -4255,7 +4632,7 @@ const LoomHandsModal = {
           <div class="schedule-info">
             <div class="schedule-name">${c.name || c.id}</div>
             <div class="schedule-purpose">${c.purpose || ''}</div>
-            <div class="schedule-cron">${c.running ? '运行中' : '已停止'}${c.error ? ' · ' + c.error : ''}</div>
+            <div class="schedule-cron">${c.running ? 'Running' : 'Stopped'}${c.error ? ' - ' + c.error : ''}</div>
           </div>
           <button class="schedule-toggle ${isOn ? 'is-on' : ''}" data-type="connector" data-id="${c.id}"></button>
         </div>`;
@@ -4287,11 +4664,11 @@ const LoomHandsModal = {
         });
       });
     } catch {
-      listEl.innerHTML = '<div class="schedule-empty">加载失败</div>';
+      listEl.innerHTML = '<div class="schedule-empty">Failed to load</div>';
     }
   },
 
-  // ── Helpers ──────────────────────────────────────────────────────────
+  // 鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   _setStatus(type, msg) {
     if (!this._statusEl) return;
     this._statusEl.className = 'loom-modal-status' + (type ? ' loom-status-' + type : '');
@@ -4308,7 +4685,7 @@ const LoomHandsModal = {
 };
 window.LoomHandsModal = LoomHandsModal;
 
-// ────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 document.addEventListener('DOMContentLoaded', function() {
   Anchor.init();
