@@ -35,6 +35,10 @@ const PROCESS_REGISTRY = path.join(RUNTIME_DIR, 'anchor-processes.json');
 const SHUTDOWN_LOG = path.join(RUNTIME_DIR, 'shutdown.log');
 const WORKSPACE_FILE = path.join(WORKSPACE_DIR, 'workspace.json');
 const CUSTOM_CONTEXT_FILE = path.join(WORKSPACE_DIR, 'context-registry.json');
+const CHANNEL_RESOURCES_FILE = path.join(WORKSPACE_DIR, 'channel-resources.json');
+const INTENT_STREAM_FILE = path.join(ROOT, 'brain', 'context', 'intent-stream.jsonl');
+const INTENT_WIKI_INTENTS_FILE = path.join(ROOT, 'brain', 'intent_wiki', 'intents.json');
+const INTENT_WIKI_EVIDENCE_FILE = path.join(ROOT, 'brain', 'intent_wiki', 'evidence.jsonl');
 const TARGET_PATH = process.env.ANCHOR_TARGET_PATH || path.join(ROOT, 'anchor-output');
 const CONFIG_FILE = path.join(WORKSPACE_DIR, 'connectors.json');
 
@@ -74,6 +78,7 @@ if (!fs.existsSync(TARGET_PATH)) fs.mkdirSync(TARGET_PATH, { recursive: true });
 
 // ── State ─────────────────────────────────────────────────────────────
 let currentHtml = '';
+const surfaceHtml = { fin: '', general: '' };
 const pendingOps = [];            // buffered while agent not connected
 const webviewClients = new Set(); // browser WebSocket connections
 let mainAgentWs = null;          // main CC agent shim (subagent_id = null)
@@ -101,6 +106,7 @@ let _tl = null;
 
 if (!process.env.ANCHOR_FRESH_START && fs.existsSync(CURRENT_HTML)) {
   currentHtml = fs.readFileSync(CURRENT_HTML, 'utf8');
+  surfaceHtml.fin = currentHtml;
 }
 
 function log(msg) { process.stderr.write(`[anchor] ${msg}\n`); }
@@ -121,6 +127,82 @@ function anchorLayoutContract() {
   ].join('\n');
 }
 
+function escapeHtmlAttr(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function renderDynamicVisualPage(visualId) {
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loom Visual</title>
+<link rel="stylesheet" href="/resource/colors_and_type.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/loom-detail-overlay.css">
+</head>
+<body data-loom-entry="dynamic-visual" data-loom-visual-id="${escapeHtmlAttr(visualId)}">
+<div class="refraction-bg">
+  <div class="blob blob1"></div>
+  <div class="blob blob2"></div>
+  <div class="blob blob3"></div>
+  <div class="light light1"></div>
+  <div class="light light2"></div>
+  <div class="grain"></div>
+</div>
+<header id="anchor-toolbar">
+  <img class="toolbar-logo" src="/assets/logo-mark.svg" alt="Loom" width="32" height="32">
+  <span class="toolbar-brand">Loom Visual</span>
+  <span class="toolbar-status" id="status">connecting...</span>
+  <span class="toolbar-processing" id="processing" style="display:none">
+    <span class="processing-dot"></span>
+    <span class="processing-label">Processing</span>
+    <span class="processing-target"></span>
+  </span>
+  <span class="toolbar-info" id="info"></span>
+  <button class="toolbar-shutdown" id="anchor-shutdown" title="Shutdown Anchor services" type="button">
+    <i class="ph-bold ph-power"></i>
+  </button>
+</header>
+<section id="anchor-home" class="anchor-home anchor-home--general" style="display:none"></section>
+<main id="anchor-shell">
+  <section id="anchor-content"></section>
+</main>
+<script src="/timing-waterfall.js"></script>
+<script src="/loom-detail-overlay.js"></script>
+<script src="/anchor-client.js"></script>
+<script>document.addEventListener('DOMContentLoaded',()=>{if(window.AnchorClient)AnchorClient._allowIncomingHtml=true;});</script>
+<script src="/prompt-panel.js"></script>
+<script src="/hand-feedback-widget.js"></script>
+<div id="anchor-execute-all" class="hidden">
+  <button class="btn btn--brand execute-all-btn">
+    <span class="execute-icon"><i class="ph-bold ph-play"></i></span>
+    <span class="execute-label">Execute All</span>
+  </button>
+  <span class="execute-badge">0</span>
+</div>
+</body>
+</html>`;
+}
+
+function browserSurfaceFromUrl(url) {
+  try {
+    const parsed = new URL(url || '/', `http://localhost:${PORT}`);
+    const visualPrefix = '/ws/visual/';
+    if (parsed.pathname.startsWith(visualPrefix)) {
+      return surfaceFromVisualId(decodeURIComponent(parsed.pathname.slice(visualPrefix.length)));
+    }
+    if (parsed.pathname === '/ws/general') return 'general';
+  } catch {}
+  return 'fin';
+}
+
 function readJsonFile(file, fallback) {
   try {
     if (!fs.existsSync(file)) return fallback;
@@ -135,6 +217,11 @@ function writeJsonFile(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
 }
 
+function appendJsonl(file, data) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.appendFileSync(file, JSON.stringify(data, null, 2).replace(/\n\s*/g, '') + '\n', 'utf8');
+}
+
 function slugify(input, fallback) {
   const s = String(input || '')
     .trim()
@@ -143,6 +230,231 @@ function slugify(input, fallback) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 48);
   return s || fallback || 'item';
+}
+
+function compactText(input, max = 300) {
+  return String(input || '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function keywordsFromText(input, limit = 12) {
+  const stop = new Set(['the', 'and', 'for', 'with', 'this', 'that', 'user', 'intent', 'source']);
+  const words = String(input || '').toLowerCase().match(/[a-z0-9\u4e00-\u9fff]{2,}/g) || [];
+  const out = [];
+  for (const word of words) {
+    if (stop.has(word) || out.includes(word)) continue;
+    out.push(word);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function normalizeChannel(value, url = '') {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw) return slugify(raw, 'external');
+  const u = String(url || '').toLowerCase();
+  if (u.includes('x.com') || u.includes('twitter.com')) return 'x';
+  if (u.includes('reddit.com')) return 'reddit';
+  if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+  if (u.includes('github.com')) return 'github';
+  if (u.includes('rss') || u.endsWith('.xml')) return 'rss';
+  return 'external';
+}
+
+function channelTrustTier(value) {
+  const v = String(value || '').trim().toUpperCase();
+  return /^[A-G]$/.test(v) ? v : 'F';
+}
+
+function loadChannelResources() {
+  const data = readJsonFile(CHANNEL_RESOURCES_FILE, { version: 1, resources: [] });
+  return { version: 1, resources: Array.isArray(data.resources) ? data.resources : [] };
+}
+
+function saveChannelResources(data) {
+  writeJsonFile(CHANNEL_RESOURCES_FILE, {
+    version: 1,
+    resources: Array.isArray(data.resources) ? data.resources : [],
+  });
+}
+
+function normalizeChannelResource(input) {
+  const now = new Date().toISOString();
+  const url = compactText(input.url || '', 1000);
+  const text = compactText(input.text || input.source || input.title || url, 2000);
+  const channel = normalizeChannel(input.channel, url);
+  const source = compactText(input.source || url || channel, 200);
+  const title = compactText(input.title || source || url || 'External resource', 160);
+  const tags = Array.isArray(input.tags)
+    ? input.tags.map(tag => slugify(tag, '')).filter(Boolean).slice(0, 12)
+    : [];
+  const baseId = 'channel_' + channel + '_' + slugify(url || source || title, 'resource');
+  return {
+    resource_id: compactText(input.resource_id || baseId, 120),
+    channel,
+    source,
+    url,
+    title,
+    description: compactText(input.description || '', 500),
+    text,
+    tags,
+    trust_tier: channelTrustTier(input.trust_tier),
+    resource_kind: slugify(input.resource_kind || (url ? 'link' : 'note'), 'note'),
+    intent_hint: compactText(input.intent_hint || '', 500),
+    value_signal: compactText(input.value_signal || input.intent_hint || title, 300),
+    created_at: input.created_at || now,
+    updated_at: now,
+    added_by: input.added_by || 'host_agent',
+  };
+}
+
+function registerChannelResource(input) {
+  const resource = normalizeChannelResource(input || {});
+  const store = loadChannelResources();
+  const existingIndex = store.resources.findIndex(item =>
+    item.resource_id === resource.resource_id ||
+    (resource.url && item.url === resource.url) ||
+    (!resource.url && item.channel === resource.channel && item.source === resource.source && item.title === resource.title)
+  );
+  if (existingIndex >= 0) {
+    resource.resource_id = store.resources[existingIndex].resource_id;
+    resource.created_at = store.resources[existingIndex].created_at || resource.created_at;
+    store.resources[existingIndex] = { ...store.resources[existingIndex], ...resource };
+  } else {
+    store.resources.unshift(resource);
+  }
+  saveChannelResources(store);
+  cultivateIntentWikiFromChannelResource(resource);
+  return resource;
+}
+
+function cultivateIntentWikiFromChannelResource(resource) {
+  const now = new Date().toISOString();
+  const rawInput = compactText([resource.title, resource.url, resource.text].filter(Boolean).join(' | '), 300);
+  const value = compactText(resource.value_signal || resource.intent_hint || resource.title, 120);
+  const intentId = 'source_preferences.' + slugify(value, 'external_resource');
+  const event = {
+    ts: now,
+    input_type: 'resource_share',
+    channel_resource_entry: true,
+    raw_input: rawInput,
+    intent: {
+      goal: `Use external resource: ${resource.title}`,
+      motivation: resource.intent_hint || 'User registered an external channel/resource for future Loom context.',
+      decision_frame: '',
+      belief_signal: '',
+      behavior_intent: 'register external resource channel',
+      analytical_direction: resource.intent_hint || resource.description || '',
+      content_signal: value,
+    },
+    anchor_context: null,
+    resource_intent: {
+      engagement_type: 'channel_connect',
+      what_user_values: value,
+      author_signal: resource.source || resource.channel,
+    },
+    session_id: 'channel:' + resource.resource_id,
+  };
+  appendJsonl(INTENT_STREAM_FILE, event);
+  appendJsonl(INTENT_WIKI_EVIDENCE_FILE, {
+    ts: now,
+    intent_id: intentId,
+    event_ts: event.ts,
+    input_type: 'resource_share',
+    channel_resource_entry: true,
+    raw_input: rawInput,
+    anchor_context: null,
+    intent: event.intent,
+    reason: 'external channel resource registered',
+    resource_id: resource.resource_id,
+    channel: resource.channel,
+  });
+
+  const graph = readJsonFile(INTENT_WIKI_INTENTS_FILE, {
+    version: 1,
+    zones: { source_preferences: 'What evidence, resources, or authors the user tends to value.' },
+    intents: [],
+  });
+  if (!Array.isArray(graph.intents)) graph.intents = [];
+  const idx = graph.intents.findIndex(node => node.intent_id === intentId);
+  const activationHints = {
+    keywords: keywordsFromText([resource.title, resource.source, resource.tags.join(' '), resource.intent_hint, resource.value_signal].join(' ')),
+    resource_ids: [resource.resource_id],
+    channels: [resource.channel],
+    requires_fresh_context: ['x', 'twitter', 'reddit', 'rss', 'youtube', 'social'].includes(resource.channel),
+  };
+  if (idx >= 0) {
+    const node = graph.intents[idx];
+    const oldHints = node.activation_hints || {};
+    node.label = value || node.label;
+    node.principle = 'Prefer evidence and resources matching this registered external channel when relevant.';
+    node.evidence_count = (node.evidence_count || 0) + 1;
+    node.confidence = Math.min(0.95, Number(((node.confidence || 0.35) + 0.08).toFixed(2)));
+    node.updated_at = now;
+    node.last_evidence_ts = event.ts;
+    node.activation_hints = {
+      ...oldHints,
+      keywords: Array.from(new Set([...(oldHints.keywords || []), ...activationHints.keywords])).slice(0, 16),
+      resource_ids: Array.from(new Set([...(oldHints.resource_ids || []), resource.resource_id])),
+      channels: Array.from(new Set([...(oldHints.channels || []), resource.channel])),
+      requires_fresh_context: Boolean(oldHints.requires_fresh_context || activationHints.requires_fresh_context),
+    };
+  } else {
+    graph.intents.push({
+      intent_id: intentId,
+      zone: 'source_preferences',
+      label: value || 'Registered external resource channel',
+      principle: 'Prefer evidence and resources matching this registered external channel when relevant.',
+      status: 'active',
+      confidence: 0.43,
+      evidence_count: 1,
+      activation_hints: activationHints,
+      created_at: now,
+      updated_at: now,
+      last_evidence_ts: event.ts,
+    });
+  }
+  writeJsonFile(INTENT_WIKI_INTENTS_FILE, graph);
+}
+
+function normalizeVisualId(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function surfaceFromVisualId(visualId) {
+  const id = normalizeVisualId(visualId);
+  return id ? `visual:${id}` : 'general';
+}
+
+function normalizeSurface(value) {
+  const raw = String(value || '').trim();
+  if (raw === 'general') return 'general';
+  if (raw.startsWith('visual:')) return surfaceFromVisualId(raw.slice('visual:'.length));
+  return 'fin';
+}
+
+function opSurface(op) {
+  return normalizeSurface(op?.context_bundle?.route_context?.surface);
+}
+
+function agentSurface(agentId) {
+  if (!agentId) return 'fin';
+  const entry = processorPool.get(agentId) || agentRegistry.get(agentId);
+  if (entry?.surface) return normalizeSurface(entry.surface);
+  return opSurface(entry?.ops?.[0]);
+}
+
+function setSurfaceHtml(surface, html) {
+  const target = normalizeSurface(surface);
+  surfaceHtml[target] = html || '';
+  currentHtml = surfaceHtml[target];
+  if (target === 'fin') {
+    try { fs.writeFileSync(CURRENT_HTML, currentHtml, 'utf8'); } catch (e) { log('render write failed: ' + e.message); }
+  }
 }
 
 function nowIso() {
@@ -507,10 +819,11 @@ app.use((req, res, next) => {
 app.post('/html', (req, res) => {
   const html = req.body.html || '';
   if (!html.trim()) return res.status(400).json({ error: 'empty html' });
-  currentHtml = html;
+  const surface = req.body.visual_id ? surfaceFromVisualId(req.body.visual_id) : normalizeSurface(req.body.surface || 'fin');
+  setSurfaceHtml(surface, html);
+  broadcast(html, surface);
   fs.writeFileSync(CURRENT_HTML, html, 'utf8');
-  broadcast(html);
-  log(`HTML via POST (${html.length} bytes), ${webviewClients.size} client(s)`);
+  log(`HTML via POST (${html.length} bytes, surface=${surface}), ${webviewClients.size} client(s)`);
   res.json({ ok: true });
 });
 
@@ -621,6 +934,19 @@ function _callBrainRun(handId, task, context) {
     req.write(body);
     req.end();
   });
+}
+
+function parseLoomSlashCommand(text) {
+  const match = String(text || '').trim().match(/^\/(loom|loom-visual)(?:\s+([\s\S]*))?$/i);
+  if (!match) return null;
+  const command = match[1].toLowerCase();
+  const rest = String(match[2] || '').trim();
+  return {
+    command,
+    route: 'general',
+    text: rest,
+    visualize: command === 'loom-visual',
+  };
 }
 
 async function _enrichAndDeliverEnvelope(envelope) {
@@ -899,8 +1225,34 @@ app.get('/workspace/domain/:domain', (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────
 
+app.get('/loom-visual/:visualId', (req, res) => {
+  const visualId = normalizeVisualId(req.params.visualId);
+  if (!visualId) return res.status(404).send('visual session not found');
+  res.type('html').send(renderDynamicVisualPage(visualId));
+});
+
+app.get('/loom-visual', (req, res) => {
+  res.status(400).send('Create a Loom visual session from /loom-visual in the host agent first.');
+});
+
+app.post('/runtime/open-url', (req, res) => {
+  const url = normalizeLocalVisualUrl(req.body?.url);
+  if (!url) return res.status(400).json({ ok: false, error: 'only local /loom-visual URLs are allowed' });
+  broadcastBrowserMessage({ type: 'navigate', url });
+  if (webviewClients.size === 0) openBrowserUrl(url);
+  res.json({ ok: true, url });
+});
+
+app.get('/loom-fin', (req, res) => {
+  res.sendFile(path.join(WEBVIEW_DIR, 'index.html'));
+});
+
 app.get('/health', (req, res) => res.json({
   ok: true, port: PORT,
+  capabilities: {
+    service_version: 'dynamic-visual-v2',
+    dynamic_visual_webview: true,
+  },
   shutting_down: shuttingDown,
   pending_ops: pendingOps.length,
   main_agent_connected: !!mainAgentWs,
@@ -1290,6 +1642,47 @@ app.post('/resources/register', (req, res) => {
   res.json({ ok: true, resource: item });
 });
 
+app.post('/channels/capture', (req, res) => {
+  const body = req.body || {};
+  const url = compactText(body.url || '', 1000);
+  const title = compactText(body.title || body.source || url || '', 160);
+  const note = compactText(body.note || body.description || '', 500);
+  const text = compactText(body.text || note || url || title, 2000);
+  if (!title && !url && !text) {
+    return res.status(400).json({ ok: false, error: 'resource content required' });
+  }
+
+  const rawTags = Array.isArray(body.tags)
+    ? body.tags
+    : String(body.tags || '').split(',');
+  const tags = rawTags.map(tag => String(tag || '').trim()).filter(Boolean);
+  const resource = registerChannelResource({
+    channel: body.channel || '',
+    source: body.source || title || url,
+    url,
+    title: title || 'Captured resource',
+    description: note,
+    text,
+    tags,
+    trust_tier: body.trust_tier || '',
+    resource_kind: body.resource_kind || (url ? 'link' : 'note'),
+    intent_hint: body.intent_hint || note,
+    value_signal: body.value_signal || body.intent_hint || title || url || text,
+    added_by: 'desktop_capture',
+  });
+
+  res.json({
+    ok: true,
+    resource,
+    paths: {
+      channel_resources: 'logs/workspace/channel-resources.json',
+      intent_stream: 'brain/context/intent-stream.jsonl',
+      intent_wiki_evidence: 'brain/intent_wiki/evidence.jsonl',
+      intent_wiki_intents: 'brain/intent_wiki/intents.json',
+    },
+  });
+});
+
 app.get('/pending-op', (req, res) => {
   if (pendingOps.length === 0) return res.json({ pending: false });
   const op = pendingOps.shift();
@@ -1436,9 +1829,10 @@ app.get('/session/:id/events', (req, res) => {
 
 // ── Browser WebSocket handler ─────────────────────────────────────────
 
-wssBrowser.on('connection', (ws) => {
+wssBrowser.on('connection', (ws, req) => {
+  ws.loomSurface = normalizeSurface(browserSurfaceFromUrl(req?.url || ''));
   webviewClients.add(ws);
-  log(`browser connected (${webviewClients.size} total)`);
+  log(`browser connected (${webviewClients.size} total, surface=${ws.loomSurface})`);
 
   ws.on('message', (data) => {
     try {
@@ -1502,11 +1896,46 @@ wssBrowser.on('connection', (ws) => {
 
       } else if (msg.type === 'prompt') {
         startInteractionTimeline();
-        const text = (msg.text || '').trim();
+        const rawText = (msg.text || '').trim();
+        const slash = parseLoomSlashCommand(rawText);
+        const text = slash ? slash.text : rawText;
         if (!text) { ws.send(JSON.stringify({ type: 'error', message: 'prompt text required' })); return; }
 
         // Parse \hand prefix — if present, route through Brain enrichment
-        const handMatch = text.match(/^\\(market|position|target|sentiment)\s+(.*)/s);
+        const promptText = text;
+        const handMatch = promptText.match(/^\\(market|position|target|sentiment)\s+(.*)/s);
+        const requestedVisualize = slash && typeof slash.visualize === 'boolean'
+          ? slash.visualize
+          : msg.visualize;
+        const routeContext = {
+          ...(msg.context || {}),
+          source: msg.context?.source || 'ui',
+          visualize: requestedVisualize !== false,
+          presentation: requestedVisualize === false ? 'none' : (msg.context?.presentation || 'card'),
+          surface: msg.context?.visual_id
+            ? surfaceFromVisualId(msg.context.visual_id)
+            : normalizeSurface(msg.context?.surface || (slash?.command === 'loom-visual' ? 'general' : 'fin')),
+          visual_id: msg.context?.visual_id || null,
+        };
+        const effectiveRoute = String(msg.route || slash?.route || (handMatch ? handMatch[1] : '') || 'general').trim();
+        if (requestedVisualize === false) {
+          const cleanPrompt = handMatch ? handMatch[2] : promptText;
+          // General non-visual prompts must be handled by the mounted host-agent Brain.
+          // The server does not call Python /analyze or any standalone LLM path here.
+          ws.send(JSON.stringify({ type: 'ack', message: 'Prompt requires host-agent Brain' }));
+          ws.send(JSON.stringify({
+            type: 'prompt_result',
+            route: effectiveRoute,
+            result: {
+              ok: false,
+              code: 'HOST_AGENT_BRAIN_REQUIRED',
+              prompt: cleanPrompt,
+              route: effectiveRoute,
+              message: 'Run this task from the current Claude Code or Codex main agent. Do not bypass through server /analyze.'
+            }
+          }));
+          return;
+        }
         if (handMatch) {
           const hand = handMatch[1];
           const cleanPrompt = handMatch[2];
@@ -1514,7 +1943,7 @@ wssBrowser.on('connection', (ws) => {
             schema_version: '1.0',
             intent: { op: 'initial_render', target_kind: 'global', target_ref: null, instruction: cleanPrompt },
             context_bundle: { memory_ids: [], skill_ids: [], subagent_ids: [], resource_ids: [],
-                             loom_hand: hand, file_id: msg.route || null },
+                             loom_hand: hand, file_id: effectiveRoute || null, route_context: routeContext },
             render_state: { anchor_tree: [], anchor_index: {} },
             provenance: { session_id: null, event_id: 'prompt-' + Date.now(), parent_event_id: null,
                           timestamp: new Date().toISOString(), client_version: '0.1.0' }
@@ -1529,7 +1958,7 @@ wssBrowser.on('connection', (ws) => {
             schema_version: '1.0',
             intent: { op: 'initial_render', target_kind: 'global', target_ref: null, instruction: text },
             context_bundle: { memory_ids: [], skill_ids: [], subagent_ids: [], resource_ids: [],
-                             file_id: msg.route || null },
+                             file_id: effectiveRoute || null, route_context: routeContext },
             render_state: { anchor_tree: [], anchor_index: {} },
             provenance: { session_id: null, event_id: 'prompt-' + Date.now(), parent_event_id: null,
                           timestamp: new Date().toISOString(), client_version: '0.1.0' }
@@ -1570,8 +1999,9 @@ wssBrowser.on('connection', (ws) => {
   });
 
   // Send current HTML to new browser clients so the page is populated immediately.
-  if (currentHtml && currentHtml.trim()) {
-    try { ws.send(JSON.stringify({ type: 'html', content: currentHtml })); } catch {}
+  const initialHtml = surfaceHtml[ws.loomSurface] || (ws.loomSurface === 'fin' ? currentHtml : '');
+  if (initialHtml && initialHtml.trim()) {
+    try { ws.send(JSON.stringify({ type: 'html', content: initialHtml })); } catch {}
   }
 
   ws.on('close', () => {
@@ -1713,6 +2143,7 @@ wssAgent.on('connection', (ws, req, agentId) => {
 // For concurrent multi-card processing, each subagent_id gets its own CC process.
 function deliverOp(op) {
   const subagentId = op?.context_bundle?.subagent_id || null;
+  const surface = opSurface(op);
   let targetWs = null;
   let targetLabel = '';
 
@@ -1735,7 +2166,7 @@ function deliverOp(op) {
     // Regular op: route to any idle processor in the pool (round-robin among idle entries).
     // If no idle processor, the op stays in pendingOps for spawnCCProcessor to handle.
     for (const [key, entry] of processorPool) {
-      if (entry.ws && entry.ws.readyState === 1 && !entry.done) {
+      if (entry.ws && entry.ws.readyState === 1 && !entry.done && normalizeSurface(entry.surface) === surface) {
         targetWs = entry.ws;
         targetLabel = 'pool:' + key;
         break;
@@ -1751,7 +2182,7 @@ function deliverOp(op) {
 
   const targetRef = (op.intent?.target_ref) || op.target_ref || op.target || '';
   if (targetRef && targetRef !== '__root__') {
-    broadcastAgentEvent({ type: 'thinking', target_anchor: targetRef, summary: 'processing' });
+    broadcastAgentEvent({ type: 'thinking', target_anchor: targetRef, summary: 'processing' }, surface);
   }
   wsTrace('send', targetLabel, 'op', { op: op?.intent?.op, target: targetRef, queue: pendingOps.length });
   targetWs.send(JSON.stringify({ type: 'op', ops: [op], count: 1 }));
@@ -1764,20 +2195,21 @@ function deliverOp(op) {
 function handleAgentMessage(ws, msg, agentId) {
   const { type, req_id } = msg;
   const label = agentId ? 'subagent:' + agentId : 'main';
+  const surface = msg.visual_id ? surfaceFromVisualId(msg.visual_id) : normalizeSurface(msg.surface || agentSurface(agentId));
   const ack = (ok, extra) => {
     try { ws.send(JSON.stringify({ type: 'ack', req_id, ok, ...(extra || {}) })); } catch {}
   };
 
   if (type === 'render') {
     const html = msg.html || '';
-    wsTrace('recv', label, 'render', { html_len: html.length });
+    wsTrace('recv', label, 'render', { html_len: html.length, surface });
     if (!html.trim()) { ack(false, { error: 'empty html' }); return; }
-    currentHtml = html;
-    try { fs.writeFileSync(CURRENT_HTML, html, 'utf8'); } catch (e) { log('render write failed: ' + e.message); }
-    broadcast(html);
+    setSurfaceHtml(surface, html);
+    broadcast(html, surface);
     if (currentSession) recordEvent('agent.render', { html_size: html.length });
     log(`[${label}] render ${html.length} bytes → ${webviewClients.size} browser(s)`);
-    wsTrace('send', 'browser', 'html', { html_len: html.length, clients: webviewClients.size });
+    const clientCount = Array.from(webviewClients).filter(client => normalizeSurface(client.loomSurface) === surface).length;
+    wsTrace('send', 'browser', 'html', { html_len: html.length, clients: clientCount, surface });
     // Track render completion for loom agent timing calculation
     _curTiming.renderTime = Date.now();
     _tryEmitTiming();
@@ -1791,11 +2223,11 @@ function handleAgentMessage(ws, msg, agentId) {
     }
     wsTrace('recv', label, 'patch', { count: patches.length, patches: patches.map(p => p.anchor_id) });
     timelineMark('agent_content_generated');
-    broadcastPatches(patches);
+    broadcastPatches(patches, surface);
     timelineMark('webview_patch_broadcast');
     broadcastAgentTiming(label);
     wsTrace('send', 'browser', 'patch', { count: patches.length, anchors: patches.map(p => p.anchor_id) });
-    emitPatchCompleteEvents(patches, 'updated');
+    emitPatchCompleteEvents(patches, 'updated', surface);
     const missed = detectMissedCascades(patches, currentHtml);
     if (missed.length > 0) {
       const warnEvent = {
@@ -1807,10 +2239,7 @@ function handleAgentMessage(ws, msg, agentId) {
         payload: { warning_type: 'missed_cascade', missing_deps: missed,
                    message: 'patches may have missed reverse-dependency nodes' }
       };
-      const warnMsg = JSON.stringify({ type: 'agent_event', event: warnEvent });
-      for (const client of webviewClients) {
-        if (client.readyState === 1) try { client.send(warnMsg); } catch {}
-      }
+      sendBrowserMessageToSurface({ type: 'agent_event', event: warnEvent }, surface);
     }
     log(`[${label}] patch ${patches.length} node(s)${missed.length ? ` (${missed.length} cascade warning(s))` : ''}`);
     ack(true, { cascade_warnings: missed.length });
@@ -1827,11 +2256,7 @@ function handleAgentMessage(ws, msg, agentId) {
       parent_event_id: lastUserIntentId,
       payload
     };
-    const message = JSON.stringify({ type: 'agent_event', event });
-    let sent = 0;
-    for (const client of webviewClients) {
-      if (client.readyState === 1) try { client.send(message); sent++; } catch {}
-    }
+    const sent = sendBrowserMessageToSurface({ type: 'agent_event', event }, surface);
     if (currentSession) {
       try { recordEvent(kind, payload, { event_id: event.event_id, parent_event_id: lastUserIntentId }); } catch {}
     }
@@ -1840,8 +2265,8 @@ function handleAgentMessage(ws, msg, agentId) {
     ack(true, { event_id: event.event_id });
 
   } else if (type === 'get_html') {
-    wsTrace('recv', label, 'get_html', {});
-    try { ws.send(JSON.stringify({ type: 'html_state', html: currentHtml, req_id })); } catch {}
+    wsTrace('recv', label, 'get_html', { surface });
+    try { ws.send(JSON.stringify({ type: 'html_state', html: surfaceHtml[surface] || currentHtml, req_id })); } catch {}
 
   } else if (type === 'op_req') {
     // Processor requests the next op from its partition queue (via anchor_get_pending_op).
@@ -1866,10 +2291,11 @@ function handleAgentMessage(ws, msg, agentId) {
 
 // ── Broadcast helpers ─────────────────────────────────────────────────
 
-function broadcast(html) {
+function broadcast(html, surface = 'fin') {
+  const target = normalizeSurface(surface);
   const payload = JSON.stringify({ type: 'html', content: html });
   for (const ws of webviewClients) {
-    if (ws.readyState === 1) try { ws.send(payload); } catch {}
+    if (ws.readyState === 1 && normalizeSurface(ws.loomSurface) === target) try { ws.send(payload); } catch {}
   }
 }
 
@@ -1880,7 +2306,21 @@ function broadcastBrowserMessage(message) {
   }
 }
 
-function broadcastPatches(patches) {
+function sendBrowserMessageToSurface(message, surface = 'fin') {
+  const target = normalizeSurface(surface);
+  const payload = JSON.stringify(message);
+  let sent = 0;
+  for (const ws of webviewClients) {
+    if (ws.readyState === 1 && normalizeSurface(ws.loomSurface) === target) {
+      try { ws.send(payload); sent++; } catch {}
+    }
+  }
+  return sent;
+}
+
+function broadcastPatches(patches, surface = 'fin') {
+  const target = normalizeSurface(surface);
+  currentHtml = surfaceHtml[target] || currentHtml;
   const beforeHtml = currentHtml;
   let appliedCount = 0;
   for (const patch of patches) {
@@ -1889,7 +2329,8 @@ function broadcastPatches(patches) {
     if (nextHtml !== currentHtml) { currentHtml = nextHtml; appliedCount++; }
   }
   if (appliedCount > 0) {
-    try { fs.writeFileSync(CURRENT_HTML, currentHtml, 'utf8'); } catch (e) {
+    surfaceHtml[target] = currentHtml;
+    if (target === 'fin') try { fs.writeFileSync(CURRENT_HTML, currentHtml, 'utf8'); } catch (e) {
       log('patch sync write failed: ' + e.message);
     }
   } else if (beforeHtml) {
@@ -1897,11 +2338,11 @@ function broadcastPatches(patches) {
   }
   const payload = JSON.stringify({ type: 'patch', patches });
   for (const ws of webviewClients) {
-    if (ws.readyState === 1) try { ws.send(payload); } catch {}
+    if (ws.readyState === 1 && normalizeSurface(ws.loomSurface) === target) try { ws.send(payload); } catch {}
   }
 }
 
-function broadcastAgentEvent(payload) {
+function broadcastAgentEvent(payload, surface = null) {
   const event = {
     event_id: 'srv-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
     session_id: currentSession?.id || null,
@@ -1910,16 +2351,20 @@ function broadcastAgentEvent(payload) {
     parent_event_id: lastUserIntentId,
     payload
   };
+  if (surface) {
+    sendBrowserMessageToSurface({ type: 'agent_event', event }, surface);
+    return;
+  }
   const msg = JSON.stringify({ type: 'agent_event', event });
   for (const ws of webviewClients) {
     if (ws.readyState === 1) try { ws.send(msg); } catch {}
   }
 }
 
-function emitPatchCompleteEvents(patches, summary) {
+function emitPatchCompleteEvents(patches, summary, surface = null) {
   for (const patch of patches || []) {
     if (!patch || !patch.anchor_id) continue;
-    broadcastAgentEvent({ type: 'complete', target_anchor: patch.anchor_id, summary: summary || 'updated' });
+    broadcastAgentEvent({ type: 'complete', target_anchor: patch.anchor_id, summary: summary || 'updated' }, surface);
   }
 }
 
@@ -2277,9 +2722,10 @@ function spawnCCProcessor() {
 
   // Spawn one processor per partition in parallel (no global lock during spawn)
   for (const { id: partitionId, ops } of partitions) {
-    if (spawningPartitions.has(partitionId)) continue;  // already spawning this partition
-    spawningPartitions.add(partitionId);
-    spawnProcessorPartition(partitionId, ops, () => spawningPartitions.delete(partitionId));
+    const partitionKey = opSurface(ops[0]) + ':' + partitionId;
+    if (spawningPartitions.has(partitionKey)) continue;  // already spawning this partition
+    spawningPartitions.add(partitionKey);
+    spawnProcessorPartition(partitionId, ops, () => spawningPartitions.delete(partitionKey));
   }
 }
 
@@ -2319,7 +2765,7 @@ function spawnProcessorPartition(partitionId, ops, onDone) {
       windowsHide: true
     });
     // Register this processor in the pool — ws will be set when it connects
-    processorPool.set(procId, { ws: null, partition: partitionId, ops });
+    processorPool.set(procId, { ws: null, partition: partitionId, ops, surface: opSurface(op) });
   } catch (e) {
     log('[spawn] failed to start CC: ' + e.message);
     addSpawnEvent({ status: 'error', msg: 'spawn failed: ' + e.message });
@@ -2431,18 +2877,40 @@ function watchHtmlFile() {
   }, 500);
 }
 
+function normalizeLocalVisualUrl(value) {
+  try {
+    const parsed = new URL(String(value || ''), `http://localhost:${PORT}`);
+    const hostOk = ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+    const portOk = parsed.port === String(PORT) || (!parsed.port && PORT === 80);
+    if (!hostOk || !portOk || !parsed.pathname.startsWith('/loom-visual/')) return '';
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+}
+
+function openBrowserUrl(url) {
+  const cmd = process.platform === 'win32' ? `start "" "${url}"`
+            : process.platform === 'darwin' ? `open "${url}"`
+            : `xdg-open "${url}"`;
+  exec(cmd, (err) => {
+    if (err) log(`auto-open failed (non-fatal): ${err.message}`);
+    else log(`opened browser at ${url}`);
+  });
+}
+
 function maybeAutoOpenBrowser() {
   if (process.env.ANCHOR_NO_AUTO_BROWSER === '1') return;
   setTimeout(() => {
     if (webviewClients.size > 0) return;
-    const url = `http://localhost:${PORT}`;
-    const cmd = process.platform === 'win32' ? `start "" "${url}"`
-              : process.platform === 'darwin' ? `open "${url}"`
-              : `xdg-open "${url}"`;
-    exec(cmd, (err) => {
-      if (err) log(`auto-open failed (non-fatal): ${err.message}`);
-      else log(`opened browser at ${url}`);
-    });
+    const url = process.env.ANCHOR_OPEN_URL || `http://localhost:${PORT}`;
+    if (process.env.ANCHOR_OPEN_URL && !normalizeLocalVisualUrl(url)) {
+      log(`ignored invalid ANCHOR_OPEN_URL: ${url}`);
+      openBrowserUrl(`http://localhost:${PORT}`);
+      return;
+    }
+    openBrowserUrl(url);
   }, 800);
 }
 

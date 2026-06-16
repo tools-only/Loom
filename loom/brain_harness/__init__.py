@@ -3,7 +3,8 @@ from .dispatcher import WorkflowResolver
 from .distiller import ResourceDistiller
 from .intent_processor import IntentProcessor, IntentStream, IntentEvent
 from .intent_wiki import IntentWiki, IntentNode, IntentActivation
-from .intent_harness import RewardedIntentHarness, IntentPolicy, PolicyPlan, RewardReport
+from .intent_harness import RewardedIntentHarness, IntentPolicy, PolicyPlan, RubricSpec, RewardReport
+from .resources import ResourceMetadata, ResourceRegistry, StrategyPrimitive
 from .state import BrainState, StrategyRule, LearnedNote, AnalyticalFramework
 from .workflow_episode import WorkflowEpisode, EpisodeState, TerminationReason
 from .budget_governor import BudgetGovernor, BudgetExceeded
@@ -14,7 +15,8 @@ __all__ = [
     "BrainHarness", "WorkflowResolver", "ResourceDistiller",
     "IntentProcessor", "IntentStream", "IntentEvent",
     "IntentWiki", "IntentNode", "IntentActivation",
-    "RewardedIntentHarness", "IntentPolicy", "PolicyPlan", "RewardReport",
+    "RewardedIntentHarness", "IntentPolicy", "PolicyPlan", "RubricSpec", "RewardReport",
+    "ResourceMetadata", "ResourceRegistry", "StrategyPrimitive",
     "BrainState", "StrategyRule", "LearnedNote", "AnalyticalFramework",
     "WorkflowEpisode", "EpisodeState", "TerminationReason",
     "BudgetGovernor", "BudgetExceeded",

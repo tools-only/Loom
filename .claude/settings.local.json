@@ -251,7 +251,17 @@
       "Bash(echo \"rc=$?\")",
       "Bash(/d/conda/python.exe -m py_compile loom/brain.py loom_core/agent_adapters/providers/sdk_legacy.py)",
       "Bash(echo \"EXIT: $?\")",
-      "Bash(/d/conda/python.exe -c ' *)"
+      "Bash(/d/conda/python.exe -c ' *)",
+      "mcp__anchor__loom_prompt",
+      "Bash(cat .claude/settings.json)",
+      "Bash(cat .claude/settings.local.json)",
+      "Bash(findstr \"55192\")",
+      "Bash(findstr \":3000\")",
+      "Bash(findstr \":3001\")",
+      "Bash(findstr \":3002\")",
+      "Bash(echo \"killed $?\")",
+      "Bash(/d/conda/python.exe *)",
+      "Bash(npx skills@latest add mattpocock/skills)"
     ]
   },
   "terminal": {

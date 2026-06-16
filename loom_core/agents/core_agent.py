@@ -525,6 +525,7 @@ class LoomCoreAgent:
             )
             intent_activation = getattr(self._harness, "_last_intent_activation", None)
             policy_plan = getattr(self._harness, "_last_policy_plan", None)
+            intent_rubric = getattr(self._harness, "_last_intent_rubric", None)
             reward_report = getattr(self._harness, "_last_reward_report", None)
             self._harness.write_last_synthesis(question, wf, synthesis)
 
@@ -567,6 +568,7 @@ class LoomCoreAgent:
             "cold_start": cold,
             "intent_activation": self._asdict_or_none(intent_activation),
             "intent_policy_plan": self._asdict_or_none(policy_plan),
+            "intent_rubric": self._asdict_or_none(intent_rubric),
             "intent_reward_report": self._asdict_or_none(reward_report),
             "episode": ep.to_summary() if ep is not None else None,
             "hand_plan": hand_plan.to_dict() if hand_plan is not None else None,

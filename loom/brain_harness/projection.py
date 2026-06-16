@@ -10,9 +10,9 @@ Sections (all 10):
   1.  brain_md            — static role contract text
   2.  strategy_rules      — domain-matched strategy rules
   3.  frameworks          — distilled analytical frameworks
-  4.  intent_stream       — recent intent stream formatted for prompt
-  5.  intent_wiki         — Intent Wiki activation, formatted for prompt
-  6.  policy_plan         — Rewarded Intent Harness policy plan, formatted
+  4.  intent_stream       — recent intent stream, evaluator metadata
+  5.  intent_activation   — Intent Wiki activation, evaluator metadata
+  6.  intent_rubric       — post-generation rubric spec
   7.  learned_notes       — recent domain-relevant learned notes
   8.  last_synthesis      — last synthesis snapshot (<24h)
   9.  intent_context      — derived intent context (decision frame, etc.)
@@ -130,7 +130,7 @@ def build_projection(
     Side effects (kept to match existing _assemble_prompt behavior):
       - calls harness.state._reload()
       - sets harness._last_intent_activation
-      - sets harness._last_policy_plan
+      - sets harness._last_intent_rubric
     """
     # Pick up any state edits since last call.
     harness.state._reload()
@@ -153,26 +153,37 @@ def build_projection(
     )
     frameworks_list = [_serialize(fw) for fw in frameworks]
 
-    # ── Section 4: intent_stream (formatted text tail) ─────────────────────
+    # ── Section 4: intent_stream (evaluator metadata only) ─────────────────
     intent_stream_text = ""
     if getattr(harness, "_intent_stream", None) is not None:
         intent_stream_text = harness._intent_stream.format_for_prompt(n=5)
 
-    # ── Section 5: intent_wiki activation (formatted text) ─────────────────
+    # ── Section 5: intent activation (evaluator metadata only) ─────────────
     activation = harness.intent_wiki.activate(
         question=question,
         domain=domain,
         context={"hand_claims": hand_claims or {}},
     )
     harness._last_intent_activation = activation
-    intent_wiki_text = harness.intent_wiki.format_activation_for_prompt(activation)
 
-    # ── Section 6: policy_plan (Rewarded Intent Harness) ───────────────────
-    policy_plan = harness.rewarded_intent_harness.plan(
-        activation, domain=domain, question=question
+    # ── Section 6: rubric spec (post-generation evaluator only) ────────────
+    resource_context: dict[str, Any] = {}
+    resource_registry = getattr(harness, "resource_registry", None)
+    if resource_registry is not None and hasattr(resource_registry, "query_rubric_context"):
+        resource_context = resource_registry.query_rubric_context(
+            domain=domain,
+            question=question,
+            limit=5,
+        )
+    intent_rubric = harness.rewarded_intent_harness.compile_rubric(
+        activation,
+        domain=domain,
+        question=question,
+        resource_context=resource_context,
     )
-    harness._last_policy_plan = policy_plan
-    policy_plan_text = harness.rewarded_intent_harness.format_plan_for_prompt(policy_plan)
+    harness._last_intent_rubric = intent_rubric
+    if hasattr(harness, "_last_policy_plan"):
+        harness._last_policy_plan = None
 
     # ── Section 7: learned_notes ───────────────────────────────────────────
     notes = harness.state.query_notes(domain, n=5)
@@ -203,8 +214,8 @@ def build_projection(
         "strategy_rules": strategy_rules,
         "frameworks": frameworks_list,
         "intent_stream": intent_stream_text,
-        "intent_wiki": intent_wiki_text,
-        "policy_plan": policy_plan_text,
+        "intent_activation": _serialize(activation),
+        "intent_rubric": _serialize(intent_rubric),
         "learned_notes": learned_notes,
         "last_synthesis": last_synth_text,
         "intent_context": intent_context,

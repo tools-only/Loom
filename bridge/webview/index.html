@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="anchor-debate.css">
 <link rel="stylesheet" href="loom-detail-overlay.css">
 </head>
-<body>
+<body data-loom-entry="fin">
 
 <!-- Ambient workspace background -->
 <div class="refraction-bg">
@@ -41,6 +41,9 @@
   <button id="anchor-debate-trigger" type="button" title="Launch structured adversarial debate to produce a PRD">
     <i class="ph-bold ph-sword"></i> Debate
   </button>
+  <a id="anchor-intent-wiki-btn" class="toolbar-intelligence-link" href="#intent-wiki" title="View Intent Wiki and feedback attribution inside Loom">
+    <i class="ph-bold ph-graph"></i> Intelligence
+  </a>
   <button id="anchor-intent-stream-btn" type="button" title="View intent stream — structured log of all human interactions" onclick="window.open('http://localhost:3002/intent-stream','_blank')">
     <i class="ph-bold ph-brain"></i> Intents
   </button>
@@ -59,6 +62,15 @@
       <div class="home-prompt" role="search">
         <i class="ph-bold ph-magnifying-glass"></i>
         <input id="anchor-prompt-input" class="anchor-prompt-input home-prompt-input" type="text" placeholder="选择一个工作模式开始...">
+        <select id="anchor-task-domain" class="home-prompt-domain" aria-label="Task domain">
+          <option value="market" selected>Market</option>
+          <option value="target">Targets</option>
+          <option value="position">Portfolio</option>
+        </select>
+        <label class="home-prompt-visual" title="Render this task into the Loom visual workspace">
+          <input id="anchor-visualize-toggle" type="checkbox" checked>
+          <span>Visual</span>
+        </label>
         <button id="anchor-prompt-submit" class="btn btn--brand home-prompt-submit" type="button" title="Generate">
           <i class="ph-bold ph-arrow-right"></i><span>Generate</span>
         </button>
@@ -551,6 +563,7 @@
 <script src="timing-waterfall.js"></script>
 <script src="loom-detail-overlay.js"></script>
 <script src="target-debate-page.js"></script>
+<script src="loom-intelligence-page.js"></script>
 <script src="anchor-client.js"></script>
 <script src="prompt-panel.js"></script>
 <script src="anchor-debate-overlay.js"></script>

@@ -23,6 +23,7 @@ import os
 import sys
 import time
 import urllib.parse
+from dataclasses import asdict
 from pathlib import Path
 
 _LOOM_DIR = Path(__file__).resolve().parent
@@ -33,7 +34,7 @@ if _bridge_module is not None and not hasattr(_bridge_module, "patch_webview"):
     del sys.modules["bridge"]
 
 from fastapi import FastAPI, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from hand_registry import REGISTRY
 from provider_client import read_config, write_config, get_client_for_brain
@@ -1154,6 +1155,9 @@ async def analyze(req: AnalyzeRequest):
             synthesis=synthesis,
             hand_artifacts=result.get("hand_artifacts", {}),
             cold_start=cold,
+            intent_activation=result.get("intent_activation"),
+            intent_rubric=result.get("intent_rubric"),
+            intent_reward_report=result.get("intent_reward_report"),
         )
         _flywheel.append_record(fw_record)
         goal.record_episode(fw_record.episode_id)
@@ -1212,10 +1216,71 @@ class DistillRequest(BaseModel):
     url: str = ""
     source_author: str = ""
     source_date: str = ""
+    source_platform: str = ""
+    resource_kind: str = ""
+    trust_tier: str = ""
+    intent_hint: str = ""
+    tags: list[str] = Field(default_factory=list)
+    domain: str = "general"
 
 
 class FrameworkAcceptRequest(BaseModel):
     framework: dict
+
+
+class ResourceCaptureRequest(BaseModel):
+    title: str = ""
+    url: str = ""
+    text: str = ""
+    note: str = ""
+    source: str = ""
+    source_author: str = ""
+    source_platform: str = ""
+    source_date: str = ""
+    resource_kind: str = ""
+    trust_tier: str = ""
+    intent_hint: str = ""
+    value_signal: str = ""
+    tags: list[str] = Field(default_factory=list)
+    domain: str = "general"
+    market_scope: dict = Field(default_factory=dict)
+    user_signal: dict = Field(default_factory=dict)
+
+
+@app.post("/resources/capture")
+async def resources_capture(req: ResourceCaptureRequest):
+    """Capture resource metadata for evaluator-side wiki/rubric use."""
+    resource = _brain_harness.resource_registry.capture(req.model_dump())
+    return {
+        "ok": True,
+        "resource": asdict(resource),
+        "paths": {
+            "resource_wiki": "brain/resource_wiki/resources.json",
+        },
+    }
+
+
+@app.get("/resources/wiki")
+async def resources_wiki():
+    """List captured resource wiki entries and distilled strategy primitives."""
+    return {
+        "ok": True,
+        "resources": _brain_harness.resource_registry.list_resources(include_channel=True),
+        "strategy_primitives": _brain_harness.resource_registry.list_strategy_primitives(),
+    }
+
+
+@app.get("/resources/rubric-context")
+async def resources_rubric_context(domain: str = "general", question: str = "", limit: int = 5):
+    """Preview the compact resource sidecar context used by rubric compilation."""
+    return {
+        "ok": True,
+        "context": _brain_harness.resource_registry.query_rubric_context(
+            domain=domain,
+            question=question,
+            limit=limit,
+        ),
+    }
 
 
 @app.post("/distill")
@@ -1244,6 +1309,20 @@ async def distill(req: DistillRequest):
     if not text:
         return {"ok": False, "error": "provide text or url", "candidates": []}
 
+    captured_resource = _brain_harness.resource_registry.capture({
+        "title": req.url or req.source_author or text[:80],
+        "url": req.url,
+        "text": text,
+        "source_author": req.source_author,
+        "source_date": req.source_date,
+        "source_platform": req.source_platform,
+        "resource_kind": req.resource_kind or ("link" if req.url else "excerpt"),
+        "trust_tier": req.trust_tier,
+        "intent_hint": req.intent_hint,
+        "tags": req.tags,
+        "domain": req.domain,
+    })
+
     # Run framework distillation + intent parsing concurrently
     raw_label = req.url or req.source_author or text[:80]
     distill_task = asyncio.create_task(
@@ -1260,6 +1339,12 @@ async def distill(req: DistillRequest):
     )
 
     candidates = await distill_task
+    strategy_primitives = _brain_harness.resource_registry.add_strategy_primitives(
+        resource_id=captured_resource.resource_id,
+        frameworks=candidates,
+        domain=req.domain,
+        trust_tier=req.trust_tier or captured_resource.trust_tier,
+    )
     try:
         intent_event = await intent_task
         _intent_stream.append(intent_event)
@@ -1268,7 +1353,12 @@ async def distill(req: DistillRequest):
         pass
 
     print(f"[brain] /distill → {len(candidates)} framework candidate(s)", flush=True)
-    return {"ok": True, "candidates": candidates}
+    return {
+        "ok": True,
+        "resource": asdict(captured_resource),
+        "candidates": candidates,
+        "strategy_primitives": [asdict(item) for item in strategy_primitives],
+    }
 
 
 @app.post("/frameworks/accept")

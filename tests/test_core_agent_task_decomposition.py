@@ -347,6 +347,7 @@ class CoreAgentTaskDecompositionTests(unittest.TestCase):
                 self.rewarded_intent_harness = RewardedIntentHarness(self.root)
                 self._last_intent_activation = None
                 self._last_policy_plan = None
+                self._last_intent_rubric = None
 
             def cold_start(self):
                 return False

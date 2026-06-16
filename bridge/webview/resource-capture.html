@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Capture Resource</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f9fc;
+      --panel: #ffffff;
+      --line: #d8e2ec;
+      --text: #17212b;
+      --muted: #5d6b79;
+      --accent: #146c94;
+      --accent-strong: #0f536f;
+      --ok: #0f7a54;
+      --error: #a12828;
+      --shadow: 0 18px 48px rgba(28, 42, 56, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      gap: 12px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .pill {
+      flex: 0 0 auto;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.72);
+      font-size: 11px;
+    }
+
+    form {
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+      text-transform: uppercase;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 9px;
+      color: var(--text);
+      background: #fbfdff;
+      font: inherit;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+
+    textarea[name="text"] {
+      min-height: 100px;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(20, 108, 148, 0.13);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 120px;
+      gap: 10px;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 2px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 6px;
+      padding: 9px 13px;
+      color: #fff;
+      background: var(--accent);
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: var(--accent-strong);
+    }
+
+    button:disabled {
+      cursor: default;
+      opacity: 0.58;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    #status {
+      min-height: 64px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--muted);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    #status.ok {
+      border-color: rgba(15, 122, 84, 0.35);
+      color: var(--ok);
+      background: rgba(15, 122, 84, 0.07);
+    }
+
+    #status.error {
+      border-color: rgba(161, 40, 40, 0.35);
+      color: var(--error);
+      background: rgba(161, 40, 40, 0.07);
+    }
+
+    @media (max-width: 420px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .actions {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <h1>Capture Resource</h1>
+        <p class="subtitle">Save notes, links, and source hints into Loom context.</p>
+      </div>
+      <span class="pill">Intent Wiki</span>
+    </header>
+
+    <form id="capture-form">
+      <label>
+        Title
+        <input name="title" autocomplete="off" placeholder="Source title or short name">
+      </label>
+
+      <label>
+        URL
+        <input name="url" type="url" autocomplete="off" placeholder="https://...">
+      </label>
+
+      <label>
+        Resource Content
+        <textarea name="text" placeholder="Paste the resource excerpt, summary, or key facts"></textarea>
+      </label>
+
+      <label>
+        Note
+        <textarea name="note" placeholder="Why this matters, caveats, or how Loom should use it"></textarea>
+      </label>
+
+      <label>
+        Intent Hint
+        <textarea name="intent_hint" placeholder="What user preference or future task intent this resource supports"></textarea>
+      </label>
+
+      <div class="grid">
+        <label>
+          Tags
+          <input name="tags" autocomplete="off" placeholder="college, admissions">
+        </label>
+        <label>
+          Channel
+          <select name="channel">
+            <option value="">Auto</option>
+            <option value="web">Web</option>
+            <option value="paper">Paper</option>
+            <option value="github">GitHub</option>
+            <option value="rss">RSS</option>
+            <option value="social">Social</option>
+            <option value="note">Note</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="grid">
+        <label>
+          Trust
+          <select name="trust_tier">
+            <option value="F">Unreviewed</option>
+            <option value="A">A - Primary</option>
+            <option value="B">B - Strong</option>
+            <option value="C">C - Useful</option>
+            <option value="D">D - Weak</option>
+          </select>
+        </label>
+        <label>
+          Kind
+          <select name="resource_kind">
+            <option value="note">Note</option>
+            <option value="link">Link</option>
+            <option value="excerpt">Excerpt</option>
+            <option value="dataset">Dataset</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="actions">
+        <span class="hint">Saved locally; no agent command required.</span>
+        <button type="submit">Save Resource</button>
+      </div>
+    </form>
+
+    <section id="status" aria-live="polite">Ready.</section>
+  </main>
+
+  <script>
+    const form = document.getElementById('capture-form');
+    const statusBox = document.getElementById('status');
+    const submitButton = form.querySelector('button[type="submit"]');
+
+    function setStatus(kind, message) {
+      statusBox.className = kind || '';
+      statusBox.textContent = message;
+    }
+
+    function formPayload() {
+      const data = new FormData(form);
+      const payload = {};
+      for (const [key, value] of data.entries()) {
+        payload[key] = String(value || '').trim();
+      }
+      payload.tags = payload.tags
+        ? payload.tags.split(',').map(tag => tag.trim()).filter(Boolean)
+        : [];
+      return payload;
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const payload = formPayload();
+      if (!payload.title && !payload.url && !payload.text && !payload.note) {
+        setStatus('error', 'Add a title, URL, content, or note before saving.');
+        return;
+      }
+
+      submitButton.disabled = true;
+      setStatus('', 'Saving...');
+      try {
+        const response = await fetch('/channels/capture', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || `Request failed: ${response.status}`);
+        }
+        const paths = result.paths || {};
+        setStatus(
+          'ok',
+          [
+            `Saved: ${result.resource.resource_id}`,
+            `Channel: ${result.resource.channel}`,
+            '',
+            paths.channel_resources || 'logs/workspace/channel-resources.json',
+            paths.intent_wiki_evidence || 'brain/intent_wiki/evidence.jsonl',
+            paths.intent_wiki_intents || 'brain/intent_wiki/intents.json',
+          ].join('\n')
+        );
+        form.reset();
+      } catch (error) {
+        setStatus('error', error.message || 'Save failed.');
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

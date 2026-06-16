@@ -15,7 +15,10 @@ from loom.brain_harness.projection import (
     canonical_serialize,
     content_id,
 )
+from loom.brain_harness.base import BrainHarness
 from loom.brain_harness.state import BrainState
+from loom.brain_harness.intent_wiki import IntentActivation
+from loom.brain_harness.intent_harness import RubricSpec
 
 
 class TestCanonicalSerialize(unittest.TestCase):
@@ -57,6 +60,22 @@ def _make_mock_harness(tmp_root: Path | None = None) -> MagicMock:
     """Build a minimal harness mock that satisfies build_projection."""
     harness = MagicMock()
     harness.root = tmp_root or Path(".")
+    activation = IntentActivation(
+        ts="2026-06-13T00:00:00",
+        run_id="run-test",
+        question="",
+        domain="general",
+        active_intents=[],
+        inactive_intents=[],
+    )
+    rubric = RubricSpec(
+        ts="2026-06-13T00:00:00",
+        rubric_id="rubric-test",
+        domain="general",
+        question="",
+        criteria=[],
+        suppressed_policies=[],
+    )
 
     # BrainState
     harness.state = MagicMock()
@@ -65,23 +84,23 @@ def _make_mock_harness(tmp_root: Path | None = None) -> MagicMock:
     harness.state.query_frameworks = MagicMock(return_value=[])
     harness.state.query_notes = MagicMock(return_value=[])
     harness.state.get_state_version = MagicMock(return_value=0)
+    harness.resource_registry = None
 
     # IntentStream — None by default
     harness._intent_stream = None
 
     # IntentWiki
     harness.intent_wiki = MagicMock()
-    harness.intent_wiki.activate = MagicMock(return_value=MagicMock())
-    harness.intent_wiki.format_activation_for_prompt = MagicMock(return_value="")
+    harness.intent_wiki.activate = MagicMock(return_value=activation)
 
     # RewardedIntentHarness
     harness.rewarded_intent_harness = MagicMock()
-    harness.rewarded_intent_harness.plan = MagicMock(return_value=MagicMock())
-    harness.rewarded_intent_harness.format_plan_for_prompt = MagicMock(return_value="")
+    harness.rewarded_intent_harness.compile_rubric = MagicMock(return_value=rubric)
 
     # Side-effect storage
     harness._last_intent_activation = None
     harness._last_policy_plan = None
+    harness._last_intent_rubric = None
 
     return harness
 
@@ -92,8 +111,8 @@ class TestBuildProjection(unittest.TestCase):
         "strategy_rules",
         "frameworks",
         "intent_stream",
-        "intent_wiki",
-        "policy_plan",
+        "intent_activation",
+        "intent_rubric",
         "learned_notes",
         "last_synthesis",
         "intent_context",
@@ -145,17 +164,53 @@ class TestBuildProjection(unittest.TestCase):
 
     def test_intent_wiki_activation_stored_on_harness(self):
         harness = _make_mock_harness()
-        sentinel = MagicMock(name="activation")
+        sentinel = IntentActivation(
+            ts="2026-06-13T00:00:00",
+            run_id="run-sentinel",
+            question="x",
+            domain="general",
+            active_intents=[{"intent_id": "intent.test", "zone": "content_requirements"}],
+            inactive_intents=[],
+        )
         harness.intent_wiki.activate = MagicMock(return_value=sentinel)
         build_projection(harness, domain="equities", question="x")
         assert harness._last_intent_activation is sentinel
 
-    def test_policy_plan_stored_on_harness(self):
+    def test_intent_rubric_stored_on_harness(self):
         harness = _make_mock_harness()
-        sentinel = MagicMock(name="policy_plan")
-        harness.rewarded_intent_harness.plan = MagicMock(return_value=sentinel)
+        sentinel = RubricSpec(
+            ts="2026-06-13T00:00:00",
+            rubric_id="rubric-sentinel",
+            domain="general",
+            question="x",
+            criteria=[],
+            suppressed_policies=[],
+        )
+        harness.rewarded_intent_harness.compile_rubric = MagicMock(return_value=sentinel)
         build_projection(harness, domain="equities", question="x")
-        assert harness._last_policy_plan is sentinel
+        assert harness._last_intent_rubric is sentinel
+        assert harness._last_policy_plan is None
+
+    def test_resource_context_is_passed_to_rubric_compiler(self):
+        harness = _make_mock_harness()
+        resource_context = {
+            "resources": [{"resource_id": "res-1"}],
+            "strategy_primitives": [{"primitive_id": "sp-1"}],
+        }
+        harness.resource_registry = MagicMock()
+        harness.resource_registry.query_rubric_context = MagicMock(return_value=resource_context)
+
+        build_projection(harness, domain="loom-fin", question="AI capex")
+
+        harness.resource_registry.query_rubric_context.assert_called_once_with(
+            domain="loom-fin",
+            question="AI capex",
+            limit=5,
+        )
+        self.assertEqual(
+            resource_context,
+            harness.rewarded_intent_harness.compile_rubric.call_args.kwargs["resource_context"],
+        )
 
     def test_content_id_stable_same_state(self):
         harness = _make_mock_harness()
@@ -168,8 +223,15 @@ class TestBuildProjection(unittest.TestCase):
     def test_content_id_changes_when_sections_change(self):
         harness = _make_mock_harness()
         a = build_projection(harness, domain="equities", question="What now?")
-        harness.intent_wiki.format_activation_for_prompt = MagicMock(
-            return_value="ACTIVE INTENT: prefer fresh sources"
+        harness.rewarded_intent_harness.compile_rubric = MagicMock(
+            return_value=RubricSpec(
+                ts="2026-06-13T00:00:00",
+                rubric_id="rubric-changed",
+                domain="general",
+                question="What now?",
+                criteria=[{"criterion_id": "rubric.source_fit", "weight": 0.4}],
+                suppressed_policies=[],
+            )
         )
         b = build_projection(harness, domain="equities", question="What now?")
         assert a.content_id != b.content_id
@@ -181,6 +243,47 @@ class TestBuildProjection(unittest.TestCase):
         assert result.sections["intent_stream"] == ""
         assert result.sections["intent_context"] == {}
         assert result.sections["recent_intents"] == []
+
+    def test_prompt_excludes_evaluator_only_intent_metadata(self):
+        import tempfile
+
+        sections = {
+            "brain_md": "Brain role contract",
+            "strategy_rules": [],
+            "frameworks": [],
+            "intent_stream": "SHOULD_NOT_REACH_PROMPT",
+            "intent_activation": {"active_intents": [{"intent_id": "intent.hidden"}]},
+            "intent_rubric": {"criteria": [{"criterion_id": "rubric.hidden"}]},
+            "learned_notes": [],
+            "last_synthesis": "",
+            "intent_context": {"decision_context": "compact"},
+            "recent_intents": [{"raw_input": "hidden"}],
+        }
+        projection = Projection(
+            content_id="sha256:test",
+            state_version=0,
+            schema_version="1.0",
+            sections=sections,
+            materialized_at="2026-06-13T00:00:00Z",
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            harness = BrainHarness(Path(tmp))
+            prompt = harness._prompt_from_projection(projection, domain="general")
+            state_context = harness.select_state_context(
+                domain="general",
+                question="x",
+                context={},
+                projection=projection,
+            )
+
+        assert "SHOULD_NOT_REACH_PROMPT" not in prompt
+        assert "intent.hidden" not in prompt
+        assert "rubric.hidden" not in prompt
+        assert "intent_stream" not in state_context
+        assert "intent_activation" not in state_context
+        assert "intent_rubric" not in state_context
+        assert "recent_intents" not in state_context
 
 
 class TestBrainStateVersion(unittest.TestCase):

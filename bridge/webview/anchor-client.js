@@ -37,6 +37,8 @@ const Anchor = {
   defaultHandles: ['refine', 'expand', 'shorten', 'annotate', 'branch', 'edit'],
 
   init() {
+    // Dynamic visual pages auto-accept incoming HTML (no prompt-send loop from browser)
+    if (document.body?.dataset?.loomEntry === 'dynamic-visual') this._allowIncomingHtml = true;
     this.container = document.getElementById('anchor-content');
     this.statusEl = document.getElementById('status');
     this.infoEl = document.getElementById('info');
@@ -103,6 +105,15 @@ const Anchor = {
     } else if (route === 'targeted') {
       this._showRouteShell(route);
       if (window.TargetDebatePage) window.TargetDebatePage.renderInto(this);
+      this._syncHomeVisibility();
+      this._updateToolbarTabs(route);
+    } else if (route === 'general') {
+      this._showRouteShell(route);
+      this._syncHomeVisibility();
+      this._updateToolbarTabs(route);
+    } else if (route === 'intent-wiki') {
+      this._showRouteShell(route);
+      if (window.LoomIntelligencePage) window.LoomIntelligencePage.renderInto(this);
       this._syncHomeVisibility();
       this._updateToolbarTabs(route);
     } else if (['market','position','target','sentiment'].includes(route)) {
@@ -520,6 +531,7 @@ const Anchor = {
     document.querySelectorAll('.domain-tab').forEach(tab => {
       tab.classList.toggle('active', tab.dataset.domain === activeDomain);
     });
+    document.getElementById('anchor-intent-wiki-btn')?.classList.toggle('active', activeDomain === 'intent-wiki');
   },
 
   async _hydratePortfolioHub() {
@@ -802,7 +814,7 @@ const Anchor = {
   _bindGeneratedPageRoute(route) {
     const next = String(route || '').trim();
     if (!next) return;
-    if (!['overview','market','position','target','sentiment'].includes(next)) return;
+    if (!['overview','general','market','position','target','sentiment'].includes(next)) return;
     if (window.location.hash.slice(1) !== next) {
       history.replaceState(null, '', '#' + next);
     }
@@ -828,8 +840,29 @@ const Anchor = {
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
   },
 
+  _readPromptRouteChoice() {
+    const select = document.getElementById('anchor-task-domain');
+    const value = String(select?.value || '').trim();
+    return value || '';
+  },
+
+  _readVisualizeChoice() {
+    const toggle = document.getElementById('anchor-visualize-toggle');
+    return toggle ? !!toggle.checked : true;
+  },
+
+  _loomVisualId() {
+    return document.body?.dataset?.loomVisualId || '';
+  },
+
+  _loomSurface() {
+    const visualId = this._loomVisualId();
+    return visualId ? 'visual:' + visualId : (document.body?.dataset?.loomEntry === 'general-visual' ? 'general' : 'fin');
+  },
+
   _initHomeSuggestions() {
     const input = document.getElementById('anchor-prompt-input');
+    const routeSelect = document.getElementById('anchor-task-domain');
     if (!input) return;
     document.querySelectorAll('#anchor-home button[data-prompt], #anchor-home button[data-route]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -840,6 +873,9 @@ const Anchor = {
           if (route) {
             input.dataset.route = route;
             this._selectedPromptRoute = route;
+            if (routeSelect && routeSelect.querySelector('option[value="' + route + '"]')) {
+              routeSelect.value = route;
+            }
             document.querySelectorAll('#anchor-home button[data-route].is-selected').forEach(el => el.classList.remove('is-selected'));
             btn.classList.add('is-selected');
           } else {
@@ -859,19 +895,45 @@ const Anchor = {
     if (/鏍囩殑|target|tracker|nvda|aapl|tsla|瑙﹀彂/.test(t)) return 'target';
     if (/鎯呯华|sentiment|fear.?greed|reddit|stocktwits/.test(t)) return 'sentiment';
     if (/瀹忚|甯傚満|today|market|overview|椋庨櫓/.test(t)) return 'market';
-    return 'market';
+    return 'general';
+  },
+
+  _parseLoomSlashCommand(text) {
+    const match = String(text || '').trim().match(/^\/(loom|loom-visual)(?:\s+([\s\S]*))?$/i);
+    if (!match) return null;
+    const command = match[1].toLowerCase();
+    const rest = String(match[2] || '').trim();
+    return {
+      command,
+      route: 'general',
+      text: rest,
+      visualize: command === 'loom-visual',
+    };
   },
 
   submitPrompt(text, route = '') {
     if (this._staticMode) { this.toast('Static mode —prompts disabled'); return; }
-    const effectiveRoute = String(route || '').trim() || this._inferRoute(text);
-    this._navigateToRoute(effectiveRoute);
+    const slash = this._parseLoomSlashCommand(text);
+    const promptText = slash ? slash.text : text;
+    if (!promptText) { this.toast('Prompt text required'); return; }
+    const effectiveRoute = String(route || slash?.route || '').trim() || this._readPromptRouteChoice() || this._inferRoute(promptText);
+    let visualize = this._readVisualizeChoice();
+    if (slash && typeof slash.visualize === 'boolean') visualize = slash.visualize;
+    const routeContext = {
+      source: 'ui',
+      task_family: effectiveRoute === 'general' ? 'general' : 'monitor',
+      visualize,
+      presentation: visualize ? 'card' : 'none',
+      surface: this._loomSurface(),
+      visual_id: this._loomVisualId() || undefined,
+    };
+    if (visualize) this._navigateToRoute(effectiveRoute);
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       this.toast('Not connected —please wait');
       return;
     }
-    this._allowIncomingHtml = true;
-    this._pendingPromptRoute = effectiveRoute;
+    this._allowIncomingHtml = visualize;
+    this._pendingPromptRoute = visualize ? effectiveRoute : '';
     // Initialize timing for prompt-based generation
     this._timing = {
       op: 'prompt',
@@ -880,10 +942,10 @@ const Anchor = {
       t1_built: performance.now(),
       _agentContext: this._activeBranch ? 'branch:' + this._activeBranch : 'content-agent',
     };
-    this.container.innerHTML = '';
-    this.ws.send(JSON.stringify({ type: 'prompt', text, route: effectiveRoute, ts: Date.now() }));
-    this._captureIntent('query', text, 'route:' + effectiveRoute);
-    this.showProcessing('Generating...');
+    if (visualize) this.container.innerHTML = '';
+    this.ws.send(JSON.stringify({ type: 'prompt', text: promptText, route: effectiveRoute, visualize, context: routeContext, ts: Date.now() }));
+    this._captureIntent('query', text, 'route:' + effectiveRoute + ';visualize:' + visualize);
+    this.showProcessing(visualize ? 'Generating...' : 'Running...');
     this.toast('Prompt sent');
   },
 
@@ -1087,7 +1149,11 @@ const Anchor = {
     if (this._pingTimer) { clearInterval(this._pingTimer); this._pingTimer = null; }
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = protocol + '//' + location.host;
+    const visualId = this._loomVisualId();
+    const wsPath = visualId
+      ? '/ws/visual/' + encodeURIComponent(visualId)
+      : (document.body?.dataset?.loomEntry === 'general-visual' ? '/ws/general' : '');
+    const wsUrl = protocol + '//' + location.host + wsPath;
 
     try {
       this.ws = new WebSocket(wsUrl);
@@ -1171,6 +1237,19 @@ const Anchor = {
         if (this._timing && !this._timing.t3_ack) this._timing.t3_ack = performance.now();
         this.toast(msg.message || 'OK');
         break;
+      case 'prompt_result':
+        this.clearProcessing();
+        this.toast(msg.result?.ok === false ? (msg.result.error || 'Task failed') : 'Task completed');
+        break;
+      case 'navigate': {
+        try {
+          const next = new URL(msg.url || '', window.location.origin);
+          if (next.origin === window.location.origin && next.pathname.startsWith('/loom-visual/')) {
+            window.location.assign(next.href);
+          }
+        } catch {}
+        break;
+      }
       case 'error':
         this.toast('Error: ' + msg.message);
         this.clearProcessing();
@@ -1941,6 +2020,11 @@ const Anchor = {
       bundle.context_mode = effectiveCfg.context_mode || 'none';
     }
     bundle.file_id = (window.WorkspacePanel && WorkspacePanel.currentFileId) || this.currentFileId || null;
+    const visualId = this._loomVisualId();
+    bundle.route_context = Object.assign({}, bundle.route_context || {}, {
+      surface: this._loomSurface(),
+      visual_id: visualId || undefined
+    });
 
     // Trading domain extension —detect target anchor's domain
     var domain = null;

@@ -42,6 +42,17 @@ class PolicyPlan:
 
 
 @dataclass
+class RubricSpec:
+    ts: str
+    rubric_id: str
+    domain: str
+    question: str
+    criteria: list[dict[str, Any]]
+    suppressed_policies: list[dict[str, Any]]
+    resource_context: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class RewardReport:
     ts: str
     episode_id: str
@@ -139,7 +150,11 @@ class RewardedIntentHarness:
                 continue
         return out
 
-    def plan(self, activation: IntentActivation, domain: str, question: str, limit: int = 5) -> PolicyPlan:
+    def _select_policy_candidates(
+        self,
+        activation: IntentActivation,
+        limit: int = 5,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         active_zones = {item.get("zone") for item in activation.active_intents}
         selected: list[dict[str, Any]] = []
         suppressed: list[dict[str, Any]] = []
@@ -163,40 +178,162 @@ class RewardedIntentHarness:
                 suppressed.append(item)
 
         selected.sort(key=lambda p: p["score"], reverse=True)
+        return selected[:limit], suppressed
+
+    def plan(self, activation: IntentActivation, domain: str, question: str, limit: int = 5) -> PolicyPlan:
+        selected, suppressed = self._select_policy_candidates(activation, limit=limit)
         plan = PolicyPlan(
             ts=datetime.now().isoformat(),
             plan_id="plan_" + datetime.now().strftime("%Y%m%d%H%M%S%f"),
             domain=domain or "general",
             question=question,
-            selected_policies=selected[:limit],
+            selected_policies=selected,
             suppressed_policies=suppressed,
         )
         self._append_jsonl(self.episodes_path, {"type": "policy_plan", **asdict(plan)})
         return plan
 
     def format_plan_for_prompt(self, plan: PolicyPlan) -> str:
-        if not plan.selected_policies:
-            return ""
-        lines = [
-            "The following intent policies were selected by the Brain process.",
-            "Treat them as executable generation constraints, not background memory.",
+        """Deprecated: intent policies are evaluator-only, not prompt context."""
+        return ""
+
+    def compile_rubric(
+        self,
+        activation: IntentActivation,
+        domain: str,
+        question: str,
+        limit: int = 5,
+        resource_context: dict[str, Any] | None = None,
+    ) -> RubricSpec:
+        """Compile active intents into post-generation evaluation criteria.
+
+        The rubric is deliberately not formatted for Brain prompts. It gives the
+        evaluator a detailed checklist while keeping the generation context
+        focused on the current goal and explicit state.
+        """
+        selected, suppressed = self._select_policy_candidates(activation, limit=limit)
+        active_by_zone: dict[str, list[str]] = {}
+        for intent in activation.active_intents:
+            zone = str(intent.get("zone", ""))
+            if not zone:
+                continue
+            active_by_zone.setdefault(zone, []).append(str(intent.get("intent_id", "")))
+
+        criteria = []
+        for policy in selected:
+            matched_zones = list(policy.get("matched_zones", []) or [])
+            source_intent_ids = [
+                intent_id
+                for zone in matched_zones
+                for intent_id in active_by_zone.get(zone, [])
+                if intent_id
+            ]
+            criteria.append({
+                "criterion_id": policy["policy_id"].replace("policy.", "rubric.", 1),
+                "label": policy["label"],
+                "weight": policy["weight"],
+                "score": policy["score"],
+                "reward_targets": list(policy.get("reward_targets", []) or []),
+                "matched_zones": matched_zones,
+                "source_policy_id": policy["policy_id"],
+                "source_intent_ids": source_intent_ids,
+                "checks": [
+                    f"Evaluate whether the result {action}."
+                    for action in policy.get("actions", [])
+                ],
+            })
+
+        resource_context = resource_context if isinstance(resource_context, dict) else {}
+        criteria.extend(self._resource_criteria(resource_context))
+
+        rubric = RubricSpec(
+            ts=datetime.now().isoformat(),
+            rubric_id="rubric_" + datetime.now().strftime("%Y%m%d%H%M%S%f"),
+            domain=domain or "general",
+            question=question,
+            criteria=criteria,
+            suppressed_policies=suppressed,
+            resource_context=resource_context,
+        )
+        self._append_jsonl(self.episodes_path, {"type": "rubric_spec", **asdict(rubric)})
+        return rubric
+
+    @staticmethod
+    def _resource_criteria(resource_context: dict[str, Any]) -> list[dict[str, Any]]:
+        """Convert resource sidecar context into evaluator-only criteria."""
+        resources = [
+            item for item in resource_context.get("resources", [])
+            if isinstance(item, dict)
         ]
-        for policy in plan.selected_policies:
-            lines.append(f"- {policy['label']} (id={policy['policy_id']}, score={policy['score']:.2f})")
-            for action in policy.get("actions", []):
-                lines.append(f"  - action: {action}")
-        return "\n".join(lines)
+        primitives = [
+            item for item in resource_context.get("strategy_primitives", [])
+            if isinstance(item, dict)
+        ]
+        criteria: list[dict[str, Any]] = []
+        if resources:
+            criteria.append({
+                "criterion_id": "rubric.resource_source_fit",
+                "label": "Use relevant captured resources at the right confidence level",
+                "weight": 0.16,
+                "score": 0.7,
+                "reward_targets": ["source_fit", "freshness"],
+                "matched_zones": ["source_preferences"],
+                "source_policy_id": "",
+                "source_intent_ids": [],
+                "source_refs": [
+                    {
+                        "type": "resource",
+                        "id": item.get("resource_id", ""),
+                        "title": item.get("title", ""),
+                        "tier": item.get("trust_tier", "F"),
+                        "url": item.get("url", ""),
+                    }
+                    for item in resources
+                ],
+                "checks": [
+                    "Evaluate whether the result uses relevant captured resources without treating weak social signals as verified facts.",
+                    "Evaluate whether source tier, freshness, and provenance are visible when they matter to the decision.",
+                ],
+            })
+        if primitives:
+            criteria.append({
+                "criterion_id": "rubric.strategy_framework_fit",
+                "label": "Apply distilled strategy frameworks as evaluation lenses",
+                "weight": 0.18,
+                "score": 0.72,
+                "reward_targets": ["framework_fit", "risk_coverage", "decision_usefulness"],
+                "matched_zones": ["source_preferences", "decision_style", "risk_sensitivity"],
+                "source_policy_id": "",
+                "source_intent_ids": [],
+                "source_refs": [
+                    {
+                        "type": "strategy_primitive",
+                        "id": item.get("primitive_id", ""),
+                        "name": item.get("name", ""),
+                        "source_resource_ids": item.get("source_resource_ids", []),
+                    }
+                    for item in primitives
+                ],
+                "checks": [
+                    "Evaluate whether the result tests the primitive's core variables instead of only echoing its conclusion.",
+                    "Evaluate whether trigger, evidence, and invalidation conditions are made explicit.",
+                    "Evaluate whether conflicting or low-confidence frameworks are handled as hypotheses.",
+                ],
+            })
+        return criteria
 
     def evaluate_and_update(
         self,
         question: str,
         domain: str,
         activation: IntentActivation | None,
-        plan: PolicyPlan | None,
+        plan: PolicyPlan | RubricSpec | None,
         synthesis: dict[str, Any],
         hand_artifacts: dict[str, dict],
+        rubric: RubricSpec | None = None,
     ) -> RewardReport | None:
-        if activation is None or plan is None:
+        evaluation_plan = rubric or plan
+        if activation is None or evaluation_plan is None:
             return None
 
         output_text = self._output_text(synthesis, hand_artifacts)
@@ -208,12 +345,23 @@ class RewardedIntentHarness:
             "decision_usefulness": self._score_decision_usefulness(synthesis, output_text),
             "style_fit": 0.55,
         }
+        if isinstance(evaluation_plan, RubricSpec) and evaluation_plan.resource_context:
+            evaluator_scores["source_fit"] = self._score_source_fit(
+                evaluation_plan,
+                output_text,
+                hand_artifacts,
+            )
+            evaluator_scores["framework_fit"] = self._score_framework_fit(
+                evaluation_plan,
+                output_text,
+            )
 
         policy_rewards: dict[str, float] = {}
-        for policy in plan.selected_policies:
-            targets = policy.get("reward_targets", [])
+        for item in self._reward_items(evaluation_plan):
+            policy_id = item.get("source_policy_id") or item.get("policy_id") or item.get("criterion_id")
+            targets = item.get("reward_targets", [])
             values = [evaluator_scores[t] for t in targets if t in evaluator_scores]
-            policy_rewards[policy["policy_id"]] = round(sum(values) / len(values), 3) if values else 0.5
+            policy_rewards[policy_id] = round(sum(values) / len(values), 3) if values else 0.5
 
         intent_rewards: dict[str, float] = {}
         for intent in activation.active_intents:
@@ -231,7 +379,7 @@ class RewardedIntentHarness:
         report = RewardReport(
             ts=datetime.now().isoformat(),
             episode_id="ep_" + datetime.now().strftime("%Y%m%d%H%M%S%f"),
-            plan_id=plan.plan_id,
+            plan_id=self._plan_identifier(evaluation_plan),
             overall_reward=overall,
             evaluator_scores={k: round(v, 3) for k, v in evaluator_scores.items()},
             policy_rewards=policy_rewards,
@@ -241,7 +389,7 @@ class RewardedIntentHarness:
 
         self._append_jsonl(self.reward_ledger_path, asdict(report))
         self._update_policy_weights(policy_rewards)
-        self._append_jsonl(self.credit_path, self._credit_assignment(report, plan))
+        self._append_jsonl(self.credit_path, self._credit_assignment(report, evaluation_plan))
         return report
 
     def latest_reward(self) -> dict[str, Any] | None:
@@ -258,8 +406,22 @@ class RewardedIntentHarness:
     def snapshot(self) -> dict[str, Any]:
         return {
             "policies": [asdict(p) for p in self.policies()],
+            "latest_rubric": self.latest_rubric(),
             "latest_reward": self.latest_reward(),
         }
+
+    def latest_rubric(self) -> dict[str, Any] | None:
+        if not self.episodes_path.exists():
+            return None
+        lines = [ln for ln in self.episodes_path.read_text("utf-8").splitlines() if ln.strip()]
+        for line in reversed(lines):
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if item.get("type") == "rubric_spec":
+                return item
+        return None
 
     def _update_policy_weights(self, policy_rewards: dict[str, float]) -> None:
         policies = {p.policy_id: p for p in self.policies()}
@@ -345,6 +507,60 @@ class RewardedIntentHarness:
         return min(0.95, score)
 
     @staticmethod
+    def _score_source_fit(rubric: RubricSpec, output_text: str, hand_artifacts: dict[str, dict]) -> float:
+        resources = rubric.resource_context.get("resources", [])
+        if not resources:
+            return 0.6
+        artifact_text = json.dumps(hand_artifacts, ensure_ascii=False).lower()
+        combined = output_text + "\n" + artifact_text
+        hits = 0
+        strong_tier_hits = 0
+        for resource in resources:
+            if not isinstance(resource, dict):
+                continue
+            probes = [
+                str(resource.get("resource_id", "")),
+                str(resource.get("title", "")),
+                str(resource.get("url", "")),
+                str(resource.get("source_author", "")),
+            ]
+            if any(probe and probe.lower() in combined for probe in probes):
+                hits += 1
+                if str(resource.get("trust_tier", "")).upper() in {"A", "B", "C"}:
+                    strong_tier_hits += 1
+        coverage = hits / max(1, len(resources))
+        score = 0.32 + 0.48 * coverage + 0.1 * min(1, strong_tier_hits)
+        if any(word in combined for word in ("source", "provenance", "tier", "来源", "出处", "引用")):
+            score += 0.08
+        return round(min(0.95, score), 3)
+
+    @staticmethod
+    def _score_framework_fit(rubric: RubricSpec, output_text: str) -> float:
+        primitives = rubric.resource_context.get("strategy_primitives", [])
+        if not primitives:
+            return 0.6
+        variables: list[str] = []
+        invalidation_terms: list[str] = []
+        for primitive in primitives:
+            if not isinstance(primitive, dict):
+                continue
+            variables.extend(RewardedIntentHarness._keywords(" ".join(
+                str(v) for v in primitive.get("variables", [])
+            )))
+            invalidation_terms.extend(RewardedIntentHarness._keywords(" ".join(
+                str(v) for v in primitive.get("invalidation", [])
+            )))
+        variable_hits = sum(1 for word in set(variables) if word in output_text)
+        invalidation_hits = sum(1 for word in set(invalidation_terms) if word in output_text)
+        variable_score = variable_hits / max(1, min(8, len(set(variables))))
+        invalidation_score = invalidation_hits / max(1, min(4, len(set(invalidation_terms))))
+        explicit_risk = any(word in output_text for word in ("risk", "reversal", "invalid", "失效", "反证", "反转"))
+        score = 0.3 + 0.38 * min(1.0, variable_score) + 0.18 * min(1.0, invalidation_score)
+        if explicit_risk:
+            score += 0.08
+        return round(min(0.95, score), 3)
+
+    @staticmethod
     def _diagnosis(scores: dict[str, float]) -> str:
         weak = sorted((k, v) for k, v in scores.items() if v < 0.45)
         strong = sorted((k, v) for k, v in scores.items() if v >= 0.75)
@@ -356,12 +572,26 @@ class RewardedIntentHarness:
         return "; ".join(parts) or "balanced reward profile"
 
     @staticmethod
-    def _credit_assignment(report: RewardReport, plan: PolicyPlan) -> dict[str, Any]:
+    @staticmethod
+    def _reward_items(plan: PolicyPlan | RubricSpec) -> list[dict[str, Any]]:
+        if isinstance(plan, RubricSpec):
+            return plan.criteria
+        return plan.selected_policies
+
+    @staticmethod
+    def _plan_identifier(plan: PolicyPlan | RubricSpec) -> str:
+        if isinstance(plan, RubricSpec):
+            return plan.rubric_id
+        return plan.plan_id
+
+    @staticmethod
+    def _credit_assignment(report: RewardReport, plan: PolicyPlan | RubricSpec) -> dict[str, Any]:
         updates = []
-        for policy in plan.selected_policies:
-            reward = report.policy_rewards.get(policy["policy_id"], 0.5)
+        for item in RewardedIntentHarness._reward_items(plan):
+            policy_id = item.get("source_policy_id") or item.get("policy_id") or item.get("criterion_id")
+            reward = report.policy_rewards.get(policy_id, 0.5)
             updates.append({
-                "policy_id": policy["policy_id"],
+                "policy_id": policy_id,
                 "reward": reward,
                 "credit": "positive" if reward >= 0.6 else "negative" if reward < 0.45 else "neutral",
                 "reason": report.diagnosis,
@@ -369,7 +599,7 @@ class RewardedIntentHarness:
         return {
             "ts": datetime.now().isoformat(),
             "episode_id": report.episode_id,
-            "plan_id": plan.plan_id,
+            "plan_id": RewardedIntentHarness._plan_identifier(plan),
             "policy_updates": updates,
         }
 

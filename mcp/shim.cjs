@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Anchor MCP Shim — thin stdio JSON-RPC bridge to the Anchor Service.
 //
-// Claude Code starts this process (via .claude/mcp.json). The Anchor Service
-// (mcp/server.cjs) runs separately: scripts\start-anchor.bat
+// Claude Code/Codex starts this process via MCP config. The shim lazily starts
+// the local Loom services when a Loom entry tool is called.
 //
 // Architecture:
 //   CC Agent ←─── stdio JSON-RPC ───→ Shim ←─── WebSocket ───→ Service
@@ -14,11 +14,17 @@
 // HTTP is used only for loop-gate endpoints (/loop/active, /loop/disable).
 
 const http = require('http');
+const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 
 const PORT     = parseInt(process.env.ANCHOR_PORT || '3000');
 const AGENT_ID = process.env.ANCHOR_AGENT_ID || null;  // multi-agent routing id
+const ROOT = path.join(__dirname, '..');
 const BRIDGE_NM = path.join(__dirname, '..', 'bridge', 'node_modules');
+const LOGS_DIR = path.join(ROOT, 'logs');
+const RUNTIME_DIR = path.join(LOGS_DIR, 'runtime');
+const REQUIRED_ANCHOR_CAPABILITY = 'dynamic-visual-v2';
 
 // Reuse ws from bridge/node_modules — no separate install needed
 const wsLib    = require(path.join(BRIDGE_NM, 'ws'));
@@ -49,6 +55,11 @@ function wsTrace(direction, msgType, meta) {
   process.stdout.write(`[shim-trace] ${direction} ${msgType} ${JSON.stringify(meta)}\n`);
   try { require('fs').appendFileSync(TRACE_LOG, JSON.stringify(entry) + '\n', 'utf8'); } catch {}
 }
+
+try {
+  if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
+  if (!fs.existsSync(RUNTIME_DIR)) fs.mkdirSync(RUNTIME_DIR, { recursive: true });
+} catch {}
 
 // ── WebSocket connection to service ──────────────────────────────────
 //
@@ -185,12 +196,173 @@ function httpReq(method, urlPath, body, timeoutMs) {
 const get  = (p, ms)    => httpReq('GET',  p, null, ms);
 const post = (p, b, ms) => httpReq('POST', p, b,    ms);
 
+function httpReqTo(port, method, urlPath, body, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const data = body ? JSON.stringify(body) : null;
+    const opts = {
+      hostname: 'localhost', port, path: urlPath, method,
+      headers: data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {},
+      timeout: (timeoutMs || 5000) + 2000
+    };
+    const req = http.request(opts, res => {
+      let b = '';
+      res.on('data', c => b += c);
+      res.on('end', () => resolve({ status: res.statusCode, body: b }));
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('request timed out')); });
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function isHealthy(port) {
+  try {
+    const r = await httpReqTo(port, 'GET', '/health', null, 1200);
+    return r.status >= 200 && r.status < 300;
+  } catch {
+    return false;
+  }
+}
+
+async function hasDynamicVisualCapability(port) {
+  try {
+    const health = await httpReqTo(port, 'GET', '/health', null, 1200);
+    const body = JSON.parse(health.body || '{}');
+    if (body?.capabilities?.service_version === REQUIRED_ANCHOR_CAPABILITY &&
+        body?.capabilities?.dynamic_visual_webview === true) {
+      return true;
+    }
+  } catch {}
+
+  try {
+    const probe = await httpReqTo(port, 'GET', '/loom-visual/__loom_capability_probe__', null, 1200);
+    return probe.status >= 200 &&
+      probe.status < 300 &&
+      String(probe.body || '').includes('data-loom-entry="dynamic-visual"');
+  } catch {
+    return false;
+  }
+}
+
+function startDetached(label, command, args, options = {}) {
+  const out = path.join(RUNTIME_DIR, label.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.log');
+  const fd = fs.openSync(out, 'a');
+  const child = spawn(command, args, {
+    cwd: options.cwd || ROOT,
+    env: { ...process.env, ...(options.env || {}) },
+    detached: true,
+    windowsHide: true,
+    stdio: ['ignore', fd, fd],
+  });
+  child.unref();
+  log(`started ${label} pid=${child.pid}`);
+  return child.pid;
+}
+
+async function waitForPortDown(port, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!(await isHealthy(port))) return true;
+    await sleep(300);
+  }
+  return false;
+}
+
+async function waitForHealth(port, label, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await isHealthy(port)) return true;
+    await sleep(500);
+  }
+  throw new Error(`${label} did not become healthy on port ${port}`);
+}
+
+function visualOpenEnv(options = {}) {
+  if (!options.visual_id) return {};
+  return { ANCHOR_OPEN_URL: `http://localhost:${PORT}/loom-visual/${options.visual_id}` };
+}
+
+async function restartAnchorService(reason, options = {}) {
+  log(`refreshing Anchor service: ${reason}`);
+  try {
+    await httpReqTo(PORT, 'POST', '/shutdown', { reason }, 3000);
+  } catch (e) {
+    log(`Anchor shutdown request failed, continuing with restart attempt: ${e.message}`);
+  }
+  await waitForPortDown(PORT, 8000);
+  if (serviceWs) {
+    try { serviceWs.close(); } catch {}
+  }
+  serviceWs = null;
+  wsReady = false;
+  reconnecting = false;
+  startDetached('Anchor service', process.execPath, [path.join('mcp', 'server.cjs')], { cwd: ROOT, env: visualOpenEnv(options) });
+  await waitForHealth(PORT, 'Anchor service', 15000);
+  if (!(await hasDynamicVisualCapability(PORT))) {
+    throw new Error('Anchor service restarted but dynamic Loom visual webview capability is still unavailable');
+  }
+  connectToService();
+}
+
+async function ensureAnchorServiceFreshForVisual(options = {}) {
+  if (!(await isHealthy(PORT))) {
+    startDetached('Anchor service', process.execPath, [path.join('mcp', 'server.cjs')], { cwd: ROOT, env: visualOpenEnv(options) });
+    await waitForHealth(PORT, 'Anchor service', 15000);
+    connectToService();
+  }
+  if (await hasDynamicVisualCapability(PORT)) return;
+  await restartAnchorService('dynamic visual webview capability mismatch', options);
+}
+
+async function ensureLoomServices(options = {}) {
+  const needVisual = !!options.visualize;
+
+  if (needVisual) await ensureAnchorServiceFreshForVisual(options);
+}
+
+function normalizeLoomArgs(text, route) {
+  const raw = String(text || '').trim();
+  return { text: raw, route: 'general' };
+}
+
+function createVisualId() {
+  return 'vis_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function visualTargetArgs(args) {
+  return args.visual_id ? { visual_id: args.visual_id } : { surface: args.surface || 'fin' };
+}
+
 // ── Tool definitions ──────────────────────────────────────────────────
 const TOOLS = [
   {
+    name: 'loom_prompt',
+    description: 'Prepare a general Loom entry for the current host agent Brain. This tool never runs Brain inference; it only prepares optional visual surfaces.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'General task prompt. Finance fixed tasks stay in Loom Fin.' },
+        route: { type: 'string', enum: ['general'] },
+        visualize: { type: 'boolean', description: 'Whether to route through the visual workspace.' }
+      },
+      required: ['text']
+    }
+  },
+  {
     name: 'anchor_render',
     description: 'Render HTML to the Anchor webview. The HTML must have data-anc, data-handles, data-deps attributes per Anchor protocol. After calling, open http://localhost:3000 to see the interactive page.',
-    inputSchema: { type: 'object', properties: { html: { type: 'string', description: 'Complete HTML document with anchor annotations' } }, required: ['html'] }
+    inputSchema: {
+      type: 'object',
+      properties: {
+        html: { type: 'string', description: 'Complete HTML document with anchor annotations' },
+        surface: { type: 'string', description: 'Render target for legacy fixed surfaces. Prefer visual_id for /loom-visual.' },
+        visual_id: { type: 'string', description: 'Dynamic Loom visual session id returned by loom_prompt.' }
+      },
+      required: ['html']
+    }
   },
   {
     name: 'anchor_await_op',
@@ -210,7 +382,7 @@ const TOOLS = [
   {
     name: 'anchor_get_html',
     description: 'Get the currently rendered HTML from the webview.',
-    inputSchema: { type: 'object', properties: {} }
+    inputSchema: { type: 'object', properties: { visual_id: { type: 'string', description: 'Dynamic Loom visual session id returned by loom_prompt.' } } }
   },
   {
     name: 'anchor_emit_event',
@@ -219,7 +391,8 @@ const TOOLS = [
       type: 'object',
       properties: {
         type: { type: 'string', enum: ['thinking', 'tool_call', 'partial_render', 'decision', 'complete', 'error', 'debate'] },
-        payload: { type: 'object' }
+        payload: { type: 'object' },
+        visual_id: { type: 'string', description: 'Dynamic Loom visual session id returned by loom_prompt.' }
       },
       required: ['type']
     }
@@ -293,7 +466,8 @@ const TOOLS = [
             },
             required: ['anchor_id', 'html_fragment']
           }
-        }
+        },
+        visual_id: { type: 'string', description: 'Dynamic Loom visual session id returned by loom_prompt.' }
       },
       required: ['patches']
     }
@@ -348,11 +522,47 @@ async function dispatch(msg) {
 async function callTool(id, name, args) {
   try {
     switch (name) {
+      // ── loom_prompt ───────────────────────────────────────────────────
+      case 'loom_prompt': {
+        const normalized = normalizeLoomArgs(args.text || '', args.route || '');
+        if (!normalized.text) {
+          rpcErr(id, -32602, 'loom_prompt requires non-empty text');
+          break;
+        }
+        const visualize = args.visualize === true;
+        const visualId = visualize ? createVisualId() : '';
+        const visualUrl = visualId ? `http://localhost:${PORT}/loom-visual/${visualId}` : '';
+        await ensureLoomServices({ visualize, visual_id: visualId });
+        if (visualize) {
+          try { await post('/runtime/open-url', { url: visualUrl }, 1500); } catch {}
+          rpcResult(id, JSON.stringify({
+            ok: true,
+            mode: visualize ? 'visual_prepare' : 'text_prepare',
+            route: normalized.route,
+            brain: 'host_agent',
+            surface: `visual:${visualId}`,
+            visual_id: visualId,
+            text: normalized.text,
+            url: visualUrl,
+            next: 'The current Claude Code or Codex main agent must perform the Brain work, then call anchor_render with the returned visual_id.',
+          }));
+        } else {
+          rpcResult(id, JSON.stringify({
+            ok: true,
+            mode: visualize ? 'visual_prepare' : 'text_prepare',
+            route: normalized.route,
+            brain: 'host_agent',
+            text: normalized.text,
+            next: 'The current Claude Code or Codex main agent must perform the Brain work directly. Do not call /analyze or another LLM process.',
+          }));
+        }
+        break;
+      }
 
       // ── anchor_render ────────────────────────────────────────────────
       case 'anchor_render': {
         const html = args.html || '';
-        const r = await sendCmd({ type: 'render', html });
+        const r = await sendCmd({ type: 'render', html, ...visualTargetArgs(args) });
         rpcResult(id, r.ok
           ? `Rendered ${html.length} bytes to webview.`
           : `Error: ${r.error}`);
@@ -461,7 +671,7 @@ async function callTool(id, name, args) {
 
       // ── anchor_get_html ──────────────────────────────────────────────
       case 'anchor_get_html': {
-        const r = await sendCmd({ type: 'get_html' });
+        const r = await sendCmd({ type: 'get_html', ...visualTargetArgs(args) });
         rpcResult(id, r.html || '(empty)');
         break;
       }
@@ -501,7 +711,7 @@ async function callTool(id, name, args) {
 
       // ── anchor_patch ─────────────────────────────────────────────────
       case 'anchor_patch': {
-        const r = await sendCmd({ type: 'patch', patches: args.patches || [] });
+        const r = await sendCmd({ type: 'patch', patches: args.patches || [], ...visualTargetArgs(args) });
         rpcResult(id, r.ok
           ? `Patched ${(args.patches || []).length} node(s)${r.cascade_warnings ? ` (${r.cascade_warnings} cascade warning(s))` : ''}.`
           : `Error: ${r.error}`);
@@ -510,7 +720,7 @@ async function callTool(id, name, args) {
 
       // ── anchor_emit_event ────────────────────────────────────────────
       case 'anchor_emit_event': {
-        const r = await sendCmd({ type: 'event', kind: 'agent.' + args.type, payload: args.payload || {} });
+        const r = await sendCmd({ type: 'event', kind: 'agent.' + args.type, payload: args.payload || {}, ...visualTargetArgs(args) });
         rpcResult(id, 'emitted ' + (r.event_id || ''));
         break;
       }

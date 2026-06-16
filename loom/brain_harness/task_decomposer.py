@@ -210,16 +210,12 @@ class TaskDecomposer:
             )
 
         for key in (
-            "brain_md",
             "strategy_rules",
             "frameworks",
-            "intent_stream",
-            "intent_wiki",
-            "policy_plan",
             "learned_notes",
             "last_synthesis",
             "intent_context",
-            "recent_intents",
+            "request_context",
         ):
             value = state_context.get(key)
             if not value:

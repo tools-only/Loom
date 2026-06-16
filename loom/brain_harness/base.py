@@ -11,9 +11,11 @@ Prompt layers:
   2. brain-coordination SKILL  — static meta-skill index (loaded wholesale, fine)
   3. query_rules(domain)       — DYNAMIC: programmatic rule selection from BrainState
   4. query_frameworks(domain)  — DYNAMIC: distilled analytical frameworks
-  5. intent_stream.tail(5)     — DYNAMIC: recent human intent signals (the WHY)
-  6. query_notes(domain)       — DYNAMIC: recent domain-relevant learned notes
-  7. last-synthesis.md (<24h)  — fresh context snapshot
+  5. query_notes(domain)       — DYNAMIC: recent domain-relevant learned notes
+  6. last-synthesis.md (<24h)  — fresh context snapshot
+
+Intent Wiki activation and rubric detail are evaluator-side metadata. They are
+not injected into Brain prompts or task-decomposition context.
 """
 from __future__ import annotations
 
@@ -28,12 +30,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .intent_processor import IntentStream
     from .intent_wiki import IntentActivation
-    from .intent_harness import PolicyPlan, RewardReport
+    from .intent_harness import PolicyPlan, RewardReport, RubricSpec
 
 from .state import BrainState
 from .intent_wiki import IntentWiki
 from .intent_harness import RewardedIntentHarness
 from .projection import Projection, build_projection
+from .resources import ResourceRegistry
 
 
 def _parse_json(text: str) -> dict | None:
@@ -66,9 +69,11 @@ class BrainHarness:
         self.state = BrainState(self.root)  # structured queryable state
         self._intent_stream: IntentStream | None = None  # injected by brain.py at startup
         self.intent_wiki = IntentWiki(self.root)
+        self.resource_registry = ResourceRegistry(self.root)
         self._last_intent_activation: IntentActivation | None = None
         self.rewarded_intent_harness = RewardedIntentHarness(self.root)
         self._last_policy_plan: PolicyPlan | None = None
+        self._last_intent_rubric: RubricSpec | None = None
         self._last_reward_report: RewardReport | None = None
 
     # ── Prompt assembly ────────────────────────────────────────────────────────
@@ -170,20 +175,20 @@ class BrainHarness:
             context={"hand_claims": hand_claims or {}},
         )
         self._last_intent_activation = activation
-        activation_text = self.intent_wiki.format_activation_for_prompt(activation)
+        activation_text = ""
         if activation_text:
             parts.append(
-                "\n\n---\n\n## Active long-lived user intents (Intent Wiki)\n\n"
+                "\n\n---\n\n## Deprecated evaluator-only intent metadata\n\n"
                 + activation_text
             )
 
         # ── Dynamic: rewarded policy plan over active intents ───────────────
-        policy_plan = self.rewarded_intent_harness.plan(activation, domain=domain, question=question)
-        self._last_policy_plan = policy_plan
-        policy_text = self.rewarded_intent_harness.format_plan_for_prompt(policy_plan)
+        policy_plan = None
+        self._last_policy_plan = None
+        policy_text = ""
         if policy_text:
             parts.append(
-                "\n\n---\n\n## Selected intent policies (Rewarded Intent Harness)\n\n"
+                "\n\n---\n\n## Deprecated evaluator-only policy metadata\n\n"
                 + policy_text
             )
 
@@ -215,9 +220,6 @@ class BrainHarness:
         ordered_sections = [
             ("strategy_rules", f"Strategy rules (domain={domain}, selected by Brain process)"),
             ("frameworks", f"Analytical frameworks (domain={domain}, distilled)"),
-            ("intent_stream", "Recent intent stream (what the user is actually working toward)"),
-            ("intent_wiki", "Active long-lived user intents (Intent Wiki)"),
-            ("policy_plan", "Selected intent policies (Rewarded Intent Harness)"),
             ("learned_notes", f"Learned notes (domain={domain}, recent)"),
             ("last_synthesis", "Last synthesis (< 24h)"),
         ]
@@ -262,16 +264,11 @@ class BrainHarness:
                 "state_version": projection.state_version,
                 "schema_version": projection.schema_version,
             },
-            "brain_md": sections.get("brain_md", ""),
             "strategy_rules": sections.get("strategy_rules", []),
             "frameworks": sections.get("frameworks", []),
-            "intent_stream": sections.get("intent_stream", ""),
-            "intent_wiki": sections.get("intent_wiki", ""),
-            "policy_plan": sections.get("policy_plan", ""),
             "learned_notes": sections.get("learned_notes", []),
             "last_synthesis": sections.get("last_synthesis", ""),
             "intent_context": sections.get("intent_context", {}),
-            "recent_intents": sections.get("recent_intents", []),
             "request_context": context or {},
         }
 
@@ -925,8 +922,9 @@ class BrainHarness:
             question=question,
             domain=domain,
             activation=self._last_intent_activation,
-            plan=self._last_policy_plan,
+            plan=None,
             synthesis=parsed,
             hand_artifacts=hand_artifacts,
+            rubric=self._last_intent_rubric,
         )
         return parsed

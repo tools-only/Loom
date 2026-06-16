@@ -11,8 +11,9 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -67,6 +68,9 @@ class FlywheelRecord:
     hand_evaluations: list[HandEval] = field(default_factory=list)
     orchestration_trace: list[PhaseTrace] = field(default_factory=list)
     human_feedback: list[HumanFeedback] = field(default_factory=list)
+    intent_activation: dict[str, Any] | None = None
+    intent_rubric: dict[str, Any] | None = None
+    intent_reward_report: dict[str, Any] | None = None
     # Derived in P4 by FlywheelAnalyzer:
     profile_signals: list[dict] = field(default_factory=list)
     strategy_signals: list[dict] = field(default_factory=list)
@@ -79,8 +83,15 @@ class FlywheelRecord:
         synthesis: dict,
         hand_artifacts: dict,
         cold_start: bool = False,
+        intent_activation: dict[str, Any] | None = None,
+        intent_rubric: dict[str, Any] | None = None,
+        intent_reward_report: dict[str, Any] | None = None,
     ) -> "FlywheelRecord":
         episode_id = _new_episode_id()
+        intent_activation = _plain_dict(intent_activation)
+        intent_rubric = _plain_dict(intent_rubric)
+        intent_reward_report = _plain_dict(intent_reward_report)
+        reward_score = _reward_score(intent_reward_report)
         hand_evals = []
         for hand_id, art in (hand_artifacts or {}).items():
             meta = art.get("metadata", {}) if isinstance(art, dict) else {}
@@ -103,6 +114,7 @@ class FlywheelRecord:
             has_reversal_condition=bool(synthesis.get("reversal_condition")) if synthesis else False,
             cold_start=cold_start,
             hand_count=len(hand_artifacts or {}),
+            overall_quality=reward_score or 0.0,
         )
 
         return FlywheelRecord(
@@ -113,6 +125,9 @@ class FlywheelRecord:
             domain=domain,
             brain_self_eval=brain_eval,
             hand_evaluations=hand_evals,
+            intent_activation=intent_activation,
+            intent_rubric=intent_rubric,
+            intent_reward_report=intent_reward_report,
         )
 
     def to_dict(self) -> dict:
@@ -127,6 +142,11 @@ class FlywheelRecord:
             "domain": self.domain,
             "stance": self.brain_self_eval.stance,
             "confidence": self.brain_self_eval.confidence,
+            "reward_score": _reward_score(self.intent_reward_report),
+            "rubric_id": _rubric_id(self.intent_rubric),
+            "rubric_criteria_count": _rubric_criteria_count(self.intent_rubric),
+            "rubric_resource_count": _rubric_resource_count(self.intent_rubric),
+            "rubric_strategy_primitive_count": _rubric_strategy_primitive_count(self.intent_rubric),
             "hand_count": self.brain_self_eval.hand_count,
             "cold_start": self.brain_self_eval.cold_start,
         }
@@ -197,10 +217,63 @@ def _infer_tier(sources: list) -> str:
     return "unknown"
 
 
+def _plain_dict(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if is_dataclass(value) and not isinstance(value, type):
+        return asdict(value)
+    if isinstance(value, dict):
+        return value
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        data = to_dict()
+        return data if isinstance(data, dict) else None
+    return None
+
+
+def _reward_score(reward_report: dict[str, Any] | None) -> float | None:
+    if not isinstance(reward_report, dict):
+        return None
+    score = reward_report.get("overall_reward")
+    return score if isinstance(score, (int, float)) else None
+
+
+def _rubric_id(intent_rubric: dict[str, Any] | None) -> str:
+    if not isinstance(intent_rubric, dict):
+        return ""
+    return str(intent_rubric.get("rubric_id", "") or "")
+
+
+def _rubric_criteria_count(intent_rubric: dict[str, Any] | None) -> int:
+    if not isinstance(intent_rubric, dict):
+        return 0
+    criteria = intent_rubric.get("criteria")
+    return len(criteria) if isinstance(criteria, list) else 0
+
+
+def _rubric_resource_count(intent_rubric: dict[str, Any] | None) -> int:
+    context = _rubric_resource_context(intent_rubric)
+    resources = context.get("resources")
+    return len(resources) if isinstance(resources, list) else 0
+
+
+def _rubric_strategy_primitive_count(intent_rubric: dict[str, Any] | None) -> int:
+    context = _rubric_resource_context(intent_rubric)
+    primitives = context.get("strategy_primitives")
+    return len(primitives) if isinstance(primitives, list) else 0
+
+
+def _rubric_resource_context(intent_rubric: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(intent_rubric, dict):
+        return {}
+    context = intent_rubric.get("resource_context")
+    return context if isinstance(context, dict) else {}
+
+
 def _new_episode_id() -> str:
     return f"ep-{int(time.time() * 1000)}-{uuid.uuid4().hex[:8]}"
 
 
 def _now() -> str:
     import datetime
-    return datetime.datetime.utcnow().isoformat() + "Z"
+    return datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z")
