@@ -1,17 +1,17 @@
-"""Loom Brain — FastAPI service on port 3002.
+"""Loom Brain 鈥?FastAPI service on port 3002.
 
 Routes:
   POST /analyze { question, context?, domain_hint?, hands? }
-                → { ok, synthesis, hand_artifacts, workflow_decision, cold_start }
-  POST /run   { hand_id, task, context, runtime? }  →  { ok, hand_id, artifact }
-  GET  /health                                       →  { ok, service, hands }
-  GET  /resources/:id                                →  raw connector data (no policy)
-  GET  /intent-stream                                →  intent stream UI page
-  GET  /intent-stream/data                           →  intent events + derived context (JSON)
-  GET  /feedback                                     →  raw feedback events
-  POST /feedback                                     →  append feedback event
-  GET  /hand/:id/config                              →  hand config
-  PUT  /hand/:id/config                              →  write hand config
+                鈫?{ ok, synthesis, hand_artifacts, workflow_decision, cold_start }
+  POST /run   { hand_id, task, context, runtime? }  鈫? { ok, hand_id, artifact }
+  GET  /health                                       鈫? { ok, service, hands }
+  GET  /resources/:id                                鈫? raw connector data (no policy)
+  GET  /intent-stream                                鈫? intent stream UI page
+  GET  /intent-stream/data                           鈫? intent events + derived context (JSON)
+  GET  /feedback                                     鈫? raw feedback events
+  POST /feedback                                     鈫? append feedback event
+  GET  /hand/:id/config                              鈫? hand config
+  PUT  /hand/:id/config                              鈫? write hand config
 """
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ import os
 import sys
 import time
 import urllib.parse
+import uuid
 from dataclasses import asdict
 from pathlib import Path
 
@@ -34,10 +35,18 @@ if _bridge_module is not None and not hasattr(_bridge_module, "patch_webview"):
     del sys.modules["bridge"]
 
 from fastapi import FastAPI, Request
-from pydantic import BaseModel, Field
+from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 from hand_registry import REGISTRY
-from provider_client import read_config, write_config, get_client_for_brain
+from provider_client import (
+    read_config,
+    write_config,
+    get_client_for_brain,
+)
+from domains import DomainRegistry
+from domains.finance import LoomFinanceAdapter
+from domains.general import LoomGeneralAdapter
 from bridge import patch_webview, get_connector_data
 from timing_stats import compute_stages
 from harness.eval_log import append_signal
@@ -54,6 +63,13 @@ if str(_ROOT) not in sys.path:
 from loom_core.runtime.app import LoomCoreRuntime
 from loom_core.agent_adapters.registry import create_adapter_registry
 from loom_core.agent_adapters.providers import create_providers
+from loom_core.agent_adapters.runtime_bindings import (
+    HandRuntimeBindingStore,
+    hand_runtime_config_path,
+    resolve_hand_runtime,
+)
+from loom_core.codex_hand_channel import CodexHandChannel, HandRequest
+from loom_core.agent_service import AgentSessionService
 
 _core = LoomCoreRuntime(root_dir=_ROOT)
 _core.bootstrap()
@@ -93,7 +109,7 @@ for _hid, _hand in HANDS.items():
         adapter_id=f"sdk-{_hid}",
         invoke_fn=_make_sdk_invoke(_hand, _hid),
         capabilities=[f"{_hid}.analysis"],
-        label=f"SDK Legacy — {_hid}",
+        label=f"SDK Legacy 鈥?{_hid}",
     )
     try:
         _adapter_registry.register(_prov["instance"])
@@ -126,9 +142,132 @@ if _use_runtime_hand:
 # else: default stays "brain-inline" (set in AgentAdapterRegistry.__init__)
 
 from loom_core.agent_adapters.cloud_bootstrap import register_cloud_adapters
+from loom_core.agent_adapters.factory import (
+    adapter_from_config,
+    adapter_public_info,
+    normalize_adapter_config,
+    persistable_adapter_config,
+)
 register_cloud_adapters(_adapter_registry, _core, _ROOT)
 
-# ── Brain agent wiring ────────────────────────────────────────────────────────
+_DYNAMIC_ADAPTER_PATH = _ROOT / "loom" / "agent-adapters.json"
+_DYNAMIC_ADAPTER_CONFIGS: dict[str, dict] = {}
+
+
+def _register_dynamic_adapter_config(config: dict, *, persist: bool = True) -> dict:
+    """Register a process/http adapter from runtime config."""
+    normalized = normalize_adapter_config(config)
+    adapter = adapter_from_config(
+        normalized,
+        runtime=_core,
+        hands_root=_ROOT / "hands",
+    )
+    _adapter_registry.upsert(adapter)
+    _DYNAMIC_ADAPTER_CONFIGS[adapter.id] = {
+        **persistable_adapter_config(config),
+        "set_default_runtime": bool(config.get("set_default_runtime", False)),
+    }
+    if config.get("set_default_runtime"):
+        _adapter_registry.set_default_runtime_adapter(adapter.id)
+    if persist:
+        _save_dynamic_adapters()
+    return adapter_public_info(adapter)
+
+
+def _load_dynamic_adapters() -> None:
+    if not _DYNAMIC_ADAPTER_PATH.exists():
+        return
+    try:
+        data = json.loads(_DYNAMIC_ADAPTER_PATH.read_text("utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"[brain] failed to load dynamic adapters: {exc}", flush=True)
+        return
+    entries = data.get("adapters", data if isinstance(data, dict) else {})
+    if not isinstance(entries, dict):
+        return
+    for adapter_id, config in entries.items():
+        if not isinstance(config, dict):
+            continue
+        try:
+            _register_dynamic_adapter_config(
+                {"adapter_id": adapter_id, **config},
+                persist=False,
+            )
+        except Exception as exc:
+            print(f"[brain] dynamic adapter {adapter_id} skipped: {exc}", flush=True)
+
+
+def _save_dynamic_adapters() -> None:
+    try:
+        _DYNAMIC_ADAPTER_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _DYNAMIC_ADAPTER_PATH.write_text(
+            json.dumps(
+                {"version": 1, "adapters": _DYNAMIC_ADAPTER_CONFIGS},
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        print(f"[brain] failed to save dynamic adapters: {exc}", flush=True)
+
+
+def _ensure_runtime_adapter(adapter_id: str):
+    """Find an adapter, lazily loading CLI-written dynamic config if needed."""
+    adapter = _adapter_registry.find_by_id(adapter_id)
+    if adapter is not None or not _DYNAMIC_ADAPTER_PATH.exists():
+        return adapter
+    try:
+        data = json.loads(_DYNAMIC_ADAPTER_PATH.read_text("utf-8"))
+        entries = data.get("adapters", {}) if isinstance(data, dict) else {}
+        config = entries.get(adapter_id) if isinstance(entries, dict) else None
+        if isinstance(config, dict):
+            _register_dynamic_adapter_config(
+                {"adapter_id": adapter_id, **config},
+                persist=False,
+            )
+    except Exception as exc:
+        print(f"[brain] failed to lazy-load adapter {adapter_id}: {exc}", flush=True)
+    return _adapter_registry.find_by_id(adapter_id)
+
+
+_load_dynamic_adapters()
+
+_DIRECT_CODEX_RUNTIME_ID = "codex-app-server"
+
+
+def _create_direct_codex_channel() -> CodexHandChannel:
+    """Build the direct channel from the active Codex runtime configuration."""
+    config = _DYNAMIC_ADAPTER_CONFIGS.get(_DIRECT_CODEX_RUNTIME_ID, {})
+    codex_home = os.environ.get("LOOM_CODEX_HOME") or config.get("codex_home") or None
+    raw_timeout = os.environ.get("LOOM_CODEX_HAND_TIMEOUT_S") or config.get("timeout_s", 120.0)
+    try:
+        timeout_s = float(raw_timeout)
+    except (TypeError, ValueError):
+        timeout_s = 120.0
+    return CodexHandChannel(codex_home=codex_home, timeout_s=timeout_s)
+
+
+async def _run_direct_codex_hand(hand_id: str, task: str, context: dict) -> dict:
+    """Invoke a Brain Hand through the SDK/app-server channel."""
+    spec = (context or {}).get("agentic_hand_spec", {}) or {}
+    system_prompt = str(spec.get("system_prompt") or "") if isinstance(spec, dict) else ""
+    started = time.monotonic()
+    print(f"[brain] codex-hand start hand={hand_id}", flush=True)
+    artifact = await _create_direct_codex_channel().run(
+        HandRequest(
+            task=task,
+            hand_id=hand_id,
+            cwd=str(_ROOT),
+            system_prompt=system_prompt,
+            context=dict(context or {}),
+        )
+    )
+    elapsed = time.monotonic() - started
+    print(f"[brain] codex-hand completed hand={hand_id} elapsed={elapsed:.1f}s", flush=True)
+    return artifact
+
+# 鈹€鈹€ Brain agent wiring 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 import sys as _sys
 _loom_dir = Path(__file__).resolve().parent
 if str(_loom_dir) not in _sys.path:
@@ -141,10 +280,54 @@ from brain_harness.intent_processor import IntentProcessor, IntentStream
 from brain_harness.intent_wiki import IntentWiki
 from brain_harness.goal_context import GoalContextStore
 from brain_harness.flywheel import FlywheelRecord, FlywheelWriter
+from brain_harness.contextual_intent import ContextualIntentCompiler, ScopedFeedback
+from brain_harness.orchestration import build_minimal_orchestration_snapshot
+from loom_core.interaction_protocol.social import (
+    _is_loom_command_token,
+    build_analyze_request_from_social,
+    is_explicit_loom_command,
+    normalize_social_payload,
+    parse_agent_command,
+    resolve_social_agent_request,
+)
+from loom_core.interaction_protocol.social_channel import (
+    SocialChannelAdapter,
+    available_social_channel_types,
+    social_channel_from_config,
+)
+from loom_core.interaction_protocol.social_channel_config import (
+    create_social_channel_registry_from_document,
+    load_social_channel_document,
+    registry_to_document,
+    save_social_channel_document,
+    social_channel_config_path,
+)
+from loom_core.interaction_protocol.social_reply import (
+    render_analysis_reply,
+    send_social_reply,
+)
+from loom_core.interaction_protocol.social_progress import DiscordProgress, DiscordProgressReporter
+from loom_core.interaction_protocol.social_verify import verify_social_request
+from loom_core.repair.episode_repair import (
+    build_repair_plan,
+    build_repair_task,
+    summarize_repair_for_reply,
+)
 from loom_core.agents.core_agent import LoomCoreAgent
 from brain_portfolio import PortfolioDataHub
 
-_brain_harness = BrainHarness(_ROOT)
+# 鈹€鈹€ Domain adapter layer 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+_domain_registry = DomainRegistry(default_domain="general")
+_domain_registry.register(LoomFinanceAdapter())
+_domain_registry.register(LoomGeneralAdapter())
+
+# Merge default hands from domain adapters into REGISTRY
+for adapter in (_domain_registry.get("finance"), _domain_registry.get("general")):
+    for hand_id, cfg in (adapter.default_hands or {}).items():
+        if hand_id not in REGISTRY:
+            REGISTRY[hand_id] = cfg
+
+_brain_harness = BrainHarness(_ROOT, domain_registry=_domain_registry)
 # _brain_client / _brain_model were initialized above for brain-inline adapter
 _brain_resolver = WorkflowResolver(_ROOT, REGISTRY, _brain_client, _brain_model)
 _brain_distiller = ResourceDistiller(_ROOT, _brain_client, _brain_model)
@@ -156,7 +339,25 @@ _brain_harness._intent_stream = _intent_stream  # inject stream into harness pro
 
 _goal_store = GoalContextStore(_ROOT)
 _flywheel = FlywheelWriter(_ROOT)
+_contextual_intent_compiler = ContextualIntentCompiler()
 _portfolio_hub = PortfolioDataHub(_ROOT)
+_SOCIAL_CHANNEL_CONFIG_PATH = social_channel_config_path(_ROOT)
+_social_channel_registry = create_social_channel_registry_from_document(
+    load_social_channel_document(_SOCIAL_CHANNEL_CONFIG_PATH)
+)
+_agent_session_service = AgentSessionService(_adapter_registry)
+from loom_core.agent_session_registry import AgentSessionRegistry
+from loom_core.interaction_protocol.social import SessionCommand, parse_session_command
+_session_registry = AgentSessionRegistry()
+
+
+def _save_social_channels() -> None:
+    doc = registry_to_document(_social_channel_registry)
+    save_social_channel_document(
+        _SOCIAL_CHANNEL_CONFIG_PATH,
+        default_channel=doc["default_channel"],
+        channels=doc["channels"],
+    )
 
 
 def _with_brain_portfolio_context(hand_id: str, context: dict) -> dict:
@@ -195,16 +396,28 @@ def _with_brain_portfolio_context(hand_id: str, context: dict) -> dict:
 
 
 async def _brain_hand_runner(hand_id: str, task: str, ctx: dict) -> dict:
-    """Run a single hand for Brain's /analyze — reuses sdk path.
+    """Run a single hand for Brain's /analyze 鈥?reuses sdk path.
 
     Routing precedence:
-      1. ``hand_id in REGISTRY`` → existing SDK / mounted-adapter path
-      2. ``hand_id in _mounted`` → existing mounted-adapter path
-      3. Otherwise (Brain-generated runtime hand) → route to ``brain-inline``
+      1. ``hand_id in REGISTRY`` 鈫?existing SDK / mounted-adapter path
+      2. ``hand_id in _mounted`` 鈫?existing mounted-adapter path
+      3. Otherwise (Brain-generated runtime hand) 鈫?route to ``brain-inline``
          adapter using the spec's ``system_prompt`` (synthesized from the
          declared dimension when absent).
     """
     ctx = _with_brain_portfolio_context(hand_id, ctx)
+
+    # Inject domain adapter config so hands can use domain-specific skill/personal paths
+    info = REGISTRY.get(hand_id, {})
+    hand_domains = info.get("domains", ["general"])
+    if _domain_registry:
+        adapter = _domain_registry.get(hand_domains[0])
+        ctx["_domain_adapter_config"] = {
+            "skill_path": adapter.skill_path,
+            "personal_file_names": adapter.personal_file_names,
+            "context_snapshot_name": adapter.context_snapshot_name,
+            "assistant_branding": adapter.assistant_branding,
+        }
 
     # Runtime-generated hand: not registered statically and not mounted.
     if hand_id not in REGISTRY and hand_id not in _mounted:
@@ -218,6 +431,8 @@ async def _brain_hand_runner(hand_id: str, task: str, ctx: dict) -> dict:
             )
         _executor_id = spec.get("executor_id") or "brain-inline"
         _resolved_id = _adapter_registry.resolve_runtime_adapter(_executor_id)
+        if _resolved_id == _DIRECT_CODEX_RUNTIME_ID:
+            return await _run_direct_codex_hand(hand_id, task, ctx)
         adapter = _adapter_registry.find_by_id(_resolved_id)
         if adapter is None:
             adapter = _adapter_registry.find_by_id("brain-inline")  # fallback
@@ -241,14 +456,14 @@ async def _brain_hand_runner(hand_id: str, task: str, ctx: dict) -> dict:
         return artifact
 
     info = REGISTRY.get(hand_id, {})
-    runtime = _mounted.get(hand_id) or info.get("runtime", "sdk")
+    runtime = _runtime_for_hand(hand_id)
     if runtime == "sdk":
         hand = HANDS.get(hand_id)
         if not hand:
             raise ValueError(f"unknown hand: {hand_id}")
         resource_menu = get_menu_for_hand(hand_id, ctx.get("tags", []))
         return await hand.run(task, ctx, resource_menu)
-    adapter = _adapter_registry.find_by_id(runtime)
+    adapter = _ensure_runtime_adapter(runtime)
     if adapter is None:
         raise ValueError(f"unknown runtime adapter: {runtime}")
     envelope = {
@@ -269,6 +484,7 @@ async def _brain_hand_runner(hand_id: str, task: str, ctx: dict) -> dict:
 _core_agent = LoomCoreAgent(
     _brain_harness, _brain_resolver, _brain_hand_runner, _brain_client, _brain_model
 )
+_core_agent._domain_registry = _domain_registry
 
 app = FastAPI(title="Loom Brain", version="0.3.0")
 
@@ -283,6 +499,30 @@ app.add_middleware(
 # Tracks currently mounted external agents per hand: {hand_id: adapter_id}
 _mounted: dict[str, str] = {}
 _MOUNT_PATH = _ROOT / "loom" / "mounts.json"
+_HAND_RUNTIME_BINDINGS = HandRuntimeBindingStore(hand_runtime_config_path(_ROOT))
+
+
+def _runtime_for_hand(hand_id: str, explicit: str = "") -> str:
+    info = REGISTRY.get(hand_id, {})
+    return resolve_hand_runtime(
+        explicit=explicit,
+        bound=_HAND_RUNTIME_BINDINGS.get(hand_id),
+        mounted=_mounted.get(hand_id, ""),
+        declared=str(info.get("runtime", "sdk")),
+    )
+
+
+def _hand_runtime_state(hand_id: str) -> dict:
+    info = REGISTRY.get(hand_id, {})
+    configured = _HAND_RUNTIME_BINDINGS.get(hand_id)
+    return {
+        "hand_id": hand_id,
+        "label": info.get("label", hand_id),
+        "configured_runtime": configured,
+        "effective_runtime": _runtime_for_hand(hand_id),
+        "declared_runtime": info.get("runtime", "sdk"),
+        "mounted_runtime": _mounted.get(hand_id, ""),
+    }
 
 
 def _load_mounts() -> None:
@@ -364,11 +604,20 @@ def _register_mount_adapter(hand_id: str, endpoint: str, description: str,
 def _read_personal_context(hand_id: str) -> dict[str, str]:
     """Return {label: content} for SKILL.md + personal/ + fresh context/."""
     out: dict[str, str] = {}
-    skill_md = _ROOT / "skills" / "investment-research-framework" / "SKILL.md"
-    if skill_md.exists():
-        out["skill_index"] = skill_md.read_text("utf-8")
+    # Look up domain adapter config from the hand's REGISTRY entry
+    info = REGISTRY.get(hand_id, {})
+    hand_domains = info.get("domains", ["general"])
+    adapter = _domain_registry.get(hand_domains[0]) if _domain_registry else None
+    skill_path = adapter.skill_path if adapter else "skills/investment-research-framework"
+    fnames = adapter.personal_file_names if adapter else ["profile.md", "themes.md", "watchlist.md", "sources.md"]
+    snap_name = adapter.context_snapshot_name if adapter else "regime-snapshot.md"
+
+    if skill_path:
+        skill_md = _ROOT / skill_path / "SKILL.md"
+        if skill_md.exists():
+            out["skill_index"] = skill_md.read_text("utf-8")
     personal_dir = _ROOT / "hands" / hand_id / "personal"
-    for fname in ["profile.md", "themes.md", "watchlist.md", "sources.md"]:
+    for fname in fnames:
         p = personal_dir / fname
         if p.exists() and p.stat().st_size > 0:
             out[f"personal/{fname}"] = p.read_text("utf-8")
@@ -376,9 +625,9 @@ def _read_personal_context(hand_id: str) -> dict[str, str]:
     if notes.exists() and notes.stat().st_size > 0:
         txt = notes.read_text("utf-8")
         out["personal/learned-notes.md"] = txt[-4000:]
-    snap = _ROOT / "hands" / hand_id / "context" / "regime-snapshot.md"
+    snap = _ROOT / "hands" / hand_id / "context" / snap_name
     if snap.exists() and (time.time() - snap.stat().st_mtime) < 86400:
-        out["context/regime-snapshot.md"] = snap.read_text("utf-8")
+        out[f"context/{snap_name}"] = snap.read_text("utf-8")
     return out
 
 
@@ -398,19 +647,22 @@ def _format_personal_block(personal: dict[str, str]) -> str:
 def _build_hand_system_prompt(hand_id: str, description: str) -> str:
     info = REGISTRY.get(hand_id, {})
     label = info.get("label", hand_id)
-    domain = info.get("description", "")
-    user_note = f"\n\n## 用户说明\n{description.strip()}" if description.strip() else ""
+    hand_domains = info.get("domains", ["general"])
+    adapter = _domain_registry.get(hand_domains[0]) if _domain_registry else None
+    branding = adapter.assistant_branding if adapter else "Loom"
+    domain_desc = info.get("description", "")
+    user_note = f"\n\n## 鐢ㄦ埛璇存槑\n{description.strip()}" if description.strip() else ""
     base = (
-        f"你是 Loom Fin 的【{label}】hand agent。{user_note}\n\n"
-        f"## 分析职责\n{domain}\n\n"
-        "## 输出协议（严格遵守）\n"
-        "分析完成后，输出 EXACTLY 一行 JSON：\n"
+        f"You are {branding}'s [{label}] hand agent. {user_note}\n\n"
+        f"## Analysis responsibility\n{domain}\n\n"
+        "## Output protocol (strict)\n"
+        "After analysis, output exactly one JSON line:\n"
         '{"type":"run.artifact","artifact":{"metadata":{"resources_used":[...],"key_claims":[...],"gaps":[...]},"narrative":"..."}}\n\n'
-        "- resources_used: 你访问的所有数据源名称\n"
-        "- key_claims: 2-5 条有数据支撑的核心判断\n"
-        "- gaps: 你需要但无法获取的数据\n"
-        "- narrative: 2-4 段中文分析\n\n"
-        "不要输出其他任何内容。"
+        "- resources_used: every data source you accessed\n"
+        "- key_claims: 2-5 core claims supported by evidence\n"
+        "- gaps: data you needed but could not obtain\n"
+        "- narrative: 2-4 concise analysis paragraphs\n\n"
+        "Do not output any other content."
     )
     return base + _format_personal_block(_read_personal_context(hand_id))
 
@@ -506,7 +758,7 @@ def _render_state_engine(state_engine: dict) -> str:
     priority_signal = html.escape(targeted.get("priority_signal", ""))
     priority_html = (
         f'<div class="insight-box" style="border-left:3px solid var(--accent-iris)">'
-        f'<strong>优先信号：</strong> {priority_signal}</div>'
+        f'<strong>Priority signal:</strong> {priority_signal}</div>'
     ) if priority_signal else ""
 
     watch = targeted.get("watch_conditions", [])
@@ -543,17 +795,17 @@ def _render_state_engine(state_engine: dict) -> str:
         f'<section class="anc-section anc-section--gc brain-state-engine" '
         f'data-anc="brain-state-engine" data-handles="refine" data-has-detail="true">'
         f'<div class="anc-pill-row">'
-        f'<span class="anc-pill anc-pill--gen">状态推理</span>'
+        f'<span class="anc-pill anc-pill--gen">State reasoning</span>'
         f'<span class="anc-pill {status_class}">{html.escape(status)}</span>'
         f'</div>'
         f'<h2>{title}</h2>'
         f'{priority_html}'
         f'{regime_html}'
-        f'<h4>观察变量</h4>{watch_html}'
-        f'<h4>立场历史</h4>{history_html}'
-        f'{"<h4>反转条件</h4>" + reversal_html if latest_reversal else ""}'
+        f'<h4>Observation Variables</h4>{watch_html}'
+        f'<h4>Stance History</h4>{history_html}'
+        f'{"<h4>Reversal Condition</h4>" + reversal_html if latest_reversal else ""}'
         f'<p style="font-size:11px;color:var(--ink-muted)">'
-        f'Domain: {domain} — Episode #{episode_count} [{episode_id}]</p>'
+        f'Domain: {domain} - Episode #{episode_count} [{episode_id}]</p>'
         f'<aside class="anc-detail" hidden>'
         f'<section class="anc-detail-section" data-detail-section="intent-focus" '
         f'data-detail-label="Intent Focus"><h3>Intent Focus</h3>{intents_html}</section>'
@@ -580,10 +832,10 @@ def _render_raw_sources(artifact: dict) -> str:
         url_html = ""
         if url:
             url_str = html.escape(str(url))
-            url_html = f'<br><a href="{url_str}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent-iris)">🔗 {url_str}</a>'
+            url_html = f'<br><a href="{url_str}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent-iris)">馃敆 {url_str}</a>'
         if query:
             query_str = html.escape(str(query))
-            url_html += f'<br><span style="font-size:11px;color:var(--ink-muted)">搜索词: {query_str}</span>'
+            url_html += f'<br><span style="font-size:11px;color:var(--ink-muted)">鎼滅储璇? {query_str}</span>'
         parts.append(
             f'<div class="anc-source-row" data-layer-type="raw_source">'
             f'<strong>{rid}</strong>'
@@ -624,7 +876,7 @@ def _render_raw_items(artifact: dict) -> str:
                 f'<div class="anc-raw-item" data-layer-type="raw_item" data-item-type="news">'
                 f'{title_html}'
                 f'<span class="anc-pill anc-pill--review" style="font-size:10px">Tier {tier}</span>'
-                f'<span style="font-size:11px;color:var(--ink-muted)"> {source} · {pub}</span>'
+                f'<span style="font-size:11px;color:var(--ink-muted)"> {source} 路 {pub}</span>'
                 f'<p style="margin:2px 0 0">{summary}</p>'
                 f'<p style="font-size:11px;color:var(--accent-iris)">{relevance}</p>'
                 f'</div>'
@@ -638,7 +890,7 @@ def _render_raw_items(artifact: dict) -> str:
                 f'<div class="anc-raw-item" data-layer-type="raw_item" data-item-type="data_point">'
                 f'<strong>{label}</strong>: <code>{value}</code>'
                 f'<span class="anc-pill anc-pill--gen" style="font-size:10px">Tier {tier}</span>'
-                f'<span style="font-size:11px;color:var(--ink-muted)"> {source} · {freshness}</span>'
+                f'<span style="font-size:11px;color:var(--ink-muted)"> {source} 路 {freshness}</span>'
                 f'<p style="font-size:11px;color:var(--accent-iris)">{relevance}</p>'
                 f'</div>'
             )
@@ -666,7 +918,7 @@ def _render_raw_items(artifact: dict) -> str:
     )
 
 
-# ── Hand color assignment for participant indicators ──────────────────────
+# 鈹€鈹€ Hand color assignment for participant indicators 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 _HAND_COLORS: dict[str, str] = {
     "market": "#7A5AF8",
     "sentiment": "#F59E0B",
@@ -677,7 +929,7 @@ _RUNTIME_HAND_PALETTE = ["#06B6D4", "#EC4899", "#8B5CF6", "#14B8A6", "#F97316", 
 
 
 def _hand_color(hand_id: str) -> str:
-    """Deterministic color for any hand_id — known hands get stable colors,
+    """Deterministic color for any hand_id 鈥?known hands get stable colors,
     runtime-generated hands are assigned from a rotation palette."""
     if hand_id in _HAND_COLORS:
         return _HAND_COLORS[hand_id]
@@ -706,7 +958,7 @@ def _render_hand_participants(hand_artifacts: dict) -> str:
         f'<div class="hand-participants" style="display:flex;gap:8px;align-items:center;'
         f'flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;'
         f'border-bottom:1px solid rgba(255,255,255,0.15)">'
-        f'<span style="font-size:11px;font-weight:600;opacity:0.7;white-space:nowrap">参与者</span>'
+        f'<span style="font-size:11px;font-weight:600;opacity:0.7;white-space:nowrap">Participants</span>'
         f'{dots}</div>'
     )
 
@@ -727,25 +979,27 @@ def _render_brain_synthesis(
     mode = workflow.get("mode", "?")
     rationale = workflow.get("rationale", "")
 
-    stance_class = {"buy": "anc-pill--active", "hold": "anc-pill--review",
-                    "reduce": "anc-pill--warn", "n/a": "anc-pill--edit"}.get(stance, "anc-pill--edit")
-    stance_label = {"buy": "建议买入", "hold": "建议持有", "reduce": "建议减持", "n/a": "无明确立场"}.get(stance, stance)
+    adapter = _domain_registry.get(domain) if _domain_registry else None
+    stance_class = (adapter.stance_css_classes or {}).get(
+        stance, adapter.default_stance_css_class if adapter else "anc-pill--edit"
+    )
+    stance_label = (adapter.stance_labels or {}).get(stance, stance)
     confidence_pct = int(confidence * 100)
 
     cold_html = ""
     if cold_start:
         cold_html = (
             '<div class="anc-pill-row">'
-            '<span class="anc-pill anc-pill--warn">⚠ 使用系统默认策略</span></div>'
-            '<p style="font-size:12px;color:var(--ink-muted)">补充 '
-            '<code>brain/personal/strategy.md</code> 以个性化整合结论。</p>'
+            '<span class="anc-pill anc-pill--warn">WARNING Using default strategy</span></div>'
+            '<p style="font-size:12px;color:var(--ink-muted)">Add <code>brain/personal/strategy.md</code> to personalize synthesis.</p>'
+            ''
         )
 
     clarify_html = ""
     if clarify:
         clarify_html = (
             f'<div class="insight-box" style="border-left:3px solid var(--accent-amber)">'
-            f'<strong>需要澄清：</strong> {clarify}</div>'
+            f'<strong>闇€瑕佹緞娓咃細</strong> {clarify}</div>'
         )
 
     drivers_html = ""
@@ -761,12 +1015,12 @@ def _render_brain_synthesis(
                 f'<span class="strategy-tag">{rule}</span></li>'
             )
         items = "".join(items_parts)
-        drivers_html = f'<h4>驱动因素</h4><ul class="risk-list">{items}</ul>'
+        drivers_html = f'<h4>椹卞姩鍥犵礌</h4><ul class="risk-list">{items}</ul>'
 
     refs_html = ""
     if strategy_refs:
         tags = " ".join(f'<code>{r}</code>' for r in strategy_refs)
-        refs_html = f'<p style="font-size:12px;color:var(--ink-muted)">策略引用：{tags}</p>'
+        refs_html = f'<p style="font-size:12px;color:var(--ink-muted)">Strategy refs: {tags}</p>'
 
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -786,20 +1040,20 @@ def _render_brain_synthesis(
         f'{cold_html}'
         f'{_render_hand_participants(hand_artifacts) if hand_artifacts else ""}'
         f'<div class="anc-pill-row">'
-        f'<span class="anc-pill anc-pill--gen">Brain 整合</span>'
+        f'<span class="anc-pill anc-pill--gen">Brain synthesis</span>'
         f'<span class="anc-pill {stance_class}">{stance_label}</span>'
         f'</div>'
-        f'<h2>整合结论</h2>'
+        f'<h2>Synthesis</h2>'
         f'<div class="brain-confidence">'
-        f'<span>置信度 {confidence_pct}%</span>'
+        f'<span>Confidence: {confidence_pct}%</span>'
         f'<div class="confidence-bar"><div class="confidence-fill" style="width:{confidence_pct}%"></div></div>'
         f'</div>'
         f'{clarify_html}'
         f'{drivers_html}'
-        f'{"<h4>反转条件</h4><blockquote>" + reversal + "</blockquote>" if reversal else ""}'
+        f'{"<h4>Reversal Condition</h4><blockquote>" + reversal + "</blockquote>" if reversal else ""}'
         f'{refs_html}'
         f'<p style="font-size:11px;color:var(--ink-muted)">'
-        f'Domain: {domain} ({mode}) — {rationale} ｜ {ts}</p>'
+        f'Domain: {domain} ({mode}) - {rationale} -> {ts}</p>'
         f'<aside class="anc-detail" hidden>'
         f'<section class="anc-detail-section anc-detail-section--brain-eval" data-detail-section="brain-eval" data-detail-label="Brain Eval">'
         f'<h3>Brain Eval</h3>'
@@ -822,11 +1076,137 @@ class AnalyzeRequest(BaseModel):
     hands: list[str] = []
 
 
+class SocialIngressRequest(BaseModel):
+    platform: str = "generic"
+    channel_adapter_id: str = ""
+    payload: dict = Field(default_factory=dict)
+    text: str = ""
+    user_id: str = ""
+    channel_id: str = ""
+    message_id: str = ""
+    thread_id: str = ""
+    event_id: str = ""
+    timestamp: str = ""
+    domain_hint: str = ""
+    context: dict = Field(default_factory=dict)
+    send_reply: bool = False
+    reply_webhook_url: str = ""
+    reply_token: str = ""
+
+
+class SocialChannelRegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    channel_id: str
+    platform: str = "generic"
+    label: str = ""
+    enabled: bool = True
+    capabilities: list[str] = Field(default_factory=list)
+    default_context: dict = Field(default_factory=dict)
+    response_mode: str = ""
+    reply_webhook_url: str = Field(default="", alias="replyWebhookUrl")
+    reply_webhook_env: str = Field(default="", alias="replyWebhookEnv")
+    reply_token: str = Field(default="", alias="replyToken")
+    reply_token_env: str = Field(default="", alias="replyTokenEnv")
+    receive_id_type: str = Field(default="", alias="receiveIdType")
+    require_verification: bool | None = Field(default=None, alias="requireVerification")
+    allow_from: list[str] = Field(default_factory=list, alias="allowFrom")
+    mode: str = ""
+    status: str = ""
+    settings: dict = Field(default_factory=dict)
+    set_default: bool = False
+
+
+class DefaultSocialChannelRequest(BaseModel):
+    channel_id: str
+
+
+class SocialChannelsConfigRequest(BaseModel):
+    default_channel: str = "generic"
+    channels: list[dict] = Field(default_factory=list)
+
+
 class RunRequest(BaseModel):
     hand_id: str
     task: str
     context: dict = {}
     runtime: str = ""
+
+
+class AgentSessionRequest(BaseModel):
+    adapter_id: str = ""
+    task: str
+    cwd: str = ""
+    context: dict = Field(default_factory=dict)
+    dangerous: bool = False
+    session_key: str = ""
+
+
+class AgentSessionStartRequest(BaseModel):
+    adapter_id: str = "runtime-hand"
+    platform: str = "discord"
+    channel_id: str = ""
+    user_id: str = ""
+    label: str = ""
+
+
+class AgentSessionSelectRequest(BaseModel):
+    platform: str = "discord"
+    channel_id: str = ""
+    user_id: str = ""
+    session_id: str
+
+
+class AgentSessionListQuery(BaseModel):
+    platform: str = ""
+    channel_id: str = ""
+    user_id: str = ""
+
+
+class AgentAdapterRegisterRequest(BaseModel):
+    adapter_id: str
+    transport: str = "process"
+    protocol: str = "loom"
+    command: list[str] | str = Field(default_factory=list)
+    task_as_arg: bool = False
+    endpoint: str = ""
+    auth_token: str = ""
+    auth_token_env: str = ""
+    timeout_s: float = 120.0
+    capabilities: list[str] = Field(default_factory=list)
+    system_prompt: str = ""
+    codex_backend: str = "sdk"
+    hw_capabilities: dict = Field(default_factory=dict)
+    set_default_runtime: bool = False
+    persist: bool = True
+
+
+class DefaultRuntimeAdapterRequest(BaseModel):
+    adapter_id: str
+
+
+class HandRuntimeRequest(BaseModel):
+    adapter_id: str = ""
+
+
+class RepairFeedbackRequest(BaseModel):
+    episode_id: str
+    signal: str = "correction"
+    comment: str = ""
+    corrected_stance: str = ""
+    hand_id: str = ""
+    target_hands: list[str] = Field(default_factory=list)
+    object_ref: str = ""
+    object_type: str = ""
+    ui_selection: str = ""
+    anchor_id: str = ""
+    intent_delta: dict = Field(default_factory=dict)
+    context: dict = Field(default_factory=dict)
+    social: dict = Field(default_factory=dict)
+    send_reply: bool = False
+    reply_webhook_url: str = ""
+    reply_token: str = ""
+    resynthesize: bool = True
 
 
 class PortfolioSourceRequest(BaseModel):
@@ -913,6 +1293,1121 @@ async def intent_capture(req: IntentCaptureRequest):
     return {"ok": True}
 
 
+def _social_payload(req: SocialIngressRequest, platform: str | None = None) -> dict:
+    payload = dict(req.payload or {})
+    payload.setdefault("platform", platform or req.platform or "generic")
+    for key in (
+        "text",
+        "user_id",
+        "channel_id",
+        "message_id",
+        "thread_id",
+        "event_id",
+        "timestamp",
+    ):
+        value = getattr(req, key, "")
+        if value:
+            payload[key] = value
+    return payload
+
+
+def _decode_raw_json(raw_body: bytes) -> dict:
+    if not raw_body:
+        return {}
+    try:
+        data = json.loads(raw_body.decode("utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+
+
+def _verification_payload(req: SocialIngressRequest, raw_payload: dict) -> dict:
+    if raw_payload:
+        return raw_payload
+    return _social_payload(req)
+
+
+def _select_social_channel(
+    req: SocialIngressRequest,
+    platform: str | None = None,
+) -> SocialChannelAdapter:
+    context = req.context or {}
+    channel_id = (
+        req.channel_adapter_id
+        or str(context.get("channel_adapter_id") or context.get("social_channel_id") or "")
+    )
+    return _social_channel_registry.resolve(
+        channel_id=channel_id,
+        platform=platform or req.platform or "generic",
+    )
+
+
+def _verify_social_or_response(
+    *,
+    channel: SocialChannelAdapter,
+    headers,
+    raw_body: bytes,
+    payload: dict,
+):
+    verification = channel.verify(
+        headers=headers,
+        body=raw_body,
+        payload=payload,
+    )
+    if verification.challenge:
+        return verification, {"challenge": verification.challenge}
+    if not verification.ok:
+        return verification, JSONResponse(
+            status_code=401,
+            content={
+                "ok": False,
+                "error": verification.error or "social webhook verification failed",
+                "verification_method": verification.method,
+            },
+        )
+    return verification, None
+
+
+def _social_bridge_managed_reply(channel_context: dict) -> bool:
+    return bool(
+        channel_context.get("bridgeManagedReply")
+        or channel_context.get("bridge_managed_reply")
+    )
+
+
+def _social_should_send_reply(req: SocialIngressRequest, channel_context: dict) -> bool:
+    return bool(
+        not _social_bridge_managed_reply(channel_context)
+        and (
+            req.send_reply
+            or req.reply_webhook_url
+            or str(channel_context.get("responseMode", "")).lower() in {"reply", "auto_reply"}
+            or str(channel_context.get("response_mode", "")).lower() in {"reply", "auto_reply"}
+        )
+    )
+
+
+def _is_loom_visual_command(text: str) -> bool:
+    """True when the message explicitly requests visual output."""
+    clean = str(text or "").strip().lower()
+    return bool(clean) and clean.split()[0] == "/loom-visual"
+
+
+def _save_visual_html(episode_id: str) -> str:
+    """Save the current interactive Loom anchor HTML to disk. Returns file path."""
+    if not episode_id:
+        return ""
+    html = _build_standalone_anchor_html()
+    if not html:
+        return ""
+    out_dir = _ROOT / "output" / "visual"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    filepath = out_dir / f"{episode_id}.html"
+    filepath.write_text(html, encoding="utf-8")
+    return str(filepath)
+
+
+_STANDALONE_CSS_CACHE: str | None = None
+_STANDALONE_HTML_TEMPLATE: str | None = None
+
+
+def _build_standalone_anchor_html() -> str:
+    """Build a self-contained interactive Loom HTML page."""
+    import re
+    global _STANDALONE_HTML_TEMPLATE
+    current_html_path = _ROOT / "output" / "current.html"
+    if not current_html_path.exists():
+        return ""
+
+    body_content = current_html_path.read_text(encoding="utf-8")
+    # Extract just the body inner content (skip doctype/head/body tags)
+    body_match = re.search(r"<body>\s*(.+?)\s*</body>", body_content, re.DOTALL)
+    if body_match:
+        body_content = body_match.group(1)
+    else:
+        # Fallback: use everything inside body
+        idx1 = body_content.find("<body")
+        idx1 = body_content.find(">", idx1) + 1 if idx1 >= 0 else 0
+        idx2 = body_content.rfind("</body>")
+        if idx2 > idx1:
+            body_content = body_content[idx1:idx2]
+
+    css = _load_standalone_css()
+    js = _STANDALONE_ANCHOR_JS
+
+    title_match = re.search(r"<title>(.+?)</title>", current_html_path.read_text(encoding="utf-8"))
+    title = title_match.group(1) if title_match else "Loom Analysis"
+
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+{css}
+</style>
+</head>
+<body data-loom-entry="fin" data-standalone="true">
+
+<header id="anchor-toolbar" style="margin-bottom:28px">
+  <span style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:18px">
+    馃К Loom
+  </span>
+  <div style="font-size:12px;color:var(--ink-muted,#8888aa);margin-top:2px">
+    Standalone interactive page &middot; Ctrl+Click to expand blocks
+  </div>
+</header>
+
+{body_content}
+
+<script>
+{js}
+</script>
+</body>
+</html>"""
+
+
+def _load_standalone_css() -> str:
+    """Load and cache the Bloom + base CSS for standalone pages."""
+    import re
+    global _STANDALONE_CSS_CACHE
+    if _STANDALONE_CSS_CACHE is not None:
+        return _STANDALONE_CSS_CACHE
+
+    parts: list[str] = []
+
+    # 1. Bloom design tokens
+    bloom_path = _ROOT / "bridge" / "webview" / "resource" / "colors_and_type.css"
+    if bloom_path.exists():
+        tokens = bloom_path.read_text(encoding="utf-8")
+        # Keep only :root block and body fonts 鈥?skip the @import (we use <link>)
+        tokens = re.sub(r'@import[^;]+;', '', tokens)
+        parts.append(tokens)
+        parts.append("\n")
+
+    # 2. Core component styles 鈥?extracted from styles.css
+    styles_path = _ROOT / "bridge" / "webview" / "styles.css"
+    if styles_path.exists():
+        core = styles_path.read_text(encoding="utf-8")
+        # Remove imports and font-face blocks
+        core = re.sub(r'@import[^;]+;', '', core)
+        core = re.sub(r'@font-face\s*\{[^}]*\}', '', core)
+        parts.append(core)
+        parts.append("\n")
+
+    # 3. Detail overlay CSS
+    overlay_path = _ROOT / "bridge" / "webview" / "loom-detail-overlay.css"
+    if overlay_path.exists():
+        parts.append(overlay_path.read_text(encoding="utf-8"))
+
+    _STANDALONE_CSS_CACHE = "".join(parts)
+    return _STANDALONE_CSS_CACHE
+
+
+# Minimal anchor protocol client for standalone HTML files.
+# Handles: Ctrl+click to expand detail sections, status pill rendering.
+_STANDALONE_ANCHOR_JS = r"""
+(function () {
+  "use strict";
+
+  const detailOverlay = createDetailOverlay();
+  document.body.appendChild(detailOverlay);
+
+  // 鈹€鈹€ Ctrl key detection 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+  let ctrlDown = false;
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Control") {
+      ctrlDown = true;
+      document.body.classList.add("anc-ctrl-active");
+    }
+  });
+  document.addEventListener("keyup", function (e) {
+    if (e.key === "Control") {
+      ctrlDown = false;
+      document.body.classList.remove("anc-ctrl-active");
+    }
+  });
+
+  // 鈹€鈹€ Click handler 鈥?Ctrl+click expands detail 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+  document.addEventListener("click", function (e) {
+    if (!ctrlDown) return;
+
+    const el = e.target.closest("[data-anc]");
+    if (!el) return;
+
+    // KPI cards with hidden details
+    const detail = el.querySelector(".anc-detail[hidden]");
+    if (detail) {
+      detail.removeAttribute("hidden");
+      return;
+    }
+
+    // Elements with explicit detail flag
+    if (el.dataset.hasDetail === "true") {
+      const detail = el.querySelector(".anc-detail");
+      if (detail) {
+        detail.hidden = !detail.hidden;
+        return;
+      }
+    }
+
+    // Open full detail overlay for the anchor
+    const anchorId = el.dataset.anc;
+    if (anchorId) {
+      showDetailOverlay(anchorId, el);
+    }
+  });
+
+  // 鈹€鈹€ Detail overlay 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+  function createDetailOverlay() {
+    const ov = document.createElement("div");
+    ov.id = "anc-detail-overlay";
+    ov.className = "anc-detail-overlay";
+    ov.setAttribute("aria-hidden", "true");
+    ov.innerHTML = (
+      '<div class="anc-detail-overlay__backdrop"></div>' +
+      '<div class="anc-detail-overlay__panel">' +
+        '<button class="anc-detail-overlay__close" aria-label="Close">&times;</button>' +
+        '<div class="anc-detail-overlay__body"></div>' +
+      '</div>'
+    );
+    ov.querySelector(".anc-detail-overlay__backdrop").addEventListener("click", hideOverlay);
+    ov.querySelector(".anc-detail-overlay__close").addEventListener("click", hideOverlay);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") hideOverlay();
+    });
+    return ov;
+  }
+
+  function showDetailOverlay(anchorId, sourceEl) {
+    const body = detailOverlay.querySelector(".anc-detail-overlay__body");
+    // Collect all detail sections from the source element
+    const detailSections = sourceEl.querySelectorAll(".anc-detail-section");
+    let html = '<h2 style="margin:0 0 16px;font-family:var(--font-display)">' + escapeHtml(sourceEl.innerText.substring(0, 80) || anchorId) + '</h2>';
+
+    if (detailSections.length) {
+      detailSections.forEach(function (sec) {
+        html += '<div style="margin-bottom:20px">' + sec.outerHTML + '</div>';
+      });
+    } else {
+      // Show all text content from the element
+      html += '<div style="white-space:pre-wrap;line-height:1.7">' + escapeHtml(sourceEl.innerText) + '</div>';
+    }
+
+    body.innerHTML = html;
+    detailOverlay.setAttribute("aria-hidden", "false");
+    detailOverlay.style.display = "flex";
+  }
+
+  function hideOverlay() {
+    detailOverlay.setAttribute("aria-hidden", "true");
+    detailOverlay.style.display = "none";
+  }
+
+  function escapeHtml(text) {
+    var d = document.createElement("div");
+    d.textContent = text;
+    return d.innerHTML;
+  }
+
+  // 鈹€鈹€ Style: Ctrl indicator 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+  var style = document.createElement("style");
+  style.textContent = (
+    ".anc-ctrl-active [data-anc] { cursor: pointer; }" +
+    ".anc-ctrl-active [data-anc]:hover { outline: 2px dashed var(--accent,#7A5AF8); outline-offset: 2px; border-radius: var(--radius-sm,8px); }" +
+    ".anc-ctrl-active [data-anc][data-has-detail]:hover, " +
+    ".anc-ctrl-active .anc-kpi:hover { outline: 2px dashed var(--accent,#7A5AF8); outline-offset: 4px; border-radius: var(--radius-md,14px); }" +
+    "/* overlay styles */" +
+    ".anc-detail-overlay { display:none; position:fixed; inset:0; z-index:9999; align-items:center; justify-content:center; }" +
+    ".anc-detail-overlay[aria-hidden=false] { display:flex; }" +
+    ".anc-detail-overlay__backdrop { position:absolute; inset:0; background:rgba(0,0,0,.35); backdrop-filter:blur(4px); }" +
+    ".anc-detail-overlay__panel { position:relative; background:var(--paper,#fafafc); border-radius:var(--radius-md,14px); max-width:720px; width:90vw; max-height:80vh; overflow-y:auto; padding:32px; box-shadow:0 20px 60px rgba(0,0,0,.15); }" +
+    ".anc-detail-overlay__close { position:absolute; top:12px; right:16px; background:none; border:none; font-size:24px; cursor:pointer; color:var(--ink-muted,#8888aa); }" +
+    ".anc-detail-overlay__close:hover { color:var(--ink,#1a1a2e); }" +
+    "/* standalone toolbar badge */" +
+    "#anchor-toolbar { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:12px; border-bottom:1px solid var(--pastel-lavender,#d4c5f9); }"
+  );
+  document.head.appendChild(style);
+})();
+"""
+
+
+def _public_webview_url(episode_id: str = "") -> str:
+    """Build a public URL pointing to the analysis result visual page."""
+    public = os.environ.get("LOOM_PUBLIC_URL", "").strip()
+    if public:
+        base = public.rstrip("/")
+    else:
+        base = _detect_base_url()
+    if episode_id:
+        return f"{base}/visual/{episode_id}"
+    return base
+
+
+def _detect_base_url() -> str:
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        ip = "127.0.0.1"
+    port = os.environ.get("LOOM_BRAIN_PORT", "3002")
+    return f"http://{ip}:{port}"
+
+
+_HTML_OUTPUT_KEYWORDS = [
+    r"html\s*鏂囦欢", r"灏?*(?:缁撴灉|鍒嗘瀽|鎶ュ憡).*(?:鍙戦€亅缁欐垜|瀵煎嚭|杈撳嚭)",
+    r"(?:鍙戦€亅缁欐垜|瀵煎嚭|杈撳嚭).*(?:html|鏂囦欢|缁撴灉|鎶ュ憡)",
+    r"鐢熸垚.*(?:html|椤甸潰|鏂囦欢)", r"瀵煎嚭.*(?:html|鏂囦欢)",
+    r"鍙?*(?:html|鏂囦欢|缁撴灉)", r"瑕?*(?:html|鏂囦欢)",
+]
+
+
+def _wants_html_output(text: str) -> bool:
+    """True when the user asks for HTML/file output 鈥?route to full agent session."""
+    import re as _re
+    clean = str(text or "").strip().lower()
+    if not clean:
+        return False
+    return any(_re.search(p, clean) for p in _HTML_OUTPUT_KEYWORDS)
+
+
+def _find_agent_html(workspace: str) -> str:
+    """Return the most recent .html file in <workspace>/output/, or ''."""
+    import time as _time
+    out_dir = Path(workspace) / "output"
+    if not out_dir.is_dir():
+        return ""
+    best = ""
+    best_mtime = 0.0
+    cutoff = _time.time() - 300  # last 5 minutes
+    try:
+        for entry in out_dir.iterdir():
+            if not entry.is_file() or entry.suffix.lower() != ".html":
+                continue
+            mtime = entry.stat().st_mtime
+            if mtime < cutoff:
+                continue
+            if mtime > best_mtime:
+                best_mtime = mtime
+                best = str(entry)
+    except OSError:
+        pass
+    return best
+
+
+async def _classify_complexity(question: str) -> str:
+    """Classify user message complexity: 'simple' or 'complex'.
+
+    Short-circuits very short / trivial messages; uses one LLM call for the rest.
+    Falls back to 'simple' on error for graceful degradation.
+    """
+    clean = str(question or "").strip()
+    # Very short messages are always simple 鈥?but check _wants_html_output first
+    # (that bypass is handled in _route_social_message before this is called)
+    if len(clean) <= 3:
+        return "simple"
+    try:
+        resp = await _brain_client.messages.create(
+            model=_brain_model,
+            max_tokens=8,
+            system=(
+                "Classify the user message as 'simple' or 'complex'.\n"
+                "simple = greeting, small talk, simple factual question, quick help, "
+                "single-step request that needs no research or multi-step analysis.\n"
+                "complex = multi-domain analysis, market research, file creation, "
+                "coding, multi-step workflow, or anything requiring decomposition into subtasks.\n"
+                "Reply ONLY 'simple' or 'complex'."
+            ),
+            messages=[{"role": "user", "content": clean}],
+        )
+        text = "".join(
+            b.text for b in resp.content if hasattr(b, "text")
+        ).strip().lower()
+        return "simple" if "simple" in text else "complex"
+    except Exception:
+        return "simple"  # graceful degradation: quick reply beats silence
+
+
+async def _simple_brain_reply(question: str, channel_context: dict) -> str:
+    """Single-turn LLM reply for simple questions 鈥?no hand dispatch."""
+    try:
+        resp = await _brain_client.messages.create(
+            model=_brain_model,
+            max_tokens=2048,
+            system=(
+                "You are Loom Brain, an AI assistant. "
+                "Give a concise, helpful reply in the same language as the user. "
+                "Keep responses focused and brief unless the user asks for detail."
+            ),
+            messages=[{"role": "user", "content": question}],
+        )
+        return "".join(
+            b.text for b in resp.content if hasattr(b, "text")
+        ).strip()
+    except Exception:
+        return "Loom Brain is temporarily unavailable. Please try again."
+
+
+async def _handle_session_command(
+    sc: SessionCommand,
+    message,
+    channel_context: dict,
+) -> tuple[str, dict]:
+    """Execute /agent session management commands."""
+    platform = str(getattr(message, "platform", "") or channel_context.get("platform", "discord"))
+    channel_id = str(getattr(message, "channel_id", "") or channel_context.get("channel_id", ""))
+    user_id = str(getattr(message, "user_id", "") or "")
+
+    def _session_list_text(sessions) -> str:
+        if not sessions:
+            return "No active agent sessions."
+        lines = [f"**Active Sessions** ({len(sessions)}):"]
+        for s in sessions:
+            fg = _session_registry.get_foreground(platform, channel_id, user_id)
+            marker = "鈻?" if (fg and fg.session_id == s.session_id) else "  "
+            lines.append(
+                f"{marker}`{s.session_id[:8]}` {s.adapter_id} "
+                f"[{s.status}] _{s.label}_ ({s.message_count} msgs)"
+            )
+        return "\n".join(lines)
+
+    if sc.action == "start":
+        # Friendly name mapping
+        _friendly = {"codex": "codex-app-server", "claude": "runtime-hand", "cc": "runtime-hand"}
+        adapter = _friendly.get(sc.adapter_id, sc.adapter_id) or "runtime-hand"
+        label = sc.label or sc.adapter_id or adapter
+        record = _session_registry.start(adapter, platform, channel_id, user_id, label)
+        _session_registry.set_foreground(platform, channel_id, user_id, record.session_id)
+        return (
+            f"[session] **Session Mode** - `{label}`\n"
+            f"ID: `{record.session_id[:8]}` | Adapter: {adapter}\n\n"
+            f"All messages now route directly to this session (Brain bypassed).\n"
+            f"Switch back: `/brain` | End session: `/agent close` | Loom analysis: `/loom <task>`",
+            {"ok": True, "session_id": record.session_id},
+        )
+
+    if sc.action == "list":
+        sessions = _session_registry.list_sessions(platform, channel_id, user_id)
+        return _session_list_text(sessions), {"ok": True, "sessions": [s.to_dict() for s in sessions]}
+
+    if sc.action == "status":
+        fg = _session_registry.get_foreground(platform, channel_id, user_id)
+        if fg is None:
+            sessions = _session_registry.list_sessions(platform, channel_id, user_id)
+            return (
+                "No foreground session set.\n\n" + _session_list_text(sessions),
+                {"ok": True, "foreground": None, "sessions": [s.to_dict() for s in sessions]},
+            )
+        return (
+            f"**Foreground Session**\n"
+            f"ID: `{fg.session_id[:8]}`\n"
+            f"Adapter: {fg.adapter_id}\n"
+            f"Label: {fg.label}\n"
+            f"Status: {fg.status}\n"
+            f"Messages: {fg.message_count}\n\n"
+            f"Send any message to route to this session. "
+            f"Use `/agent close {fg.session_id[:8]}` to end.",
+            {"ok": True, "foreground": fg.to_dict()},
+        )
+
+    if sc.action == "select":
+        sid = sc.session_id
+        sessions = _session_registry.list_sessions(platform, channel_id, user_id)
+        matched = [s for s in sessions if s.session_id.startswith(sid)] if sid else []
+        if not matched:
+            return f"Session `{sid or '?'}` not found.", {"ok": False}
+        record = matched[0]
+        _session_registry.set_foreground(platform, channel_id, user_id, record.session_id)
+        return (
+            f"**Switched to session** `{record.session_id[:8]}` ({record.adapter_id}, {record.label})",
+            {"ok": True, "session_id": record.session_id},
+        )
+
+    if sc.action == "close":
+        sid = sc.session_id
+        sessions = _session_registry.list_sessions(platform, channel_id, user_id)
+        matched = [s for s in sessions if s.session_id.startswith(sid)] if sid else []
+        if not matched:
+            fg = _session_registry.get_foreground(platform, channel_id, user_id)
+            if fg:
+                matched = [fg]
+        if not matched:
+            return "No session to close.", {"ok": False}
+        record = matched[0]
+        _session_registry.close(record.session_id)
+        return (
+            f"**Session closed** `{record.session_id[:8]}` ({record.label})",
+            {"ok": True, "session_id": record.session_id},
+        )
+
+    if sc.action == "brain":
+        _session_registry.clear_foreground(platform, channel_id, user_id)
+        return (
+            "[brain] **Switched to Brain mode.** Messages will be routed to Loom Brain for analysis.\n\n"
+            "Use `/agent start` to switch back to agent session mode.",
+            {"ok": True},
+        )
+
+    # help
+    return (
+        "**Loom Channel - Two Modes**\n\n"
+        "[brain] **Brain Mode** (default) - Loom Brain analyzes with multi-hand pipeline:\n"
+        "`/loom <task>` - Full analysis with hand agents\n"
+        "`/brain` - Switch to Brain mode\n\n"
+        "[session] **Session Mode** - Direct agent, Brain bypassed:\n"
+        "`/agent start [codex|claude] [label]` - Start persistent session\n"
+        "`/agent list` - List your sessions\n"
+        "`/agent select <id>` - Switch foreground session\n"
+        "`/agent status` - Show current session\n"
+        "`/agent close [id]` - Close session\n\n"
+        "`/codex <task>` - One-shot Codex (no session)\n"
+        "`/claude <task>` - One-shot Claude Code (no session)",
+        {"ok": True},
+    )
+
+
+async def _run_session_relay(
+    session_route: dict,
+    message,
+    channel_context: dict,
+    progress_reporter=None,
+) -> dict | None:
+    """Relay a channel message to the foreground agent session."""
+    adapter_id = session_route.get("adapter_id", "runtime-hand")
+    task = session_route.get("task", "")
+    session_id = session_route.get("session_id", "")
+
+    _session_registry.set_status(session_id, "running")
+
+    if progress_reporter is not None:
+        # Mark progress as session mode so embed shows "Session Mode" vs "Brain"
+        progress_reporter._progress.session_mode = True
+        progress_reporter.notify({
+            "type": "dispatch.sent",
+            "hand_id": adapter_id,
+            "task_id": session_id,
+            "dimension": "session relay",
+        })
+
+    try:
+        result = await _agent_session_service.run(
+            adapter_id=adapter_id,
+            task=task,
+            cwd=str(_ROOT),
+            context={
+                "source": "session_relay",
+                "session_id": session_id,
+                "social": asdict(message),
+                "agent_session": True,
+            },
+            dangerous=True,
+            session_key=session_id,
+        )
+    except Exception as exc:
+        _session_registry.set_status(session_id, "idle")
+        if progress_reporter is not None:
+            progress_reporter.notify({
+                "type": "dispatch.error",
+                "hand_id": adapter_id,
+                "task_id": session_id,
+                "message": str(exc),
+            })
+        raise
+
+    _session_registry.touch(session_id)
+    _session_registry.set_status(session_id, "idle")
+
+    if progress_reporter is not None:
+        progress_reporter.notify({
+            "type": "dispatch.artifact",
+            "hand_id": adapter_id,
+            "task_id": session_id,
+        })
+
+    return result
+
+
+async def _route_social_message(
+    message,
+    channel_context: dict,
+) -> dict:
+    """Route messages: /agent commands 鈫?foreground session 鈫?Brain pipeline."""
+    # 鈹€鈹€ Layer 0: /agent session management commands 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    session_cmd = parse_session_command(message.text)
+    if session_cmd is not None:
+        return {
+            "route": "session_command",
+            "reply_text": "",
+            "reason": f"session command: {session_cmd.action}",
+            "confidence": 1.0,
+            "router": "session",
+            "session_command": session_cmd,
+        }
+
+    settings = channel_context.get("channel_settings")
+    if not isinstance(settings, dict):
+        settings = {}
+
+    # 鈹€鈹€ Layer 1: foreground session bypasses Brain 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    platform = str(
+        channel_context.get("platform")
+        or settings.get("platform")
+        or getattr(message, "platform", "")
+        or "discord"
+    )
+    channel_id = str(
+        channel_context.get("channel_id")
+        or getattr(message, "channel_id", "")
+        or ""
+    )
+    user_id = str(getattr(message, "user_id", "") or "")
+    if platform and channel_id and user_id:
+        session_route = _session_registry.resolve_route(
+            platform, channel_id, user_id, message.text
+        )
+        if session_route["route"] == "session":
+            if not is_explicit_loom_command(message.text) and parse_agent_command(message.text) is None:
+                return {
+                    "route": "route_to_session",
+                    "reply_text": "",
+                    "reason": "foreground session active",
+                    "confidence": 1.0,
+                    "router": "session",
+                    "session_route": session_route,
+                }
+
+    direct_command = parse_agent_command(message.text)
+    direct_default = (
+        str(settings.get("executionMode") or settings.get("execution_mode") or "brain").lower()
+        == "agent"
+        and not is_explicit_loom_command(message.text)
+    )
+    if direct_command is not None or direct_default:
+        return {
+            "route": "direct_agent",
+            "reply_text": "",
+            "reason": "explicit agent command" if direct_command is not None else "channel direct-agent mode",
+            "confidence": 1.0,
+            "router": "direct",
+        }
+    # Explicit Loom commands always go through the full Brain pipeline
+    # so the UI rendering (visual page, webview patches) fires correctly.
+    if is_explicit_loom_command(message.text):
+        return {
+            "route": "complex_task",
+            "reply_text": "",
+            "reason": "explicit Loom command 鈥?full Brain pipeline for UI rendering",
+            "confidence": 1.0,
+            "router": "direct",
+        }
+    # HTML/file output requests: route to full agent session (Codex/CC).
+    # The Brain pipeline's structured JSON artifact contract is too rigid
+    # for deep analysis 鈥?a free-form agent produces much richer output.
+    if _wants_html_output(message.text):
+        # Route to the best available agent adapter for deep analysis.
+        # Falls back gracefully in _run_social_agent if none is registered.
+        return {
+            "route": "direct_agent",
+            "reply_text": "",
+            "reason": "HTML/file output requested 鈥?full agent session",
+            "confidence": 1.0,
+            "router": "direct",
+        }
+    # Complexity classification: simple 鈫?direct reply; complex 鈫?full Brain pipeline
+    try:
+        complexity = await _classify_complexity(message.text)
+    except Exception:
+        complexity = "simple"
+    if complexity == "simple":
+        return {
+            "route": "simple",
+            "reply_text": "",
+            "reason": "simple question 鈥?Brain direct reply",
+            "confidence": 1.0,
+            "router": "classifier",
+        }
+    return {
+        "route": "complex_task",
+        "reply_text": "",
+        "reason": "complex task 鈥?full Brain hand pipeline",
+        "confidence": 1.0,
+        "router": "classifier",
+    }
+
+
+def _best_agent_adapter() -> str:
+    """Return the best available full agent adapter id, or empty string."""
+    for aid in ("runtime-hand", "codex-app-server"):
+        if _adapter_registry.find_by_id(aid):
+            return aid
+    for a in _adapter_registry.list():
+        if "runtime.hand" in a.capabilities:
+            return a.id
+    return ""
+
+
+async def _run_social_agent(message, channel_context: dict, progress_reporter=None) -> dict | None:
+    """Run a channel message directly on a configured full agent runtime.
+
+    Falls back to the best available agent adapter when no explicit command
+    or agent-mode channel configuration is present (e.g. HTML output requests).
+    """
+    request = resolve_social_agent_request(
+        text=message.text,
+        user_id=message.user_id,
+        context=channel_context,
+        default_adapter_id=_adapter_registry.get_default_runtime_adapter(),
+    )
+    if request is None:
+        # Fallback for routes that want direct_agent but user didn't type
+        # /codex or /claude 鈥?pick best available adapter.
+        adapter_id = _best_agent_adapter()
+        if not adapter_id:
+            return None
+        from loom_core.interaction_protocol.social import SocialAgentCommand
+        request = SocialAgentCommand(adapter_id=adapter_id, task=message.text, dangerous=True)
+    settings = channel_context.get("channel_settings")
+    if not isinstance(settings, dict):
+        settings = {}
+    workspace = str(
+        settings.get("agentWorkspace")
+        or settings.get("agent_workspace")
+        or _ROOT
+    )
+    adapter_id = request.adapter_id
+
+    if progress_reporter is not None:
+        progress_reporter.notify({
+            "type": "dispatch.sent",
+            "hand_id": adapter_id,
+            "task_id": "direct-agent",
+            "dimension": "full agent session",
+        })
+
+    async def _agent_event(event: dict) -> None:
+        if progress_reporter is None:
+            return
+        if event.get("type") == "run.started":
+            progress_reporter.notify({
+                "type": "episode.start",
+                "episode_id": str(event.get("run_id") or ""),
+            })
+            progress_reporter.notify({
+                "type": "state.transition",
+                "to": "Dispatching",
+                "episode_id": str(event.get("run_id") or ""),
+            })
+
+    try:
+        session_key = str(channel_context.get("session_id") or "")
+        result = await _agent_session_service.run(
+            adapter_id=adapter_id,
+            task=request.task,
+            cwd=workspace,
+            context={
+                "source": "social",
+                "session_id": session_key,
+                "social": asdict(message),
+                "agent_session": True,
+            },
+            event_sink=_agent_event,
+            dangerous=request.dangerous,
+            session_key=session_key,
+        )
+    except Exception as exc:
+        if progress_reporter is not None:
+            progress_reporter.notify({
+                "type": "dispatch.error",
+                "hand_id": adapter_id,
+                "task_id": "direct-agent",
+                "message": str(exc),
+            })
+            progress_reporter.notify({"type": "episode.error", "message": str(exc)})
+            progress_reporter.notify({"type": "state.transition", "from": "Dispatching", "to": "Failed"})
+        raise
+
+    if progress_reporter is not None:
+        progress_reporter.notify({
+            "type": "dispatch.artifact",
+            "hand_id": adapter_id,
+            "task_id": "direct-agent",
+        })
+        progress_reporter.notify({
+            "type": "state.transition",
+            "to": "Persisted",
+            "episode_id": result.get("run_id", ""),
+        })
+    return result
+
+
+async def _handle_social_ingress(
+    req: SocialIngressRequest,
+    *,
+    channel: SocialChannelAdapter,
+    platform: str | None = None,
+) -> dict:
+    message = channel.normalize_payload(_social_payload(req, platform=platform or channel.platform))
+    if not channel.is_allowed(message.user_id):
+        return {
+            "ok": False,
+            "error": "sender is not allowed for this social channel",
+            "social": asdict(message),
+            "social_channel": channel.public_info(),
+        }
+    channel_context = channel.context(req.context)
+    social_route = await _route_social_message(message, channel_context)
+    channel_context["social_route"] = social_route
+    progress_reporter = None
+    status_message_id = str(channel_context.get("statusMessageId") or "")
+    if channel.platform == "discord" and status_message_id:
+        async def _publish_progress(embed: dict) -> None:
+            await channel.edit_progress(
+                message=message,
+                status_message_id=status_message_id,
+                embed=embed,
+                context=channel_context,
+            )
+
+        progress_reporter = DiscordProgressReporter(_publish_progress)
+        channel_context["_episode_event_sink"] = progress_reporter.notify
+    analyze_payload = build_analyze_request_from_social(
+        message,
+        extra_context=channel_context,
+        domain_hint=req.domain_hint,
+        domain_registry=_domain_registry,
+    )
+    if not analyze_payload["question"]:
+        return {"ok": False, "error": "social message text is required", "reply_text": ""}
+    route = social_route.get("route", "complex_task")
+    agent_session = None
+    try:
+        # 鈹€鈹€ Session command route 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+        if route == "session_command":
+            sc = social_route.get("session_command")
+            reply_text, result = await _handle_session_command(
+                sc, message, channel_context
+            )
+            visual_html_file = ""
+            if progress_reporter is not None:
+                progress_reporter._progress.direct_reply = True
+        # 鈹€鈹€ Route to foreground session 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+        elif route == "route_to_session":
+            sr = social_route.get("session_route", {})
+            agent_session = await _run_session_relay(
+                sr, message, channel_context, progress_reporter
+            )
+            if agent_session is not None:
+                result = {"episode_id": agent_session.get("run_id", "")}
+                reply_text = str(agent_session.get("text") or "")
+                visual_html_file = ""
+            else:
+                reply_text = "Agent session returned no output."
+                result = {"episode_id": ""}
+                visual_html_file = ""
+        elif route == "direct_agent":
+            agent_session = await _run_social_agent(message, channel_context, progress_reporter)
+            if agent_session is not None:
+                result = {"episode_id": agent_session.get("run_id", "")}
+                reply_text = str(agent_session.get("text") or "")
+                # Find HTML files the agent created in workspace
+                settings = channel_context.get("channel_settings")
+                ws = str(
+                    (settings.get("agentWorkspace") or settings.get("agent_workspace") or _ROOT)
+                    if isinstance(settings, dict) else _ROOT
+                )
+                visual_html_file = _find_agent_html(ws)
+                if visual_html_file:
+                    reply_text += "\n\nHTML analysis page attached."
+                else:
+                    visual_html_file = ""
+            else:
+                # Agent session not available 鈥?fall through to simple reply
+                reply_text = await _simple_brain_reply(message.text, channel_context)
+                result = {"episode_id": ""}
+                visual_html_file = ""
+                if progress_reporter is not None:
+                    progress_reporter._progress.direct_reply = True
+        elif route == "simple":
+            reply_text = await _simple_brain_reply(message.text, channel_context)
+            result = {"episode_id": ""}
+            visual_html_file = ""
+            if progress_reporter is not None:
+                progress_reporter._progress.direct_reply = True
+        else:  # complex_task
+            result = await analyze(AnalyzeRequest(**analyze_payload))
+            visual_html_file = ""
+            if _is_loom_visual_command(message.text):
+                ep_id = result.get("episode_id", "")
+                visual_html_file = _save_visual_html(ep_id)
+            reply_text = render_analysis_reply(result, visual_html_file=visual_html_file)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        reply_text = f"Loom Brain error: {exc}"
+        result = {"episode_id": ""}
+        visual_html_file = ""
+    finally:
+        if progress_reporter is not None:
+            await progress_reporter.flush()
+    reply_result = None
+    if _social_should_send_reply(req, channel_context):
+        reply_result = await channel.send_reply(
+            text=reply_text,
+            message=message,
+            webhook_url=req.reply_webhook_url or str(channel_context.get("reply_webhook_url", "")),
+            token=req.reply_token or str(channel_context.get("reply_token", "")),
+            context=channel_context,
+            file_path=visual_html_file,
+        )
+    return {
+        "ok": True,
+        "social": asdict(message),
+        "social_channel": channel.public_info(),
+        "social_route": social_route,
+        "episode_id": result.get("episode_id", ""),
+        "reply_text": reply_text,
+        "visual_html_file": visual_html_file,
+        "agent_session": agent_session,
+        "reply": asdict(reply_result) if reply_result else {"skipped": True},
+    }
+
+
+@app.get("/social/channels")
+async def list_social_channels():
+    return {
+        "ok": True,
+        "default_channel": _social_channel_registry.get_default(),
+        "config_path": str(_SOCIAL_CHANNEL_CONFIG_PATH),
+        "available_channel_types": available_social_channel_types(),
+        "channels": [channel.public_info() for channel in _social_channel_registry.list()],
+    }
+
+
+@app.get("/social/channels/config")
+async def get_social_channels_config():
+    return {
+        "ok": True,
+        "config_path": str(_SOCIAL_CHANNEL_CONFIG_PATH),
+        **registry_to_document(_social_channel_registry),
+    }
+
+
+@app.put("/social/channels/config")
+async def replace_social_channels_config(req: SocialChannelsConfigRequest):
+    global _social_channel_registry
+    document = {
+        "version": 1,
+        "default_channel": req.default_channel,
+        "channels": req.channels,
+    }
+    try:
+        registry = create_social_channel_registry_from_document(document)
+        _social_channel_registry = registry
+        _save_social_channels()
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+    return {
+        "ok": True,
+        "default_channel": _social_channel_registry.get_default(),
+        "channels": [channel.public_info() for channel in _social_channel_registry.list()],
+    }
+
+
+@app.post("/social/channels/register")
+async def register_social_channel(req: SocialChannelRegisterRequest):
+    config = req.model_dump(by_alias=True) if hasattr(req, "model_dump") else req.dict(by_alias=True)
+    try:
+        channel = social_channel_from_config(config)
+        _social_channel_registry.upsert(channel)
+        if req.set_default:
+            _social_channel_registry.set_default(channel.id)
+        _save_social_channels()
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+    return {
+        "ok": True,
+        "channel": channel.public_info(),
+        "default_channel": _social_channel_registry.get_default(),
+    }
+
+
+@app.post("/social/channels/default")
+async def set_default_social_channel(req: DefaultSocialChannelRequest):
+    try:
+        _social_channel_registry.set_default(req.channel_id)
+        _save_social_channels()
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "default_channel": _social_channel_registry.get_default()}
+
+
+@app.delete("/social/channels/{channel_id}")
+async def delete_social_channel(channel_id: str):
+    if channel_id == "generic":
+        return {"ok": False, "error": "generic channel cannot be deleted"}
+    removed = _social_channel_registry.unregister(channel_id)
+    if not removed:
+        return {"ok": False, "error": f"unknown social channel: {channel_id}"}
+    if _social_channel_registry.get_default() == channel_id:
+        _social_channel_registry.set_default("generic")
+    _save_social_channels()
+    return {"ok": True, "channel_id": channel_id}
+
+
+@app.post("/social/ingress")
+async def social_ingress(req: SocialIngressRequest, request: Request):
+    raw_body = await request.body()
+    raw_payload = _decode_raw_json(raw_body)
+    try:
+        channel = _select_social_channel(req)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"ok": False, "error": str(exc)})
+    verification, early_response = _verify_social_or_response(
+        channel=channel,
+        headers=request.headers,
+        raw_body=raw_body,
+        payload=_verification_payload(req, raw_payload),
+    )
+    if early_response is not None:
+        return early_response
+    req.context.setdefault("verification", {
+        "method": verification.method,
+        "skipped": verification.skipped,
+    })
+    return await _handle_social_ingress(req, channel=channel)
+
+
+@app.post("/social/{platform}/ingress")
+async def social_platform_ingress(platform: str, req: SocialIngressRequest, request: Request):
+    raw_body = await request.body()
+    raw_payload = _decode_raw_json(raw_body)
+    try:
+        channel = _select_social_channel(req, platform=platform)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"ok": False, "error": str(exc)})
+    verification, early_response = _verify_social_or_response(
+        channel=channel,
+        headers=request.headers,
+        raw_body=raw_body,
+        payload=_verification_payload(req, raw_payload),
+    )
+    if early_response is not None:
+        return early_response
+    req.context.setdefault("verification", {
+        "method": verification.method,
+        "skipped": verification.skipped,
+    })
+    return await _handle_social_ingress(req, channel=channel, platform=platform)
+
+
 @app.get("/portfolio/sources")
 async def portfolio_sources():
     return {"ok": True, "sources": _portfolio_hub.list_sources()}
@@ -946,7 +2441,7 @@ async def portfolio_hand_payload():
     return {"ok": True, "payload": _portfolio_hub.build_hand_payload()}
 
 
-# ── OAuth 2.0 ─────────────────────────────────────────────────────────────────
+# 鈹€鈹€ OAuth 2.0 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 _OAUTH_CLIENTS_PATH = _ROOT / "brain" / "oauth_clients.json"
 
@@ -967,22 +2462,22 @@ def _oauth_done_page(provider: str, source_id: str, ok: bool, error: str = "") -
     safe_prov = html.escape(provider.title())
     msg_js = json.dumps({"ok": ok, "source_id": source_id, "provider": provider})
     if ok:
-        return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>授权完成</title>
+        return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Authorization Complete</title>
 <style>body{{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc}}
 .card{{background:#fff;border-radius:16px;padding:40px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:320px}}
 .icon{{font-size:48px;margin-bottom:16px}}h2{{margin:0 0 8px;color:#1a1a2e}}p{{color:#666;font-size:14px}}</style>
-</head><body><div class="card"><div class="icon">✅</div><h2>授权成功</h2>
-<p>已连接到 {safe_prov}，此窗口将自动关闭。</p></div>
+</head><body><div class="card"><div class="icon">OK</div><h2>Authorization successful</h2>
+<p>Connected to {safe_prov}. This window will close automatically.</p></div>
 <script>if(window.opener){{window.opener.postMessage({msg_js},'*')}}setTimeout(()=>window.close(),1500)</script>
 </body></html>"""
     safe_err = html.escape(error)
-    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>授权失败</title>
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Authorization Failed</title>
 <style>body{{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc}}
 .card{{background:#fff;border-radius:16px;padding:40px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:320px}}
 .icon{{font-size:48px;margin-bottom:16px}}h2{{margin:0 0 8px;color:#1a1a2e}}p{{color:#e53e3e;font-size:14px}}
 button{{margin-top:16px;padding:8px 20px;border-radius:8px;border:1px solid #ddd;cursor:pointer}}</style>
-</head><body><div class="card"><div class="icon">❌</div><h2>授权失败</h2>
-<p>{safe_err}</p><button onclick="window.close()">关闭</button></div>
+</head><body><div class="card"><div class="icon">ERROR</div><h2>Authorization failed</h2>
+<p>{safe_err}</p><button onclick="window.close()">Close</button></div>
 </body></html>"""
 
 
@@ -1011,7 +2506,7 @@ async def oauth_google_start(source_id: str = ""):
     from fastapi.responses import RedirectResponse
     cfg = _load_oauth_clients().get("google", {})
     if not cfg.get("client_id"):
-        return {"ok": False, "error": "Google OAuth not configured — POST /oauth/clients first"}
+        return {"ok": False, "error": "Google OAuth not configured 鈥?POST /oauth/clients first"}
     qs = urllib.parse.urlencode({
         "client_id": cfg["client_id"],
         "redirect_uri": "http://localhost:3002/oauth/google/callback",
@@ -1058,7 +2553,7 @@ async def oauth_notion_start(source_id: str = ""):
     from fastapi.responses import RedirectResponse
     cfg = _load_oauth_clients().get("notion", {})
     if not cfg.get("client_id"):
-        return {"ok": False, "error": "Notion OAuth not configured — POST /oauth/clients first"}
+        return {"ok": False, "error": "Notion OAuth not configured 鈥?POST /oauth/clients first"}
     qs = urllib.parse.urlencode({
         "client_id": cfg["client_id"],
         "redirect_uri": "http://localhost:3002/oauth/notion/callback",
@@ -1100,7 +2595,7 @@ async def oauth_notion_callback(code: str = "", state: str = "", error: str = ""
 
 @app.post("/analyze")
 async def analyze(req: AnalyzeRequest):
-    """Brain B-business: workflow resolve → parallel hands → synthesis → render."""
+    """Brain B-business: workflow resolve 鈫?parallel hands 鈫?synthesis 鈫?render."""
     ctx = dict(req.context)
     if req.domain_hint:
         ctx["domain_hint"] = req.domain_hint
@@ -1123,8 +2618,22 @@ async def analyze(req: AnalyzeRequest):
     print(f"[brain] /analyze question={req.question[:60]!r} goal={goal_id}", flush=True)
 
     # Parse intent concurrently with synthesis; stream uses PREVIOUS events for context
+    intent_extra_context = json.dumps(
+        {
+            "source": ctx.get("source", "api"),
+            "entrypoint": ctx.get("entrypoint", ""),
+            "goal_id": goal_id,
+            "social": ctx.get("social", {}),
+        },
+        ensure_ascii=False,
+    )
     intent_task = asyncio.create_task(
-        _intent_processor.parse("query", req.question)
+        _intent_processor.parse(
+            "query",
+            req.question,
+            extra_context=intent_extra_context,
+            session_id=str(ctx.get("session_id", "")),
+        )
     )
 
     try:
@@ -1158,6 +2667,15 @@ async def analyze(req: AnalyzeRequest):
             intent_activation=result.get("intent_activation"),
             intent_rubric=result.get("intent_rubric"),
             intent_reward_report=result.get("intent_reward_report"),
+        )
+        fw_record.orchestration_snapshot = build_minimal_orchestration_snapshot(
+            episode_id=fw_record.episode_id,
+            goal=req.question,
+            domain=wf.get("domain", "general") if isinstance(wf, dict) else "general",
+            workflow=wf if isinstance(wf, dict) else {},
+            hand_plan=result.get("hand_plan") or {},
+            hand_artifacts=result.get("hand_artifacts", {}),
+            review_result=result.get("review_result") or {},
         )
         _flywheel.append_record(fw_record)
         goal.record_episode(fw_record.episode_id)
@@ -1194,7 +2712,7 @@ async def analyze(req: AnalyzeRequest):
     for hand_id, art in result["hand_artifacts"].items():
         info = REGISTRY.get(hand_id, {})
         anchor_id = info.get("anchor_id", hand_id)
-        # Error cards skip the Brain presentation layer — the enrichment function
+        # Error cards skip the Brain presentation layer 鈥?the enrichment function
         # produces the full card structure (error/impact/recovery sections) directly.
         # This ensures every card, even from a failed/unconfigured hand, follows
         # the same 5-dimensional framework as a successful hand card.
@@ -1288,7 +2806,7 @@ async def distill(req: DistillRequest):
     """Distill a resource (text or URL) into AnalyticalFramework candidates.
 
     Returns a list of framework candidates for user review (accept/edit/reject).
-    Does NOT persist automatically — call /frameworks/accept to store.
+    Does NOT persist automatically 鈥?call /frameworks/accept to store.
     """
     import httpx as _httpx
 
@@ -1352,7 +2870,7 @@ async def distill(req: DistillRequest):
     except Exception:
         pass
 
-    print(f"[brain] /distill → {len(candidates)} framework candidate(s)", flush=True)
+    print(f"[brain] /distill 鈫?{len(candidates)} framework candidate(s)", flush=True)
     return {
         "ok": True,
         "resource": asdict(captured_resource),
@@ -1398,7 +2916,7 @@ async def frameworks_list():
 
 @app.get("/intent-stream/data")
 async def intent_stream_data():
-    """JSON API — full event log + derived context."""
+    """JSON API 鈥?full event log + derived context."""
     events = _intent_stream.all()
     derived = _intent_stream.derive_context()
     graph = _intent_wiki.graph()
@@ -1436,6 +2954,15 @@ async def intent_harness_data():
     return {"ok": True, **_brain_harness.rewarded_intent_harness.snapshot()}
 
 
+@app.get("/visual/{episode_id}")
+async def visual_result(episode_id: str):
+    """Return a standalone HTML result page for a completed episode."""
+    record = _flywheel.load_detail(episode_id)
+    if record is None:
+        return HTMLResponse(f"<h1>Episode not found</h1><p>{_html_text(episode_id)}</p>", status_code=404)
+    return HTMLResponse(_render_visual_page(record, episode_id))
+
+
 @app.get("/intent-stream")
 async def intent_stream_page():
     from fastapi.responses import HTMLResponse
@@ -1448,7 +2975,7 @@ _INTENT_STREAM_PAGE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Intent Stream — Loom Brain</title>
+<title>Intent Stream 鈥?Loom Brain</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Bricolage+Grotesque:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@phosphor-icons/web@2.1.1/src/index.js" crossorigin></script>
@@ -1484,7 +3011,7 @@ _INTENT_STREAM_PAGE = """<!DOCTYPE html>
     grid-template-areas: "header header" "timeline sidebar";
   }
 
-  /* ── Header ── */
+  /* 鈹€鈹€ Header 鈹€鈹€ */
   header {
     grid-area: header;
     background: var(--surface);
@@ -1560,7 +3087,7 @@ _INTENT_STREAM_PAGE = """<!DOCTYPE html>
   }
   .refresh-btn:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
 
-  /* ── Timeline ── */
+  /* 鈹€鈹€ Timeline 鈹€鈹€ */
   #timeline {
     grid-area: timeline;
     padding: 24px;
@@ -1752,7 +3279,7 @@ _INTENT_STREAM_PAGE = """<!DOCTYPE html>
   .empty-state i { font-size: 48px; margin-bottom: 12px; display: block; }
   .empty-state p { font-size: 14px; }
 
-  /* ── Sidebar ── */
+  /* 鈹€鈹€ Sidebar 鈹€鈹€ */
   #sidebar {
     grid-area: sidebar;
     background: var(--surface);
@@ -1854,7 +3381,7 @@ _INTENT_STREAM_PAGE = """<!DOCTYPE html>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-title">Active Decision Context</div>
-    <div id="decision-context" class="decision-context" style="color:var(--ink-muted);font-style:normal">—</div>
+    <div id="decision-context" class="decision-context" style="color:var(--ink-muted);font-style:normal">-</div>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-title">Analytical Focus (resource shares)</div>
@@ -1980,7 +3507,7 @@ _INTENT_STREAM_PAGE = """<!DOCTYPE html>
         <div class="talent-grid">
           ${zoneNodes.map(n => `<div class="talent-node ${n.is_active ? 'is-active' : ''}" title="${esc(n.principle)}">
             <div class="talent-label">${esc(n.label)}</div>
-            <div class="talent-meta">${n.is_active ? 'active' : 'inactive'} · conf ${Math.round((n.confidence || 0)*100)}% · ev ${n.evidence_count || 0}</div>
+            <div class="talent-meta">${n.is_active ? 'active' : 'inactive'} 路 conf ${Math.round((n.confidence || 0)*100)}% 路 ev ${n.evidence_count || 0}</div>
           </div>`).join('')}
         </div>
       </div>`;
@@ -2013,12 +3540,75 @@ _INTENT_STREAM_PAGE = """<!DOCTYPE html>
 </html>"""
 
 
+@app.post("/agent-sessions/run")
+async def run_agent_session(req: AgentSessionRequest):
+    adapter_id = req.adapter_id or _adapter_registry.get_default_runtime_adapter()
+    try:
+        session = await _agent_session_service.run(
+            adapter_id=adapter_id,
+            task=req.task,
+            cwd=req.cwd or str(_ROOT),
+            context=req.context,
+            dangerous=req.dangerous,
+            session_key=req.session_key,
+        )
+    except Exception as exc:
+        return {"ok": False, "adapter_id": adapter_id, "error": str(exc)}
+    return {"ok": True, **session}
+
+
+# 鈹€鈹€ Agent Session Registry endpoints 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+@app.get("/agent-sessions")
+async def list_agent_sessions(
+    platform: str = "",
+    channel_id: str = "",
+    user_id: str = "",
+):
+    sessions = _session_registry.list_sessions(platform, channel_id, user_id)
+    return {
+        "ok": True,
+        "count": len(sessions),
+        "sessions": [s.to_dict() for s in sessions],
+    }
+
+
+@app.post("/agent-sessions")
+async def start_agent_session(req: AgentSessionStartRequest):
+    record = _session_registry.start(
+        adapter_id=req.adapter_id,
+        platform=req.platform,
+        channel_id=req.channel_id,
+        user_id=req.user_id,
+        label=req.label,
+    )
+    return {"ok": True, "session": record.to_dict()}
+
+
+@app.put("/agent-sessions/{session_id}/foreground")
+async def set_session_foreground(session_id: str, req: AgentSessionSelectRequest):
+    record = _session_registry.set_foreground(
+        req.platform or "discord",
+        req.channel_id,
+        req.user_id,
+        session_id,
+    )
+    if record is None:
+        return {"ok": False, "error": f"session not found: {session_id}"}
+    return {"ok": True, "session": record.to_dict()}
+
+
+@app.delete("/agent-sessions/{session_id}")
+async def close_agent_session(session_id: str):
+    ok = _session_registry.close(session_id)
+    return {"ok": ok}
+
+
 @app.post("/run")
 async def run(req: RunRequest):
     info = REGISTRY.get(req.hand_id, {})
     context = _with_brain_portfolio_context(req.hand_id, req.context)
-    # Mounted external agent takes priority over registry default
-    runtime = req.runtime or _mounted.get(req.hand_id) or info.get("runtime", "sdk")
+    runtime = _runtime_for_hand(req.hand_id, req.runtime)
     print(f"[brain] /run hand={req.hand_id} runtime={runtime} task={req.task[:60]!r}", flush=True)
 
     if runtime == "sdk":
@@ -2031,15 +3621,20 @@ async def run(req: RunRequest):
             artifact = await hand.run(req.task, context, resource_menu)
         except Exception as e:
             return {"ok": False, "error": str(e)}
+    elif runtime == _DIRECT_CODEX_RUNTIME_ID:
+        try:
+            artifact = await _run_direct_codex_hand(req.hand_id, req.task, context)
+        except Exception as e:
+            return {"ok": False, "runtime": runtime, "error": str(e)}
     else:
         # Adapter-based path (cc, codex, sdk-<id>, etc.)
-        adapter = _adapter_registry.find_by_id(runtime)
+        adapter = _ensure_runtime_adapter(runtime)
         if adapter is None:
             return {"ok": False, "error": f"unknown runtime adapter: {runtime}"}
         wiki_dir = info.get("wiki_dir", "")
         hand_dir = str(Path(wiki_dir).parent) if wiki_dir else ""
         personal = _read_personal_context(req.hand_id)
-        # Inject into context so http×loom _build_snapshot forwards it to cloud agents.
+        # Inject into context so http脳loom _build_snapshot forwards it to cloud agents.
         context_with_personal = {**context}
         if personal:
             context_with_personal["__personal__"] = personal
@@ -2048,10 +3643,11 @@ async def run(req: RunRequest):
             "context": context_with_personal,
             "hand_id": req.hand_id,
             "hand_dir": hand_dir,
+            "cwd": str(_ROOT),
             "wiki_dir": wiki_dir,
             "resource_api": "http://127.0.0.1:3001/resources",
             "feedback_log": str(_ROOT / "logs" / "feedback.jsonl"),
-            "personal": personal,  # top-level for process×loom agents (stdin JSON)
+            "personal": personal,  # top-level for process脳loom agents (stdin JSON)
         }
         artifact = None
         try:
@@ -2080,7 +3676,111 @@ async def run(req: RunRequest):
         meta.get("resources_used", []),
     )
 
-    return {"ok": True, "hand_id": req.hand_id, "artifact": artifact}
+    return {"ok": True, "hand_id": req.hand_id, "runtime": runtime, "artifact": artifact}
+
+
+@app.get("/adapters")
+async def list_agent_adapters():
+    return {
+        "ok": True,
+        "default_runtime_adapter": _adapter_registry.get_default_runtime_adapter(),
+        "adapters": [adapter_public_info(a) for a in _adapter_registry.list()],
+        "dynamic_adapter_ids": sorted(_DYNAMIC_ADAPTER_CONFIGS.keys()),
+    }
+
+
+@app.get("/hands/runtime-bindings")
+async def list_hand_runtime_bindings():
+    return {
+        "ok": True,
+        "config_path": str(_HAND_RUNTIME_BINDINGS.path),
+        "bindings": _HAND_RUNTIME_BINDINGS.list(),
+        "hands": [_hand_runtime_state(hand_id) for hand_id in sorted(REGISTRY)],
+        "adapters": [adapter_public_info(a) for a in _adapter_registry.list()],
+    }
+
+
+@app.get("/hand/{hand_id}/runtime")
+async def get_hand_runtime(hand_id: str):
+    if hand_id not in REGISTRY:
+        return {"ok": False, "error": f"unknown hand: {hand_id}"}
+    return {
+        "ok": True,
+        **_hand_runtime_state(hand_id),
+        "default_runtime_adapter": _adapter_registry.get_default_runtime_adapter(),
+        "adapters": [adapter_public_info(a) for a in _adapter_registry.list()],
+    }
+
+
+@app.put("/hand/{hand_id}/runtime")
+async def set_hand_runtime(hand_id: str, req: HandRuntimeRequest):
+    if hand_id not in REGISTRY:
+        return {"ok": False, "error": f"unknown hand: {hand_id}"}
+    adapter_id = req.adapter_id.strip()
+    if adapter_id in {"", "default"}:
+        _HAND_RUNTIME_BINDINGS.remove(hand_id)
+    elif adapter_id == "sdk" or _adapter_registry.find_by_id(adapter_id) is not None:
+        _HAND_RUNTIME_BINDINGS.set(hand_id, adapter_id)
+    else:
+        return {"ok": False, "error": f"unknown runtime adapter: {adapter_id}"}
+    return {"ok": True, **_hand_runtime_state(hand_id)}
+
+
+@app.delete("/hand/{hand_id}/runtime")
+async def clear_hand_runtime(hand_id: str):
+    if hand_id not in REGISTRY:
+        return {"ok": False, "error": f"unknown hand: {hand_id}"}
+    removed = _HAND_RUNTIME_BINDINGS.remove(hand_id)
+    return {"ok": True, "removed": removed, **_hand_runtime_state(hand_id)}
+
+
+@app.post("/adapters/register")
+async def register_agent_adapter(req: AgentAdapterRegisterRequest):
+    config = req.model_dump() if hasattr(req, "model_dump") else req.dict()
+    try:
+        adapter_info = _register_dynamic_adapter_config(
+            config,
+            persist=bool(config.get("persist", True)),
+        )
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+    return {
+        "ok": True,
+        "adapter": adapter_info,
+        "default_runtime_adapter": _adapter_registry.get_default_runtime_adapter(),
+    }
+
+
+@app.post("/adapters/default-runtime")
+async def set_default_runtime_adapter(req: DefaultRuntimeAdapterRequest):
+    adapter = _adapter_registry.find_by_id(req.adapter_id)
+    if adapter is None:
+        return {"ok": False, "error": f"unknown adapter: {req.adapter_id}"}
+    _adapter_registry.set_default_runtime_adapter(req.adapter_id)
+    if req.adapter_id in _DYNAMIC_ADAPTER_CONFIGS:
+        for cfg in _DYNAMIC_ADAPTER_CONFIGS.values():
+            cfg["set_default_runtime"] = False
+        _DYNAMIC_ADAPTER_CONFIGS[req.adapter_id]["set_default_runtime"] = True
+        _save_dynamic_adapters()
+    return {"ok": True, "default_runtime_adapter": req.adapter_id}
+
+
+@app.delete("/adapters/{adapter_id}")
+async def delete_dynamic_agent_adapter(adapter_id: str):
+    if adapter_id not in _DYNAMIC_ADAPTER_CONFIGS:
+        return {"ok": False, "error": f"adapter is not dynamic: {adapter_id}"}
+    removed = _adapter_registry.unregister(adapter_id)
+    _DYNAMIC_ADAPTER_CONFIGS.pop(adapter_id, None)
+    cleared_hand_ids = _HAND_RUNTIME_BINDINGS.remove_adapter(adapter_id)
+    if _adapter_registry.get_default_runtime_adapter() == adapter_id:
+        _adapter_registry.set_default_runtime_adapter("brain-inline")
+    _save_dynamic_adapters()
+    return {
+        "ok": True,
+        "adapter_id": adapter_id,
+        "removed": removed,
+        "cleared_hand_ids": cleared_hand_ids,
+    }
 
 
 @app.get("/resources/{resource_id:path}")
@@ -2108,7 +3808,254 @@ async def post_feedback(request: Request):
     if not body:
         return {"ok": False, "error": "event body required"}
     _core.feedback_store.append(body)
-    return {"ok": True}
+
+    scoped = ScopedFeedback.from_event(body)
+    if not scoped.episode_id:
+        return {"ok": True, "feedback": scoped.to_dict(), "intent_analysis": None}
+
+    detail = _flywheel.load_detail(scoped.episode_id) or {}
+    analysis = _contextual_intent_compiler.compile(scoped, episode=detail)
+    feedback_event = scoped.to_dict()
+    _flywheel.append_feedback_event(scoped.episode_id, feedback_event)
+    _flywheel.append_intent_analysis(scoped.episode_id, analysis.to_dict())
+    return {
+        "ok": True,
+        "feedback": feedback_event,
+        "intent_analysis": analysis.to_dict(),
+        "intent_lens": {
+            "summary": analysis.human_readable_summary,
+            "affected_objects": analysis.affected_objects,
+            "intent_delta": analysis.agent_readable_intent_delta.to_dict(),
+            "ambiguities": analysis.ambiguities,
+            "confidence": analysis.confidence,
+        },
+    }
+async def _run_episode_repair(req: RepairFeedbackRequest) -> dict:
+    detail = _flywheel.load_detail(req.episode_id)
+    if detail is None:
+        return {"ok": False, "error": f"episode not found: {req.episode_id}"}
+
+    from brain_harness.flywheel import HumanFeedback
+    feedback = HumanFeedback(
+        episode_id=req.episode_id,
+        ts=datetime.datetime.utcnow().isoformat() + "Z",
+        signal=req.signal,
+        comment=req.comment,
+        corrected_stance=req.corrected_stance,
+    )
+    _flywheel.append_human_feedback(req.episode_id, feedback)
+    _core.feedback_store.append({
+        "type": "repair_feedback",
+        "source": req.context.get("source", "api"),
+        "episode_id": req.episode_id,
+        "hand_id": req.hand_id,
+        "target_hands": req.target_hands,
+        "signal": req.signal,
+        "comment": req.comment,
+        "corrected_stance": req.corrected_stance,
+        "object_ref": req.object_ref,
+        "object_type": req.object_type,
+        "social": req.social,
+    })
+
+    scoped_feedback = ScopedFeedback(
+        episode_id=req.episode_id,
+        raw_signal=req.signal,
+        comment=req.comment,
+        object_ref=req.object_ref or (f"hand:{req.hand_id}" if req.hand_id else ""),
+        object_type=req.object_type or ("hand" if req.hand_id else ""),
+        ui_selection=req.ui_selection,
+        anchor_id=req.anchor_id,
+    )
+    feedback_event = scoped_feedback.to_dict()
+    _flywheel.append_feedback_event(req.episode_id, feedback_event)
+    intent_analysis = _contextual_intent_compiler.compile(scoped_feedback, episode=detail)
+    _flywheel.append_intent_analysis(req.episode_id, intent_analysis.to_dict())
+    repair_intent_delta = req.intent_delta or intent_analysis.agent_readable_intent_delta.to_dict()
+
+    plan = build_repair_plan(
+        detail,
+        comment=req.comment,
+        explicit_hand_id=req.hand_id,
+        target_hands=req.target_hands,
+    )
+    if not plan.target_hands:
+        result = {
+            "ok": False,
+            "episode_id": req.episode_id,
+            "error": plan.reason,
+            "repair_plan": asdict(plan),
+        "feedback": feedback_event,
+        "intent_analysis": intent_analysis.to_dict(),
+        "intent_delta": repair_intent_delta,
+            "artifacts": {},
+        }
+        _flywheel.append_repair_result(req.episode_id, result)
+        return result
+
+    artifacts: dict[str, dict] = {}
+    errors: dict[str, str] = {}
+    for hand_id in plan.target_hands:
+        task = build_repair_task(
+            detail,
+            hand_id=hand_id,
+            comment=req.comment,
+            corrected_stance=req.corrected_stance,
+            intent_delta=repair_intent_delta,
+        )
+        repair_context = {
+            **req.context,
+            "source": "feedback_repair",
+            "episode_id": req.episode_id,
+            "goal_id": detail.get("goal_id", ""),
+            "domain_hint": detail.get("domain", "general"),
+            "repair": {
+                "signal": req.signal,
+                "comment": req.comment,
+                "corrected_stance": req.corrected_stance,
+                "selection_reason": plan.reason,
+                "intent_delta": repair_intent_delta,
+                "feedback_id": feedback_event.get("feedback_id", ""),
+                "intent_analysis_id": intent_analysis.analysis_id,
+            },
+        }
+        try:
+            artifact = await _brain_hand_runner(hand_id, task, repair_context)
+            if not isinstance(artifact, dict):
+                artifact = {
+                    "metadata": {
+                        "key_claims": [],
+                        "gaps": ["repair adapter returned a non-dict artifact"],
+                        "confidence": 0.0,
+                    },
+                    "narrative": str(artifact),
+                }
+            meta = artifact.get("metadata") if isinstance(artifact, dict) else None
+            if not isinstance(meta, dict):
+                artifact["metadata"] = meta = {}
+            meta["repair_of_episode_id"] = req.episode_id
+            meta["repair_reason"] = plan.reason
+            artifacts[hand_id] = artifact
+            anchor_id = REGISTRY.get(hand_id, {}).get("anchor_id", hand_id)
+            await patch_webview(anchor_id, _render_artifact(artifact, hand_id))
+        except Exception as exc:
+            errors[hand_id] = str(exc)
+
+    original_artifacts = detail.get("hand_artifacts", {})
+    if not isinstance(original_artifacts, dict):
+        original_artifacts = {}
+    resynthesis_artifacts = {**original_artifacts, **artifacts}
+    synthesis = None
+    if artifacts and req.resynthesize:
+        repair_workflow = {
+            "domain": detail.get("domain", "general") or "general",
+            "mode": "feedback_repair",
+            "hands": list(resynthesis_artifacts.keys()),
+            "rationale": f"feedback repair: {plan.reason}",
+        }
+        try:
+            synthesis = await _brain_harness.synthesize(
+                detail.get("question", ""),
+                resynthesis_artifacts,
+                repair_workflow,
+                _brain_client,
+                _brain_model,
+                analysis_plan={"rubrics": []},
+                review_result={
+                    "follow_up_needed": False,
+                    "feedback_repair": True,
+                    "comment": req.comment,
+                },
+            )
+            _brain_harness.write_last_synthesis(
+                detail.get("question", ""),
+                repair_workflow,
+                synthesis,
+            )
+            await patch_webview(
+                "brain-synthesis",
+                _render_brain_synthesis(
+                    synthesis,
+                    repair_workflow,
+                    False,
+                    episode_id=req.episode_id,
+                    goal_id=detail.get("goal_id", ""),
+                    hand_artifacts=resynthesis_artifacts,
+                ),
+            )
+        except Exception as exc:
+            errors["_synthesis"] = str(exc)
+
+    ok = bool(artifacts) and not errors
+    result = {
+        "ok": ok,
+        "episode_id": req.episode_id,
+        "repair_plan": asdict(plan),
+        "feedback": feedback_event,
+        "intent_analysis": intent_analysis.to_dict(),
+        "intent_delta": repair_intent_delta,
+        "artifacts": artifacts,
+        "original_hand_artifact_count": len(original_artifacts),
+        "errors": errors,
+        "synthesis": synthesis,
+    }
+    _flywheel.append_repair_result(req.episode_id, result)
+
+    reply_text = summarize_repair_for_reply(result)
+    result["reply_text"] = reply_text
+    should_send_reply = bool(
+        req.send_reply
+        or req.reply_webhook_url
+        or str(req.context.get("responseMode", "")).lower() in {"reply", "auto_reply"}
+        or str(req.context.get("response_mode", "")).lower() in {"reply", "auto_reply"}
+    )
+    if should_send_reply:
+        social = req.social or {}
+        platform = str(social.get("platform") or req.context.get("platform") or "generic")
+        reply_result = await send_social_reply(
+            platform=platform,
+            text=reply_text,
+            webhook_url=req.reply_webhook_url or str(req.context.get("reply_webhook_url", "")),
+            token=req.reply_token or str(req.context.get("reply_token", "")),
+            channel_id=str(
+                social.get("channel_id")
+                or req.context.get("reply_channel_id")
+                or req.context.get("channel_id")
+                or ""
+            ),
+            message_id=str(
+                social.get("message_id")
+                or req.context.get("reply_message_id")
+                or req.context.get("message_id")
+                or ""
+            ),
+            receive_id_type=str(req.context.get("receive_id_type") or req.context.get("reply_receive_id_type") or ""),
+        )
+        result["reply"] = asdict(reply_result)
+    else:
+        result["reply"] = {"skipped": True}
+
+    asyncio.create_task(_async_capture_intent(
+        "feedback",
+        req.comment or req.signal,
+        extra_context=json.dumps({
+            "episode_id": req.episode_id,
+            "corrected_stance": req.corrected_stance,
+            "target_hands": plan.target_hands,
+        }, ensure_ascii=False),
+        session_id=str(req.context.get("session_id", "")),
+    ))
+    return result
+
+
+@app.post("/feedback/repair")
+async def repair_feedback(req: RepairFeedbackRequest):
+    return await _run_episode_repair(req)
+
+
+@app.post("/flywheel/repair")
+async def flywheel_repair(req: RepairFeedbackRequest):
+    return await _run_episode_repair(req)
 
 
 @app.get("/hand/{hand_id}/config")
@@ -2124,7 +4071,7 @@ async def put_hand_config(hand_id: str, request: Request):
     return {"ok": True, "hand_id": hand_id}
 
 
-# Connector ID → tier mapping (for backward compat when no per-claim tier available)
+# Connector ID 鈫?tier mapping (for backward compat when no per-claim tier available)
 _TIER_A = {"fred", "sec-edgar"}
 _TIER_B = {"finnhub", "yahoo-finance", "cftc-cot", "investing-calendar", "config.json"}
 _TIER_C = {"reuters-rss", "marketwatch-rss", "cnbc-rss"}
@@ -2149,16 +4096,16 @@ def _source_authority(sources: list) -> tuple[str, str]:
     has_f = bool(s & _TIER_F)
     has_g = bool(s & _TIER_G)
     if has_a or has_b:
-        return "权威数据", "anc-pill--done"
+        return "authoritative data", "anc-pill--done"
     if has_c or has_d:
-        return "新闻来源", "anc-pill--warn"
+        return "news source", "anc-pill--warn"
     if has_e:
-        return "公司来源", "anc-pill--review"
+        return "company source", "anc-pill--review"
     if has_f:
-        return "情绪参考", "anc-pill--edit"
+        return "sentiment source", "anc-pill--edit"
     if has_g:
-        return "二手参考", "anc-pill--edit"
-    return "来源未知", "anc-pill--edit"
+        return "secondary source", "anc-pill--edit"
+    return "unknown source", "anc-pill--edit"
 
 
 def _compute_source_distribution(artifact: dict) -> dict:
@@ -2237,7 +4184,7 @@ def _provenance_html(items: list) -> str:
         note = item.get("note", "")
         rows.append(
             f"<li>{tier_tag}<strong>{_html_text(source)}</strong>"
-            f'{(" · " + _html_text(freshness)) if freshness else ""}'
+            f'{(" 路 " + _html_text(freshness)) if freshness else ""}'
             f'{("<br>" + _html_text(note)) if note else ""}</li>'
         )
     return '<h4>Provenance</h4><ul class="anc-source-list">' + "".join(rows) + "</ul>"
@@ -2462,7 +4409,7 @@ def _render_source_notes(meta: dict, sources_html: str) -> str:
                        "G":"anc-tier-pill--e"}.get(tier_upper, "anc-tier-pill--e")
                 items.append(
                     f'<li><span class="anc-tier-pill {css}">{_html_text(tier_upper)}</span>'
-                    f'<div><strong>{source}</strong>{(" · " + freshness) if freshness else ""}'
+                    f'<div><strong>{source}</strong>{(" 路 " + freshness) if freshness else ""}'
                     f'{("<br>" + body) if body else ""}</div></li>'
                 )
             else:
@@ -2500,7 +4447,7 @@ def _enrich_error_artifact(artifact: dict, hand_id: str) -> dict:
     """Enrich an error artifact with proper card structure so it follows the same
     dimensional framework as a successful hand card.
 
-    All hand agents — configured or not — produce cards measured by the same 5
+    All hand agents 鈥?configured or not 鈥?produce cards measured by the same 5
     dimensions. A connection-refused error is just (L0 provenance, L4 gap transparency,
     L2 structure, etc.) rather than an empty card.
     """
@@ -2511,7 +4458,7 @@ def _enrich_error_artifact(artifact: dict, hand_id: str) -> dict:
     label = info.get("label", hand_id)
     description = info.get("description", f"{hand_id} analysis")
     err = str(meta["error"])
-    # Only enrich once — subsequent calls see a non-error artifact
+    # Only enrich once 鈥?subsequent calls see a non-error artifact
     if meta.get("_enriched"):
         return artifact
     artifact.setdefault("sections", [])
@@ -2524,7 +4471,7 @@ def _enrich_error_artifact(artifact: dict, hand_id: str) -> dict:
     meta["confidence"] = max(meta.get("confidence", 0.0), 0.0)
     # narrative
     if not artifact.get("narrative"):
-        artifact["narrative"] = f"{label} hand unavailable — {err}. This card normally contains {description}."
+        artifact["narrative"] = f"{label} hand unavailable 鈥?{err}. This card normally contains {description}."
     # gaps
     if not meta["gaps"]:
         meta["gaps"].append(f"Hand {hand_id} failed with: {err}. All data that would normally be provided by this hand is unavailable.")
@@ -2550,7 +4497,7 @@ def _enrich_error_artifact(artifact: dict, hand_id: str) -> dict:
             "bullets": [
                 {"claim": "All connector data for this hand is unavailable", "source": "system", "tier": "G"},
                 {"claim": "No key claims, evidence rows, or structured sections were produced", "source": "system", "tier": "G"},
-                {"claim": "Confidence is 0 — no data was received", "source": "system", "tier": "G"},
+                {"claim": "Confidence is 0 鈥?no data was received", "source": "system", "tier": "G"},
             ],
         })
         sections.append({
@@ -2562,9 +4509,131 @@ def _enrich_error_artifact(artifact: dict, hand_id: str) -> dict:
                 {"claim": "Restart the analysis after the service is running", "source": "system", "tier": "G"},
             ],
         })
-    # evidence is intentionally left empty — no data was received
+    # evidence is intentionally left empty 鈥?no data was received
     meta.setdefault("evidence", [])
     return artifact
+
+
+def _render_visual_page(record: dict, episode_id: str) -> str:
+    """Render a standalone HTML page for a /visual/<episode_id> result."""
+    question = record.get("question", "")
+    domain = record.get("domain", "general")
+    ts = record.get("ts", "")[:19].replace("T", " ")
+    brain = record.get("brain_self_eval", {}) or {}
+    stance = brain.get("stance", "n/a")
+    confidence = brain.get("confidence", 0.0)
+    artifacts = record.get("hand_artifacts", {}) or {}
+
+    adapter = _domain_registry.get(domain) if _domain_registry else None
+    stance_label = (adapter.stance_labels or {}).get(stance, stance)
+    confidence_pct = int(float(confidence) * 100)
+
+    hand_blocks: list[str] = []
+    for hand_id, art in artifacts.items():
+        if not isinstance(art, dict):
+            continue
+        meta = art.get("metadata", {}) or {}
+        narrative = art.get("narrative", "")
+        claims = meta.get("key_claims", []) or []
+        gaps = meta.get("gaps", []) or []
+        sections = art.get("sections", []) or []
+
+        claims_html = "".join(
+            f'<li>{_html_text(c.get("claim", str(c)) if isinstance(c, dict) else str(c))}</li>'
+            for c in claims[:8]
+        ) or "<li>No key claims</li>"
+
+        gaps_html = "".join(
+            f'<li>{_html_text(g.get("description", str(g)) if isinstance(g, dict) else str(g))}</li>'
+            for g in gaps[:5]
+        ) or ""
+
+        sections_html = ""
+        for sec in (sections or [])[:6]:
+            if not isinstance(sec, dict):
+                continue
+            bullets = sec.get("bullets", []) or []
+            bullets_html = "".join(f"<li>{_html_text(str(b))}</li>" for b in bullets[:8])
+            sections_html += (
+                f'<div class="vis-section">'
+                f'<h3>{_html_text(sec.get("title", ""))}</h3>'
+                f'<p class="vis-section-summary">{_html_text(sec.get("summary", ""))}</p>'
+                f'<ul>{bullets_html}</ul>'
+                f'</div>'
+            )
+
+        hand_blocks.append(f"""
+        <div class="vis-card">
+          <div class="vis-card-header">
+            <span class="vis-hand-id">{_html_text(hand_id)}</span>
+            <span class="vis-confidence">confidence {confidence:.2f}</span>
+          </div>
+          <div class="vis-narrative">{_html_text(narrative[:3000])}</div>
+          <details class="vis-detail">
+            <summary>Key Claims ({len(claims)})</summary>
+            <ul>{claims_html}</ul>
+          </details>
+          {f'<details class="vis-detail"><summary>Gaps ({len(gaps)})</summary><ul>{gaps_html}</ul></details>' if gaps_html else ''}
+          {sections_html}
+        </div>""")
+
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loom 鈥?{_html_text(question[:60])}</title>
+<style>
+  :root {{
+    --ink: #1a1a2e; --ink-secondary: #4a4a6a; --ink-muted: #8888aa;
+    --paper: #fafafc; --paper-secondary: #f0f0f5;
+    --accent: #7A5AF8; --accent-soft: rgba(122,90,248,.12);
+    --pastel-lavender: #e8e0ff; --pastel-coral: #ffe0d8;
+    --pastel-teal: #d0f0e8; --pastel-sky: #d8e8ff;
+    --radius-sm: 8px; --radius-md: 14px; --shadow-sm: 0 1px 4px rgba(0,0,0,.06);
+    --font-sans: system-ui,-apple-system,"Segoe UI",sans-serif;
+  }}
+  * {{ box-sizing:border-box;margin:0;padding:0 }}
+  body {{ font-family:var(--font-sans);background:var(--paper);color:var(--ink);max-width:780px;margin:0 auto;padding:24px 20px 60px;line-height:1.6 }}
+  .vis-header {{ margin-bottom:32px }}
+  .vis-header h1 {{ font-size:22px;font-weight:700;margin-bottom:8px }}
+  .vis-meta {{ font-size:13px;color:var(--ink-muted);display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px }}
+  .vis-pill {{ display:inline-block;padding:3px 12px;border-radius:999px;font-size:12px;font-weight:600 }}
+  .vis-pill--stance {{ background:var(--accent-soft);color:var(--accent) }}
+  .vis-pill--confidence {{ background:var(--pastel-sky);color:var(--ink-secondary) }}
+  .vis-pill--domain {{ background:var(--pastel-lavender);color:var(--ink-secondary) }}
+  .vis-card {{ background:var(--paper-secondary);border-radius:var(--radius-md);padding:20px;margin-bottom:20px;box-shadow:var(--shadow-sm) }}
+  .vis-card-header {{ display:flex;justify-content:space-between;align-items:center;margin-bottom:12px }}
+  .vis-hand-id {{ font-weight:700;font-size:15px;color:var(--accent) }}
+  .vis-confidence {{ font-size:12px;color:var(--ink-muted) }}
+  .vis-narrative {{ font-size:14px;line-height:1.7;white-space:pre-wrap;margin-bottom:12px }}
+  .vis-detail {{ margin-top:12px }}
+  .vis-detail summary {{ font-size:13px;font-weight:600;color:var(--ink-secondary);cursor:pointer;padding:6px 0 }}
+  .vis-detail ul {{ padding-left:20px;font-size:13px;color:var(--ink-secondary) }}
+  .vis-detail li {{ margin-bottom:4px }}
+  .vis-section {{ margin-top:16px;padding-top:12px;border-top:1px solid var(--pastel-lavender) }}
+  .vis-section h3 {{ font-size:14px;font-weight:600;margin-bottom:4px }}
+  .vis-section-summary {{ font-size:13px;color:var(--ink-muted);margin-bottom:8px }}
+  .vis-section ul {{ padding-left:20px;font-size:13px }}
+  .vis-section li {{ margin-bottom:3px }}
+  .vis-footer {{ text-align:center;font-size:11px;color:var(--ink-muted);margin-top:48px;padding-top:24px;border-top:1px solid var(--paper-secondary) }}
+</style>
+</head>
+<body>
+<div class="vis-header">
+  <h1>{_html_text(question)}</h1>
+  <div class="vis-meta">
+    <span class="vis-pill vis-pill--stance">{stance_label}</span>
+    <span class="vis-pill vis-pill--confidence">{confidence_pct}% confidence</span>
+    <span class="vis-pill vis-pill--domain">{_html_text(domain)}</span>
+    <span>{ts}</span>
+    <span>ep: {_html_text(episode_id)}</span>
+  </div>
+</div>
+{"".join(hand_blocks)}
+<div class="vis-footer">Loom Brain 路 episode {_html_text(episode_id)}</div>
+</body>
+</html>""".rstrip("\n") + "\n"
 
 
 def _render_artifact(artifact: dict, hand_id: str) -> str:
@@ -2580,24 +4649,24 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
     dist = _compute_source_distribution(artifact)
     if dist["best_tier"] != "unknown":
         best_label, best_class = {
-            "A": ("权威数据", "anc-pill--done"), "B": ("市场数据", "anc-pill--done"),
-            "C": ("新闻来源", "anc-pill--warn"), "D": ("行业数据", "anc-pill--warn"),
-            "E": ("公司来源", "anc-pill--review"), "F": ("情绪参考", "anc-pill--edit"),
-            "G": ("二手参考", "anc-pill--edit"),
-        }.get(dist["best_tier"], ("来源未知", "anc-pill--edit"))
+            "A": ("authoritative data", "anc-pill--done"), "B": ("market data", "anc-pill--done"),
+            "C": ("news source", "anc-pill--warn"), "D": ("industry data", "anc-pill--warn"),
+            "E": ("company source", "anc-pill--review"), "F": ("sentiment source", "anc-pill--edit"),
+            "G": ("secondary source", "anc-pill--edit"),
+        }.get(dist["best_tier"], ("unknown source", "anc-pill--edit"))
         authority_label, auth_class = best_label, best_class
         if dist["mixed"]:
-            authority_label += " · 多级混用"
+            authority_label += " / mixed tiers"
             auth_class = "anc-pill--warn"
     else:
         authority_label, auth_class = _source_authority(sources_used)
 
-    gaps_html = "".join(f"<li>{_html_text(g)}</li>" for g in gaps) or "<li>无明显数据缺口</li>"
+    gaps_html = "".join(f"<li>{_html_text(g)}</li>" for g in gaps) or "<li>No explicit data gaps</li>"
     claims_html = "".join(
         f"<li>{_claim_source_tag(c)}{_html_text(_claim_text(c))}</li>"
         for c in (key_claims or [])
     )
-    sources_html = ", ".join(f"<code>{_html_text(s)}</code>" for s in sources_used) or "无"
+    sources_html = ", ".join(f"<code>{_html_text(s)}</code>" for s in sources_used) or "none"
 
     info = REGISTRY.get(hand_id, {})
     anchor_id = info.get("anchor_id", hand_id)
@@ -2611,63 +4680,73 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
     raw_items_html = _render_raw_items(artifact)
     agent_section_html = _render_agent_section(artifact, hand_id)
 
-    if overview_only:
-        # True summary: pill + title + narrative only visible; detail in aside
-        return f"""<section class="anc-section anc-section--gc" data-anc="{anchor_id}" data-handles="refine,expand" data-has-detail="true">
-  <div class="anc-pill-row">
-    <span class="hand-indicator" style="width:10px;height:10px;border-radius:50%;background:{hand_color};display:inline-block;flex-shrink:0" title="{html.escape(hand_id)}"></span>
-    <span class="anc-pill anc-pill--gen">AI 生成</span>
-    <span class="anc-pill {auth_class}">{authority_label}</span>
-  </div>
-  <h2>{label}</h2>
-  <div class="insight-box"><p>{_html_text(narrative)}</p></div>
-  <aside class="anc-detail" hidden>
-    {raw_sources_html}
-    {raw_items_html}
-    {detail_sections_html}
-    {evidence_html}
-    {agent_section_html}
-    <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources" data-layer-type="analysis">
-      <h3>Sources</h3>
-      {source_notes_html}
-    </section>
-    <section class="anc-detail-section anc-detail-section--hand-eval" data-detail-section="hand-eval" data-detail-label="Hand Eval" data-layer-type="analysis">
-      <h3>Hand Eval</h3>
-      <div class="anc-eval-block"><div class="anc-eval-label">Authority</div>{authority_label}</div>
-      <div class="anc-eval-block"><div class="anc-eval-label">Coverage gaps</div><ul>{gaps_html}</ul></div>
-    </section>
-  </aside>
-</section>"""
+    # 鈹€鈹€ Density card: L3 visible, L2/L1/L0 progressively revealable 鈹€鈹€鈹€鈹€鈹€鈹€
+    l2_parts: list[str] = []
+    if detail_sections_html:
+        l2_parts.append(detail_sections_html)
+    if agent_section_html:
+        l2_parts.append(agent_section_html)
+    l2_html = "".join(l2_parts) if l2_parts else ""
 
-    return f"""<section class="anc-section anc-section--gc" data-anc="{anchor_id}" data-handles="refine,expand" data-has-detail="true">
-  <div class="anc-pill-row">
-    <span class="hand-indicator" style="width:10px;height:10px;border-radius:50%;background:{hand_color};display:inline-block;flex-shrink:0" title="{html.escape(hand_id)}"></span>
-    <span class="anc-pill anc-pill--gen">AI 生成</span>
-    <span class="anc-pill {auth_class}">{authority_label}</span>
-  </div>
-  <h2>{label}</h2>
-  <div class="insight-box"><p>{_html_text(narrative)}</p></div>
-  {('<h4>关键判断</h4><ul>' + claims_html + '</ul>') if claims_html else ''}
-  <h4>数据缺口</h4>
-  <ul class="risk-list">{gaps_html}</ul>
-  <p>数据来源：{sources_html} ｜ {ts}</p>
-  <aside class="anc-detail" hidden>
-    {raw_sources_html}
-    {raw_items_html}
-    {detail_sections_html}
-    {evidence_html}
-    {agent_section_html}
-    <section class="anc-detail-section anc-detail-section--sources" data-detail-section="sources" data-detail-label="Sources" data-layer-type="analysis">
-      <h3>Sources</h3>
-      {source_notes_html}
-    </section>
-    <section class="anc-detail-section anc-detail-section--hand-eval" data-detail-section="hand-eval" data-detail-label="Hand Eval" data-layer-type="analysis">
-      <h3>Hand Eval</h3>
-      <div class="anc-eval-block"><div class="anc-eval-label">Authority</div>{authority_label}</div>
-      <div class="anc-eval-block"><div class="anc-eval-label">Coverage gaps</div><ul>{gaps_html}</ul></div>
-    </section>
-  </aside>
-</section>"""
+    l1_parts: list[str] = []
+    if evidence_html:
+        l1_parts.append(evidence_html)
+    if source_notes_html:
+        l1_parts.append(
+            '<section class="anc-detail-section anc-detail-section--sources" '
+            'data-detail-section="sources" data-detail-label="Sources" data-layer-type="analysis">'
+            f'<h3>Sources</h3>{source_notes_html}</section>'
+        )
+    l1_html = "".join(l1_parts) if l1_parts else ""
+
+    l0_parts: list[str] = []
+    if raw_sources_html:
+        l0_parts.append(raw_sources_html)
+    if raw_items_html:
+        l0_parts.append(raw_items_html)
+    l0_html = "".join(l0_parts) if l0_parts else ""
+
+    l3_extra = ""
+    if not overview_only:
+        l3_extra = (
+            f"{('<h4>Key claims</h4><ul>' + claims_html + '</ul>') if claims_html else ''}"
+            f"<h4>Data gaps</h4><ul class=\"risk-list\">{gaps_html}</ul>"
+            f"<p>Data sources: {sources_html} / {ts}</p>"
+        )
+
+    parts: list[str] = [
+        f'<section class="anc-section anc-section--gc anc-density-card" data-anc="{anchor_id}" data-handles="refine" data-has-detail="true">',
+        # L3 鈥?always visible
+        '<div class="anc-density-layer anc-density-layer--l3" data-density="l3">',
+        f'<div class="anc-pill-row">',
+        f'<span class="hand-indicator" style="width:10px;height:10px;border-radius:50%;background:{hand_color};display:inline-block;flex-shrink:0" title="{html.escape(hand_id)}"></span>',
+        f'<span class="anc-pill anc-pill--gen">AI 鐢熸垚</span>',
+        f'<span class="anc-pill {auth_class}">{authority_label}</span>',
+        f'</div>',
+        f'<h2>{label}</h2>',
+        f'<div class="insight-box"><p>{_html_text(narrative)}</p></div>',
+        l3_extra,
+        '</div>',
+    ]
+    # L2 鈥?detail sections + agent info
+    if l2_html:
+        parts.append(f'<div class="anc-density-layer anc-density-layer--l2" data-density="l2">{l2_html}</div>')
+    # L1 鈥?evidence table + source notes
+    if l1_html:
+        parts.append(f'<div class="anc-density-layer anc-density-layer--l1" data-density="l1">{l1_html}</div>')
+    # L0 鈥?raw sources + raw items
+    if l0_html:
+        parts.append(f'<div class="anc-density-layer anc-density-layer--l0" data-density="l0">{l0_html}</div>')
+    parts.append(
+        '<div class="anc-density-indicator" aria-hidden="true">'
+        '<span class="anc-density-dot active" data-density-dot="l3" title="姒傝"></span>'
+        f'{"<span class=\"anc-density-dot\" data-density-dot=\"l2\" title=\"鍒嗘瀽\"></span>" if l2_html else ""}'
+        f'{"<span class=\"anc-density-dot\" data-density-dot=\"l1\" title=\"璇佹嵁\"></span>" if l1_html else ""}'
+        f'{"<span class=\"anc-density-dot\" data-density-dot=\"l0\" title=\"鍘熷鏁版嵁\"></span>" if l0_html else ""}'
+        '</div>'
+    )
+    parts.append('</section>')
+    return "\n".join(parts)
 
 
 class MountRequest(BaseModel):
@@ -2713,18 +4792,14 @@ async def get_mount(hand_id: str):
 
 @app.get("/health")
 def health():
-    adapters_info = [
-        {
-            "id": a.id,
-            "hw_capabilities": getattr(a, "hw_capabilities", {}),
-        }
-        for a in _adapter_registry.list()
-    ]
+    adapters_info = [adapter_public_info(a) for a in _adapter_registry.list()]
     return {
         "ok": True,
         "service": "loom-brain",
         "hands": list(HANDS.keys()),
         "adapters": adapters_info,
+        "default_runtime_adapter": _adapter_registry.get_default_runtime_adapter(),
+        "dynamic_adapter_ids": sorted(_DYNAMIC_ADAPTER_CONFIGS.keys()),
         "mounted": dict(_mounted),
     }
 
@@ -2761,6 +4836,23 @@ async def get_goal(goal_id: str):
     return {"ok": True, "goal": goal.to_dict()}
 
 
+@app.get("/orchestration/{episode_id}")
+async def get_orchestration(episode_id: str):
+    detail = _flywheel.load_detail(episode_id)
+    if detail is None:
+        return {"ok": False, "error": f"episode not found: {episode_id}"}
+    snapshot = detail.get("orchestration_snapshot")
+    if not isinstance(snapshot, dict) or not snapshot:
+        snapshot = build_minimal_orchestration_snapshot(
+            episode_id=episode_id,
+            goal=str(detail.get("question", "")),
+            domain=str(detail.get("domain", "general") or "general"),
+            workflow={},
+            hand_plan={},
+            hand_artifacts=detail.get("hand_artifacts", {}) if isinstance(detail.get("hand_artifacts"), dict) else {},
+        )
+    return {"ok": True, "orchestration": snapshot}
+
 @app.get("/flywheel")
 async def flywheel_log(limit: int = 50):
     records = _flywheel.read_summary_log(limit=limit)
@@ -2772,6 +4864,17 @@ class FeedbackRequest(BaseModel):
     signal: str = "thumbs_up"
     comment: str = ""
     corrected_stance: str = ""
+    object_ref: str = ""
+    object_type: str = ""
+
+
+class ConfirmCorrectionRequest(BaseModel):
+    episode_id: str
+    analysis_id: str = ""
+    repair_id: str = ""
+    comment: str = ""
+    reuse_scope: str = "task_pattern"
+    enabled: bool = True
 
 
 @app.post("/flywheel/feedback")
@@ -2788,6 +4891,37 @@ async def flywheel_feedback(req: FeedbackRequest):
     ok = _flywheel.append_human_feedback(req.episode_id, fb)
     return {"ok": ok}
 
+
+
+@app.post("/corrections/confirm")
+async def confirm_correction(req: ConfirmCorrectionRequest):
+    detail = _flywheel.load_detail(req.episode_id)
+    if detail is None:
+        return {"ok": False, "error": f"episode not found: {req.episode_id}"}
+    correction = {
+        "correction_id": "cc-" + uuid.uuid4().hex[:12],
+        "episode_id": req.episode_id,
+        "analysis_id": req.analysis_id,
+        "repair_id": req.repair_id,
+        "comment": req.comment,
+        "reuse_scope": req.reuse_scope or "task_pattern",
+        "enabled": bool(req.enabled),
+        "ts": datetime.datetime.utcnow().isoformat() + "Z",
+    }
+    ok = _flywheel.append_confirmed_correction(req.episode_id, correction)
+    return {"ok": ok, "correction": correction}
+
+
+@app.get("/corrections")
+async def list_confirmed_corrections(limit: int = 50):
+    records = _flywheel.read_summary_log(limit=limit)
+    corrections = []
+    for record in records:
+        episode_id = record.get("episode_id", "")
+        detail = _flywheel.load_detail(episode_id) if episode_id else None
+        if isinstance(detail, dict):
+            corrections.extend(detail.get("confirmed_corrections", []) or [])
+    return {"ok": True, "count": len(corrections), "corrections": corrections}
 
 @app.get("/review")
 async def review():
@@ -2811,3 +4945,17 @@ async def put_config(request: Request):
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

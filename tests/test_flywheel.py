@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import tempfile
@@ -56,6 +56,7 @@ class FlywheelRecordTests(unittest.TestCase):
         self.assertEqual("rubric-1", data["intent_rubric"]["rubric_id"])
         self.assertEqual(0.82, data["intent_reward_report"]["overall_reward"])
         self.assertEqual(0.82, data["brain_self_eval"]["overall_quality"])
+        self.assertIn("market", data["hand_artifacts"])
 
         summary = record.summary_line()
         self.assertEqual(0.82, summary["reward_score"])
@@ -83,12 +84,73 @@ class FlywheelRecordTests(unittest.TestCase):
             detail = json.loads(detail_path.read_text("utf-8"))
             self.assertEqual("rubric-2", detail["intent_rubric"]["rubric_id"])
             self.assertEqual(0.64, detail["intent_reward_report"]["overall_reward"])
+            self.assertEqual({}, detail["hand_artifacts"])
 
             summaries = writer.read_summary_log(limit=1)
             self.assertEqual(1, len(summaries))
             self.assertEqual("rubric-2", summaries[0]["rubric_id"])
             self.assertEqual(0.64, summaries[0]["reward_score"])
 
+    def test_writer_loads_detail_and_appends_repair_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            writer = FlywheelWriter(Path(tmp))
+            record = FlywheelRecord.new(
+                goal_id="goal-3",
+                question="repair this",
+                domain="general",
+                synthesis={"stance": "n/a", "confidence": 0.4},
+                hand_artifacts={"market": {"metadata": {"key_claims": [], "gaps": ["missing"]}}},
+            )
+            writer.append_record(record)
+
+            detail = writer.load_detail(record.episode_id)
+            self.assertIsNotNone(detail)
+            self.assertEqual("repair this", detail["question"])
+            self.assertIn("market", detail["hand_artifacts"])
+
+            ok = writer.append_repair_result(record.episode_id, {
+                "ok": True,
+                "repair_plan": {"target_hands": ["market"]},
+            })
+            self.assertTrue(ok)
+            updated = writer.load_detail(record.episode_id)
+            self.assertEqual(1, len(updated["repair_history"]))
+            self.assertEqual(["market"], updated["repair_history"][0]["repair_plan"]["target_hands"])
+
+
+    def test_writer_appends_feedback_analysis_and_confirmed_correction(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            writer = FlywheelWriter(Path(tmp))
+            record = FlywheelRecord.new(
+                goal_id="goal-4",
+                question="fix a claim",
+                domain="general",
+                synthesis={"stance": "n/a", "confidence": 0.4},
+                hand_artifacts={},
+            )
+            writer.append_record(record)
+
+            self.assertTrue(writer.append_feedback_event(record.episode_id, {
+                "feedback_id": "fb-1",
+                "object_ref": "claim:c1",
+                "comment": "wrong",
+            }))
+            self.assertTrue(writer.append_intent_analysis(record.episode_id, {
+                "analysis_id": "cia-1",
+                "feedback_id": "fb-1",
+                "affected_objects": ["claim:c1"],
+            }))
+            self.assertTrue(writer.append_confirmed_correction(record.episode_id, {
+                "correction_id": "cc-1",
+                "analysis_id": "cia-1",
+                "reuse_scope": "task_pattern",
+            }))
+
+            updated = writer.load_detail(record.episode_id)
+            self.assertEqual("fb-1", updated["feedback_events"][0]["feedback_id"])
+            self.assertEqual("cia-1", updated["intent_analyses"][0]["analysis_id"])
+            self.assertEqual("cc-1", updated["confirmed_corrections"][0]["correction_id"])
 
 if __name__ == "__main__":
     unittest.main()
+

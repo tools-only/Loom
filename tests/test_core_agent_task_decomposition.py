@@ -96,6 +96,42 @@ class _AgenticHarness(_FakeHarness):
         }
 
 
+class _RepairReviewHarness(_AgenticHarness):
+    def __init__(self, follow_up_tasks):
+        super().__init__()
+        self.follow_up_tasks = follow_up_tasks
+        self.synthesized_artifacts = None
+
+    async def review(self, question, analysis_plan, hand_artifacts, client, model):
+        return {
+            "rubric_coverage": {"Evidence": "partial"},
+            "follow_up_needed": True,
+            "confidence_gaps": ["evidence is too thin"],
+            "follow_up_tasks": self.follow_up_tasks,
+        }
+
+    async def synthesize(
+        self,
+        question,
+        hand_artifacts,
+        workflow_decision,
+        client,
+        model,
+        analysis_plan=None,
+        review_result=None,
+    ):
+        self.synthesized_artifacts = hand_artifacts
+        return await super().synthesize(
+            question,
+            hand_artifacts,
+            workflow_decision,
+            client,
+            model,
+            analysis_plan=analysis_plan,
+            review_result=review_result,
+        )
+
+
 class _ProjectionAwareHarness(_AgenticHarness):
     def __init__(self):
         super().__init__()
@@ -451,6 +487,109 @@ class CoreAgentTaskDecompositionTests(unittest.TestCase):
         asyncio.run(agent.analyze("run by priority", {}))
 
         self.assertEqual(["runtime-high", "runtime-low"], events)
+
+    def test_review_repair_replaces_rejected_task_artifact(self):
+        calls = []
+
+        async def hand_runner(hand_id, task, context):
+            calls.append({"hand_id": hand_id, "task": task, "context": context})
+            if context.get("repair_feedback"):
+                return {
+                    "metadata": {"confidence": 0.86, "key_claims": ["source-backed repair"], "gaps": []},
+                    "narrative": "Repair includes source-backed evidence.",
+                    "sections": [],
+                    "evidence": [],
+                }
+            return {
+                "metadata": {"confidence": 0.42, "key_claims": ["thin claim"], "gaps": ["missing source"]},
+                "narrative": "Initial answer is thin.",
+                "sections": [],
+                "evidence": [],
+            }
+
+        client = _MessageClient(
+            '{"rationale":"one task","tasks":['
+            '{"task_id":"t1","hand_id":"runtime-evidence-agent","executor_id":"brain-inline",'
+            '"dimension":"evidence","task":"Collect evidence",'
+            '"system_prompt":"You are an evidence specialist.",'
+            '"capabilities":[],"rubrics":[],"priority":0,"depends_on":[]}'
+            ']}'
+        )
+        harness = _RepairReviewHarness([
+            {
+                "target_task_id": "t1",
+                "hand_id": "runtime-evidence-agent",
+                "executor_id": "brain-inline",
+                "task": "Redo t1 with cited evidence",
+                "reason": "missing source support",
+            }
+        ])
+        agent = LoomCoreAgent(harness, _FakeDispatcher(), hand_runner, client=client, model="fake")
+
+        result = asyncio.run(agent.analyze("repair weak evidence", {}))
+
+        self.assertEqual(2, len(calls))
+        self.assertIn("REPAIR REQUIRED", calls[1]["task"])
+        self.assertEqual("missing source support", calls[1]["context"]["repair_feedback"])
+        artifact = result["hand_artifacts"]["t1"]
+        meta = artifact["metadata"]
+        self.assertEqual("Repair includes source-backed evidence.", artifact["narrative"])
+        self.assertEqual("accepted_after_review_repair", meta["quality_status"])
+        self.assertEqual("t1", meta["replaces_artifact_key"])
+        self.assertEqual(1, meta["repair_attempt"])
+        self.assertEqual("missing source support", meta["review_repair_reason"])
+        self.assertEqual(1, result["review_result"]["repair_budget"]["attempts_used"])
+        self.assertEqual(0, result["review_result"]["repair_budget"]["remaining"])
+        self.assertEqual("repaired", result["review_result"]["repair_history"][0]["status"])
+        self.assertIs(harness.synthesized_artifacts, result["hand_artifacts"])
+
+    def test_review_repair_budget_zero_skips_follow_up_and_marks_rejection(self):
+        calls = []
+
+        async def hand_runner(hand_id, task, context):
+            calls.append({"hand_id": hand_id, "task": task, "context": context})
+            return {
+                "metadata": {"confidence": 0.35, "key_claims": ["thin claim"], "gaps": ["missing source"]},
+                "narrative": "Initial answer is thin.",
+                "sections": [],
+                "evidence": [],
+            }
+
+        client = _MessageClient(
+            '{"rationale":"one task","tasks":['
+            '{"task_id":"t1","hand_id":"runtime-evidence-agent","executor_id":"brain-inline",'
+            '"dimension":"evidence","task":"Collect evidence",'
+            '"system_prompt":"You are an evidence specialist.",'
+            '"capabilities":[],"rubrics":[],"priority":0,"depends_on":[]}'
+            ']}'
+        )
+        harness = _RepairReviewHarness([
+            {
+                "target_task_id": "t1",
+                "hand_id": "runtime-evidence-agent",
+                "executor_id": "brain-inline",
+                "task": "Redo t1 with cited evidence",
+                "reason": "missing source support",
+            }
+        ])
+        agent = LoomCoreAgent(harness, _FakeDispatcher(), hand_runner, client=client, model="fake")
+
+        result = asyncio.run(agent.analyze(
+            "repair weak evidence",
+            {"quality_gate": {"max_repair_attempts": 0}},
+        ))
+
+        self.assertEqual(1, len(calls))
+        meta = result["hand_artifacts"]["t1"]["metadata"]
+        self.assertEqual("rejected_repair_budget_exceeded", meta["quality_status"])
+        self.assertEqual("missing source support", meta["review_repair_reason"])
+        budget = result["review_result"]["repair_budget"]
+        self.assertEqual(0, budget["max_repair_attempts"])
+        self.assertEqual(0, budget["attempts_used"])
+        self.assertTrue(budget["exceeded"])
+        history = result["review_result"]["repair_history"]
+        self.assertEqual("skipped", history[0]["status"])
+        self.assertTrue(history[0]["budget_exceeded"])
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
-"""DataFlywheel — structured episode record persistence for BrainStateEngine (L5).
+﻿"""DataFlywheel 鈥?structured episode record persistence for BrainStateEngine (L5).
 
 Write-only in P0; FlywheelAnalyzer (read + derive signals) is P4.
 
 Each /analyze call produces one FlywheelRecord written to:
-  brain/flywheel/records.jsonl   — append-only master log
-  brain/flywheel/<episode_id>.json — per-episode detail (for selective reads)
+  brain/flywheel/records.jsonl   鈥?append-only master log
+  brain/flywheel/<episode_id>.json 鈥?per-episode detail (for selective reads)
 """
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ class HumanFeedback:
 
 @dataclass
 class FlywheelRecord:
-    """One entry in the data flywheel — one per /analyze call."""
+    """One entry in the data flywheel 鈥?one per /analyze call."""
     episode_id: str
     goal_id: str
     ts: str
@@ -66,7 +66,9 @@ class FlywheelRecord:
     domain: str
     brain_self_eval: BrainSelfEval
     hand_evaluations: list[HandEval] = field(default_factory=list)
+    hand_artifacts: dict[str, Any] = field(default_factory=dict)
     orchestration_trace: list[PhaseTrace] = field(default_factory=list)
+    orchestration_snapshot: dict[str, Any] = field(default_factory=dict)
     human_feedback: list[HumanFeedback] = field(default_factory=list)
     intent_activation: dict[str, Any] | None = None
     intent_rubric: dict[str, Any] | None = None
@@ -125,6 +127,7 @@ class FlywheelRecord:
             domain=domain,
             brain_self_eval=brain_eval,
             hand_evaluations=hand_evals,
+            hand_artifacts=hand_artifacts or {},
             intent_activation=intent_activation,
             intent_rubric=intent_rubric,
             intent_reward_report=intent_reward_report,
@@ -186,6 +189,33 @@ class FlywheelWriter:
         except Exception:
             return False
 
+    def load_detail(self, episode_id: str) -> dict[str, Any] | None:
+        """Load the full per-episode detail record."""
+        detail_path = self._dir / f"{episode_id}.json"
+        if not detail_path.exists():
+            return None
+        try:
+            data = json.loads(detail_path.read_text("utf-8"))
+            return data if isinstance(data, dict) else None
+        except Exception:
+            return None
+
+    def append_repair_result(self, episode_id: str, repair: dict[str, Any]) -> bool:
+        """Append a Brain-triggered repair attempt to an episode detail file."""
+        return self._append_to_detail_list(episode_id, "repair_history", repair)
+
+    def append_feedback_event(self, episode_id: str, event: dict[str, Any]) -> bool:
+        """Append a scoped raw feedback event to an episode detail file."""
+        return self._append_to_detail_list(episode_id, "feedback_events", event)
+
+    def append_intent_analysis(self, episode_id: str, analysis: dict[str, Any]) -> bool:
+        """Append a contextual intent analysis to an episode detail file."""
+        return self._append_to_detail_list(episode_id, "intent_analyses", analysis)
+
+    def append_confirmed_correction(self, episode_id: str, correction: dict[str, Any]) -> bool:
+        """Append a user-confirmed correction to an episode detail file."""
+        return self._append_to_detail_list(episode_id, "confirmed_corrections", correction)
+
     def read_summary_log(self, limit: int = 100) -> list[dict]:
         if not self._log.exists():
             return []
@@ -198,8 +228,22 @@ class FlywheelWriter:
                 pass
         return out
 
+    def _append_to_detail_list(self, episode_id: str, key: str, item: dict[str, Any]) -> bool:
+        detail_path = self._dir / f"{episode_id}.json"
+        if not detail_path.exists():
+            return False
+        try:
+            data = json.loads(detail_path.read_text("utf-8"))
+            data.setdefault(key, []).append(item)
+            detail_path.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            return True
+        except Exception:
+            return False
 
-# ── helpers ───────────────────────────────────────────────────────────────
+# 鈹€鈹€ helpers
 
 _TIER_A_B = {"fred", "sec-edgar", "finnhub", "yahoo-finance", "cftc-cot", "investing-calendar"}
 _TIER_C = {"reuters-rss", "marketwatch-rss", "cnbc-rss"}
@@ -277,3 +321,6 @@ def _new_episode_id() -> str:
 def _now() -> str:
     import datetime
     return datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z")
+
+
+

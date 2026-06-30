@@ -1,16 +1,16 @@
-/* canvas-client.js — loom-human-ag freeform canvas
+/* canvas-client.js 鈥?loom-human-ag freeform canvas
    Stand-alone; does NOT import or depend on anchor-client.js          */
 'use strict';
 (function () {
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // State
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 var state = {
-  cards:       new Map(),    // anchor_id → { el, contentEl, x, y, w, h, rot, scale, z, localMoved }
+  cards:       new Map(),    // anchor_id 鈫?{ el, contentEl, x, y, w, h, rot, scale, z, localMoved }
   viewport:    { x: 0, y: 0, zoom: 1 },
   selected:    new Set(),    // anchor_ids currently selected
-  connections: new Map(),    // connId → { id, fromId, toId }
+  connections: new Map(),    // connId 鈫?{ id, fromId, toId }
 };
 
 var CANVAS_W = 3000;
@@ -24,25 +24,25 @@ var snapBtnEl, connectBtnEl, exportBtnEl;
 var _activeSuggestion = null;
 var _syncTimer = null;
 
-// ── Undo/redo ────────────────────────────────────────────────────────
+// 鈹€鈹€ Undo/redo 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 var _undoStack = [];
 var _redoStack = [];
 var _dragStartSnap = null;
 
-// ── Direct edit mode ────────────────────────────────────────────────
+// 鈹€鈹€ Direct edit mode 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 var _editingId   = null;
 var EDITABLE_SEL = 'h1,h2,h3,h4,h5,h6,p,li,td,th,.kpi-value,.kpi-label,.kpi-label-top,.kpi-unit';
 
-// ── Connect mode ────────────────────────────────────────────────────
+// 鈹€鈹€ Connect mode 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 var _connectMode = false;
 var _connectFrom = null;   // anchor_id of the "from" card
 
-// ── Snap ────────────────────────────────────────────────────────────
+// 鈹€鈹€ Snap 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 var _snapEnabled = true;
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Boot
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 document.addEventListener('DOMContentLoaded', function () {
   stage       = document.getElementById('canvas-stage');
   viewport    = document.getElementById('canvas-viewport');
@@ -77,9 +77,9 @@ document.addEventListener('DOMContentLoaded', function () {
   }, true);
 });
 
-// ─────────────────────────────────────────────────────────────────────
-// Viewport — pan (space-drag or middle-drag) + wheel zoom
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// Viewport 鈥?pan (space-drag or middle-drag) + wheel zoom
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function initViewport() {
   var isPanning = false;
   var panStart  = null;
@@ -89,7 +89,7 @@ function initViewport() {
   document.addEventListener('keydown', function (e) {
     var inInput = document.activeElement === promptInput;
 
-    // Edit mode — only Escape passes through; everything else is for the text editor
+    // Edit mode 鈥?only Escape passes through; everything else is for the text editor
     if (_editingId) {
       if (e.key === 'Escape') { e.preventDefault(); exitEditMode(); }
       return;
@@ -140,7 +140,7 @@ function initViewport() {
       e.preventDefault();
       return;
     }
-    // Click on empty canvas → clear selection + start marquee
+    // Click on empty canvas 鈫?clear selection + start marquee
     if (e.target === viewport || e.target === stage) {
       clearSelection();
       var vr = viewport.getBoundingClientRect();
@@ -174,7 +174,7 @@ function initViewport() {
     isPanning = false;
   });
 
-  // ── Touch: 1-finger pan, 2-finger pinch-zoom ───────────────────
+  // 鈹€鈹€ Touch: 1-finger pan, 2-finger pinch-zoom 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   var _lastPinchDist = null;
 
   viewport.addEventListener('touchstart', function (e) {
@@ -262,7 +262,7 @@ function updateMarqueeEl(m) {
 function finishMarquee(m) {
   var w = Math.abs(m.endX - m.startX);
   var h = Math.abs(m.endY - m.startY);
-  if (w < 5 && h < 5) return; // was a click, not a drag — selection cleared in mousedown
+  if (w < 5 && h < 5) return; // was a click, not a drag 鈥?selection cleared in mousedown
   var vr = viewport.getBoundingClientRect();
   var mx1 = Math.min(m.startX, m.endX) + vr.left;
   var my1 = Math.min(m.startY, m.endY) + vr.top;
@@ -276,9 +276,9 @@ function finishMarquee(m) {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Card rendering — parse agent HTML → positioned cards
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// Card rendering 鈥?parse agent HTML 鈫?positioned cards
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function renderFromHtml(html) {
   var tmp = document.createElement('div');
   tmp.innerHTML = html;
@@ -369,9 +369,9 @@ function addCard(id, outerHtml, x, y, w, h, rot, scale, z) {
   return entry;
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Handles DOM
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function buildHandles(id) {
   var h = document.createElement('div');
   h.className = 'card-handles';
@@ -389,9 +389,9 @@ function buildHandles(id) {
   return h;
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Drag state
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 var _drag = null;
 
 function bindCardEvents(id, host, entry) {
@@ -400,14 +400,14 @@ function bindCardEvents(id, host, entry) {
     clearSelection();
     selectCard(id);
   });
-  // Double-click → enter direct edit mode
+  // Double-click 鈫?enter direct edit mode
   host.addEventListener('dblclick', function (e) {
     if (e.target.closest('.card-handles')) return;
     e.stopPropagation();
     enterEditMode(id);
   });
 
-  // Card body → select + move (or connect in connect mode)
+  // Card body 鈫?select + move (or connect in connect mode)
   host.addEventListener('mousedown', function (e) {
     if (e.target.closest('.card-handles')) return;
     e.stopPropagation();
@@ -559,9 +559,9 @@ function updateCardTransform(entry) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Selection
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function selectCard(id) {
   state.selected.add(id);
   var e = state.cards.get(id);
@@ -597,9 +597,9 @@ function deleteSelected() {
   scheduleSync();
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// Layout suggestion — ghost preview + Accept / Reject
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// Layout suggestion 鈥?ghost preview + Accept / Reject
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function showLayoutSuggestion(payload) {
   if (_activeSuggestion) dismissLayoutSuggestion();
   _activeSuggestion = payload;
@@ -619,7 +619,7 @@ function showLayoutSuggestion(payload) {
   });
 
   if (suggBarEl) {
-    if (suggLabelEl) suggLabelEl.textContent = 'AI 建议重排 ' + payload.moves.length + ' 张卡片';
+    if (suggLabelEl) suggLabelEl.textContent = 'AI layout suggestion for ' + payload.moves.length + ' cards';
     suggBarEl.classList.remove('hidden');
   }
 }
@@ -660,9 +660,9 @@ function rejectLayoutSuggestion() {
   dismissLayoutSuggestion();
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Patch apply (incoming from agent via WS)
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function applyPatches(patches) {
   patches.forEach(function (p) {
     var entry = state.cards.get(p.anchor_id);
@@ -723,20 +723,30 @@ function applyPatches(patches) {
 function submitCardFeedback(anchorId, signal, comment) {
   var entry = state.cards.get(anchorId);
   if (!entry || !entry.el.dataset.episodeId) return;
-  fetch('http://localhost:3002/flywheel/feedback', {
+  var object_ref = entry.el.getAttribute('data-object-ref') || entry.el.getAttribute('data-orchestration-ref') || ('artifact:' + anchorId);
+  fetch('http://localhost:3002/feedback', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       episode_id: entry.el.dataset.episodeId,
+      raw_signal: signal || 'thumbs_up',
       signal: signal || 'thumbs_up',
-      comment: comment || ''
+      comment: comment || '',
+      object_ref: object_ref,
+      object_type: object_ref.split(':')[0] || 'artifact',
+      orchestration_ref: object_ref,
+      ui_scope: {
+        anchor_id: anchorId,
+        object_ref: object_ref,
+        selection: ''
+      }
     })
   }).catch(function() {});
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // WebSocket
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function initWS() {
   var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   try {
@@ -752,7 +762,7 @@ function initWS() {
   };
 
   ws.onclose = function () {
-    setStatus('Reconnecting…');
+    setStatus('Reconnecting...');
     setTimeout(initWS, 3000);
   };
 
@@ -769,7 +779,7 @@ function initWS() {
 
     } else if (msg.type === 'layout_suggest') {
       showLayoutSuggestion(msg);
-      setStatus('建议重排…', 'thinking');
+      setStatus('Suggesting layout...', 'thinking');
 
     } else if (msg.type === 'suggestion_accepted') {
       // Already applied locally; this echo from server is a no-op
@@ -796,7 +806,7 @@ function initWS() {
 function handleAgentEvent(msg) {
   var t = msg.event_type || msg.type;
   if (t === 'thinking') {
-    setStatus((msg.payload && msg.payload.summary) || 'Thinking…', 'thinking');
+    setStatus((msg.payload && msg.payload.summary) || 'Thinking...', 'thinking');
   } else if (t === 'complete') {
     setStatus('Done', 'live');
   } else if (t === 'error') {
@@ -804,9 +814,9 @@ function handleAgentEvent(msg) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Prompt UI
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function initPromptUI() {
   var btn = document.getElementById('canvas-prompt-send');
   btn.addEventListener('click', handleSend);
@@ -822,7 +832,7 @@ function handleSend() {
   promptInput.value = '';
   var op = state.cards.size > 0 ? 'refine' : 'initial_render';
   sendEnvelope(instruction, op);
-  setStatus('Sending…');
+  setStatus('Sending...');
 }
 
 function sendEnvelope(instruction, op) {
@@ -925,9 +935,9 @@ function buildSelectedSubtrees() {
   return out;
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Persistence
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function serializeConnections() {
   var arr = [];
   state.connections.forEach(function (c) { arr.push({ id: c.id, fromId: c.fromId, toId: c.toId }); });
@@ -992,12 +1002,12 @@ function loadSavedCanvas() {
     .catch(function () {});
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Helpers
-// ─────────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Direct card editing (double-click)
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function enterEditMode(id) {
   if (_editingId === id) return;
   if (_editingId) exitEditMode();
@@ -1061,9 +1071,9 @@ function exitEditMode() {
   scheduleSync();
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Snap-to-grid
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function snap(v) {
   var s = Math.round(v / SNAP_GRID) * SNAP_GRID;
   return Math.abs(v - s) < SNAP_THR ? s : v;
@@ -1074,9 +1084,9 @@ function toggleSnap() {
   if (snapBtnEl) snapBtnEl.classList.toggle('active', _snapEnabled);
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Undo / redo
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function snapshotCards() {
   var snap = [];
   state.cards.forEach(function (entry, id) {
@@ -1140,9 +1150,9 @@ function redo() {
   setStatus('Redo');
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Duplicate (Ctrl+D)
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function duplicateSelected() {
   if (state.selected.size === 0) return;
   pushUndo();
@@ -1163,9 +1173,9 @@ function duplicateSelected() {
   scheduleSync();
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Connector arrows (SVG overlay)
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function toggleConnectMode() {
   _connectMode = !_connectMode;
   _connectFrom = null;
@@ -1262,12 +1272,12 @@ function renderConnections() {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Export PNG
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function exportPNG() {
-  if (!window.html2canvas) { setStatus('导出库加载中，请稍后重试'); return; }
-  if (state.cards.size === 0) { setStatus('画布为空'); return; }
+  if (!window.html2canvas) { setStatus('瀵煎嚭搴撳姞杞戒腑锛岃绋嶅悗閲嶈瘯'); return; }
+  if (state.cards.size === 0) { setStatus('鐢诲竷涓虹┖'); return; }
 
   var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   state.cards.forEach(function (entry) {
@@ -1289,7 +1299,7 @@ function exportPNG() {
   state.viewport.x = 0; state.viewport.y = 0; state.viewport.zoom = 1;
   applyViewportTransform();
 
-  setStatus('导出中…', 'thinking');
+  setStatus('Exporting...', 'thinking');
 
   setTimeout(function () {
     window.html2canvas(stage, {
@@ -1310,11 +1320,11 @@ function exportPNG() {
       a.download = 'canvas-' + new Date().toISOString().slice(0, 10) + '.png';
       a.href = canvas.toDataURL('image/png');
       a.click();
-      setStatus('已导出', 'live');
+      setStatus('Exported', 'live');
     }).catch(function () {
       state.viewport.x = svx; state.viewport.y = svy; state.viewport.zoom = svz;
       applyViewportTransform();
-      setStatus('导出失败');
+      setStatus('Export failed');
     });
   }, 60);
 }
@@ -1332,7 +1342,7 @@ function updateSelectionUI() {
   var n = state.selected.size;
   if (selBadgeEl) {
     if (n > 0) {
-      selBadgeEl.textContent = n + ' 卡片已选中';
+      selBadgeEl.textContent = n + ' cards selected';
       selBadgeEl.classList.add('visible');
     } else {
       selBadgeEl.classList.remove('visible');
@@ -1340,8 +1350,8 @@ function updateSelectionUI() {
   }
   if (promptInput) {
     promptInput.placeholder = n > 0
-      ? '对选中的 ' + n + ' 张卡片发出指令…'
-      : '描述你想在画布上生成的内容…';
+      ? 'Send instruction to ' + n + ' selected cards...'
+      : 'Describe what to generate on the canvas...';
   }
 }
 
@@ -1352,3 +1362,4 @@ function setStatus(text, kind) {
 }
 
 })();
+
