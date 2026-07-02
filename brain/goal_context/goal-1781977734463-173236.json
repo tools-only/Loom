@@ -1,0 +1,24 @@
+{
+  "goal_id": "goal-1781977734463-173236",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-20T17:48:54.463974Z",
+  "updated_at": "2026-06-20T17:49:30.358220Z",
+  "status": "open",
+  "title": "hello",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1781977770356-8b54470b",
+      "ts": "2026-06-20T17:49:30.356223Z",
+      "stance": "n/a",
+      "confidence": 0.0,
+      "key_drivers": [],
+      "reversal_condition": "用户提供具体投研问题或方向后重新评估"
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1781977770356-8b54470b"
+  ]
+}

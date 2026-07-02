@@ -1,0 +1,78 @@
+/* ─────────────────────────────────────────────────────
+   Layout Tool — Drag, resize handles, select+delete
+   ───────────────────────────────────────────────────── */
+
+/* ── Grab cursor on canvas ──────────────── */
+.layout-canvas {
+  cursor: default;
+}
+
+/* ── Dragging ───────────────────────────── */
+.anc-dragging {
+  z-index: 500 !important;
+  box-shadow: 0 16px 48px -16px rgba(122, 90, 248, 0.35) !important;
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+body.layout-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Selection ──────────────────────────── */
+.layout-selected {
+  outline: 2px solid var(--accent-iris, #7A5AF8);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── User-positioned ────────────────────── */
+.anc-user-positioned {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), inset 3px 0 0 rgba(122, 90, 248, 0.35) !important;
+}
+
+/* ── Resize handles ─────────────────────── */
+#layout-resize-handles {
+  display: none;
+  position: fixed;
+  pointer-events: none;
+  z-index: 1997;
+}
+#layout-resize-handles > .layout-rsz {
+  position: absolute;
+  pointer-events: auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #fff;
+  border: 2px solid var(--accent-iris, #7A5AF8);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  transition: transform 0.1s;
+}
+#layout-resize-handles > .layout-rsz:hover {
+  transform: scale(1.5);
+}
+
+.layout-rsz-n,  .layout-rsz-s  { cursor: ns-resize; }
+.layout-rsz-e,  .layout-rsz-w  { cursor: ew-resize; }
+.layout-rsz-ne, .layout-rsz-sw { cursor: nesw-resize; }
+.layout-rsz-nw, .layout-rsz-se { cursor: nwse-resize; }
+
+/* ── Snap indicator ─────────────────────── */
+#layout-snap-indicator {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3000;
+  padding: 6px 16px;
+  border-radius: var(--r-pill);
+  background: rgba(20, 21, 43, 0.82);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}

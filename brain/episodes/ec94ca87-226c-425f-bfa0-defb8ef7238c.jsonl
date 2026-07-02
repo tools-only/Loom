@@ -1,0 +1,6 @@
+{"ts": 1781443458.31213, "type": "episode.start", "episode_id": "ec94ca87-226c-425f-bfa0-defb8ef7238c", "context_keys": ["domain_hint", "goal_id"]}
+{"ts": 1781443458.31781, "type": "phase.start", "episode_id": "ec94ca87-226c-425f-bfa0-defb8ef7238c", "phase": "plan"}
+{"ts": 1781443458.318315, "type": "state.transition", "episode_id": "ec94ca87-226c-425f-bfa0-defb8ef7238c", "from": "Planning", "to": "Planning"}
+{"ts": 1781443458.318315, "type": "projection-binding", "episode_id": "ec94ca87-226c-425f-bfa0-defb8ef7238c", "fn": "plan", "state_version": 0, "schema_version": "1.0", "content_id": "sha256:11f747b0e506506b"}
+{"ts": 1781443458.319363, "type": "episode.error", "episode_id": "ec94ca87-226c-425f-bfa0-defb8ef7238c", "message": "\"Could not resolve authentication method. Expected either api_key or auth_token to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted\""}
+{"ts": 1781443458.3198783, "type": "state.transition", "episode_id": "ec94ca87-226c-425f-bfa0-defb8ef7238c", "from": "Planning", "to": "Failed", "message": "\"Could not resolve authentication method. Expected either api_key or auth_token to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted\""}

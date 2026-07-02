@@ -1,0 +1,726 @@
+{
+  "episode_id": "ep-1782823928105-d69fd123",
+  "goal_id": "goal-1782823422534-0dc2aa",
+  "ts": "2026-06-30T12:52:08.105795Z",
+  "question": "\\market 今日美股市场盘前简报",
+  "domain": "general",
+  "brain_self_eval": {
+    "episode_id": "ep-1782823928105-d69fd123",
+    "confidence": 0.0,
+    "stance": "n/a",
+    "key_driver_count": 0,
+    "has_reversal_condition": false,
+    "cold_start": false,
+    "hand_count": 1,
+    "overall_quality": 0.61
+  },
+  "hand_evaluations": [
+    {
+      "hand_id": "t0",
+      "artifact_present": true,
+      "claim_count": 5,
+      "gap_count": 3,
+      "source_tier": "unknown"
+    }
+  ],
+  "hand_artifacts": {
+    "t0": {
+      "hand_id": "brain-inline",
+      "domain": "general",
+      "generated_at": "2026-06-30T09:00:00Z",
+      "rubric_coverage": [
+        "盘前市场快照",
+        "宏观驱动与风险事件",
+        "市场情绪与波动率",
+        "行业与个股催化"
+      ],
+      "narrative": "2026年6月30日美股盘前：所有实时金融数据源（Yahoo Finance, FRED, CBOE, Finnhub, Investing.com, CNBC, MarketWatch）均被网络访问权限阻止。本快照无法提供实时指数期货、大宗商品、国债收益率、VIX及盘前异动个股数据。L0层raw_items包含12个待填充数据点，每个已标注预期来源URL和当前missing状态。L1-L3层提供了完整的分析框架和证据模板。建议用户在Claude Code设置中授权Bash(curl)/WebFetch/WebSearch工具的网络访问权限后重新运行本分析。",
+      "metadata": {
+        "key_claims": [
+          {
+            "claim": "美股三大指数期货（标普500 ES=F、纳指100 NQ=F、道指YM=F）盘前数据待获取",
+            "rubric": "盘前市场快照",
+            "confidence": 0.1,
+            "reversal_condition": "授权网络访问后通过Yahoo Finance/Investing.com获取实时数据"
+          },
+          {
+            "claim": "WTI原油CL=F、黄金GC=F、10Y美债收益率^TNX、美元指数DX-Y.NYB数据待获取",
+            "rubric": "盘前市场快照",
+            "confidence": 0.1,
+            "reversal_condition": "授权后获取商品交易所和ICE实时报价"
+          },
+          {
+            "claim": "盘前涨跌幅超±3%的个股列表及驱动原因待获取",
+            "rubric": "行业与个股催化",
+            "confidence": 0.1,
+            "reversal_condition": "授权后获取MarketWatch/Benzinga盘前扫描数据"
+          },
+          {
+            "claim": "6月30日为2026年Q2季度末，存在机构窗口粉饰效应和季度末流动性再平衡风险",
+            "rubric": "宏观驱动与风险事件",
+            "confidence": 0.7,
+            "reversal_condition": "观察收盘前后的机构调仓行为和成交量异常"
+          },
+          {
+            "claim": "当前无法获取VIX、Put/Call比率、涨跌家数比、ETF资金流向等情绪指标",
+            "rubric": "市场情绪与波动率",
+            "confidence": 0.1,
+            "reversal_condition": "授权后获取CBOE/Yahoo Finance/ETF.com数据"
+          }
+        ],
+        "confidence": 0.15,
+        "gaps": [
+          {
+            "level": "L0",
+            "severity": "critical",
+            "description": "所有实时金融数据源无法访问——Yahoo Finance API, FRED API, CBOE, Finnhub, Investing.com, MarketWatch, CNBC, Reuters均被网络访问权限阻止",
+            "affected_rubrics": [
+              "盘前市场快照",
+              "宏观驱动与风险事件",
+              "市场情绪与波动率",
+              "行业与个股催化"
+            ],
+            "remediation": "用户需在Claude Code权限设置中授权Bash(curl)/WebFetch/WebSearch工具的网络访问"
+          },
+          {
+            "level": "L1",
+            "severity": "high",
+            "description": "Brain资源连接器（resource_library.json中注册的fred, yahoo-finance, finnhub, marketwatch-rss等14个连接器）无法通过localhost:3002确认API可用性",
+            "affected_rubrics": [
+              "盘前市场快照"
+            ],
+            "remediation": "确认Brain服务(port 3002)在运行，授权localhost访问"
+          },
+          {
+            "level": "L3",
+            "severity": "high",
+            "description": "L0层raw_items全部12个数据点的value为null，无法支撑L1-L3层分析",
+            "affected_rubrics": [
+              "盘前市场快照",
+              "宏观驱动与风险事件",
+              "市场情绪与波动率",
+              "行业与个股催化"
+            ],
+            "remediation": "解决网络访问权限后重新运行本分析"
+          }
+        ],
+        "hand_id": "hand-market-data",
+        "executor_id": "brain-inline",
+        "task_id": "t0",
+        "quality_status": "rejected_repair_budget_exceeded",
+        "review_repair_reason": "行业与个股催化 rubric 缺失",
+        "repair_attempt": 2,
+        "replaces_artifact_key": "t0"
+      }
+    }
+  },
+  "orchestration_trace": [],
+  "orchestration_snapshot": {
+    "episode_id": "ep-1782823928105-d69fd123",
+    "goal": "\\market 今日美股市场盘前简报",
+    "domain": "general",
+    "workflow_mode": "state_driven",
+    "rationale": "LLM domain classification",
+    "nodes": [
+      {
+        "id": "brain",
+        "type": "brain",
+        "label": "Brain"
+      },
+      {
+        "id": "task:t0",
+        "type": "task",
+        "label": "Brain-generated fallback dimension",
+        "task": "\\market 今日美股市场盘前简报",
+        "depends_on": []
+      },
+      {
+        "id": "hand:runtime-inline-0",
+        "type": "hand",
+        "label": "runtime-inline-0",
+        "executor_id": "brain-inline"
+      },
+      {
+        "id": "artifact:t0",
+        "type": "artifact",
+        "label": "Artifact t0",
+        "confidence": 0.15,
+        "gap_count": 3,
+        "claim_count": 5
+      },
+      {
+        "id": "review",
+        "type": "review",
+        "label": "Review gaps"
+      }
+    ],
+    "edges": [
+      {
+        "from": "brain",
+        "to": "task:t0",
+        "reason": "task decomposition"
+      },
+      {
+        "from": "task:t0",
+        "to": "hand:runtime-inline-0",
+        "reason": "hand routing",
+        "executor_id": "brain-inline"
+      },
+      {
+        "from": "hand:runtime-inline-0",
+        "to": "artifact:t0",
+        "reason": "returned artifact"
+      },
+      {
+        "from": "brain",
+        "to": "review",
+        "reason": "quality review"
+      }
+    ],
+    "profiles": {
+      "runtime-inline-0": {
+        "agent_id": "runtime-inline-0",
+        "adapter_id": "brain-inline",
+        "capabilities": [],
+        "status": "selected",
+        "base_model": "unknown",
+        "tools": [],
+        "mcp_servers": [],
+        "skills": []
+      }
+    },
+    "diagnostics": [
+      {
+        "type": "artifact_gap",
+        "object_ref": "artifact:t0",
+        "message": "{'level': 'L0', 'severity': 'critical', 'description': '所有实时金融数据源无法访问——Yahoo Finance API, FRED API, CBOE, Finnhub, Investing.com, MarketWatch, CNBC, Reuters均被网络访问权限阻止', 'affected_rubrics': ['盘前市场快照', '宏观驱动与风险事件', '市场情绪与波动率', '行业与个股催化'], 'remediation': '用户需在Claude Code权限设置中授权Bash(curl)/WebFetch/WebSearch工具的网络访问'}"
+      },
+      {
+        "type": "artifact_gap",
+        "object_ref": "artifact:t0",
+        "message": "{'level': 'L1', 'severity': 'high', 'description': 'Brain资源连接器（resource_library.json中注册的fred, yahoo-finance, finnhub, marketwatch-rss等14个连接器）无法通过localhost:3002确认API可用性', 'affected_rubrics': ['盘前市场快照'], 'remediation': '确认Brain服务(port 3002)在运行，授权localhost访问'}"
+      },
+      {
+        "type": "artifact_gap",
+        "object_ref": "artifact:t0",
+        "message": "{'level': 'L3', 'severity': 'high', 'description': 'L0层raw_items全部12个数据点的value为null，无法支撑L1-L3层分析', 'affected_rubrics': ['盘前市场快照', '宏观驱动与风险事件', '市场情绪与波动率', '行业与个股催化'], 'remediation': '解决网络访问权限后重新运行本分析'}"
+      },
+      {
+        "type": "review_gap",
+        "object_ref": "review",
+        "message": "缺乏实时指数期货、大宗商品、美债收益率、美元指数数据"
+      },
+      {
+        "type": "review_gap",
+        "object_ref": "review",
+        "message": "缺乏今日经济数据发布日历、美联储官员讲话安排"
+      },
+      {
+        "type": "review_gap",
+        "object_ref": "review",
+        "message": "缺乏VIX、Put/Call、涨跌家数等市场情绪指标"
+      },
+      {
+        "type": "review_gap",
+        "object_ref": "review",
+        "message": "缺乏盘前异动个股及行业催化新闻"
+      }
+    ]
+  },
+  "human_feedback": [],
+  "intent_activation": {
+    "ts": "2026-06-30T20:51:31.480903",
+    "run_id": "run_20260630205131480903",
+    "question": "\\market 今日美股市场盘前简报",
+    "domain": "general",
+    "active_intents": [
+      {
+        "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
+        "zone": "content_requirements",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.67,
+        "reason": "repeated evidence; high confidence; keyword match: market; fresh context needed",
+        "confidence": 0.95,
+        "evidence_count": 20
+      },
+      {
+        "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件",
+        "zone": "risk_sensitivity",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.67,
+        "reason": "repeated evidence; high confidence; keyword match: market; fresh context needed",
+        "confidence": 0.95,
+        "evidence_count": 20
+      },
+      {
+        "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+        "zone": "content_requirements",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件等等",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.57,
+        "reason": "repeated evidence; keyword match: market; fresh context needed",
+        "confidence": 0.51,
+        "evidence_count": 2
+      },
+      {
+        "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+        "zone": "risk_sensitivity",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件等等",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.57,
+        "reason": "repeated evidence; keyword match: market; fresh context needed",
+        "confidence": 0.51,
+        "evidence_count": 2
+      },
+      {
+        "intent_id": "content_requirements.market_今日美股市场盘前预测简报_宏观信号_板块轮动_风险事件",
+        "zone": "content_requirements",
+        "label": "\\market 今日美股市场盘前预测简报：宏观信号、板块轮动、风险事件",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.47,
+        "reason": "keyword match: market; fresh context needed",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.market_今日美股市场盘前预测简报_宏观信号_板块轮动_风险事件",
+        "zone": "risk_sensitivity",
+        "label": "\\market 今日美股市场盘前预测简报：宏观信号、板块轮动、风险事件",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.47,
+        "reason": "keyword match: market; fresh context needed",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "content_requirements.brain_今日美股市场前瞻简报_宏观信号_板块轮动_风险事件",
+        "zone": "content_requirements",
+        "label": "\\brain 今日美股市场前瞻简报：宏观信号、板块轮动、风险事件",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.35,
+        "reason": "fresh context needed",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "content_requirements.呈现今日盘前最重要的几条新闻_然后划分到市场各个板块_详细阐述每个板块的大体判断",
+        "zone": "content_requirements",
+        "label": "呈现今日盘前最重要的几条新闻，然后划分到市场各个板块，详细阐述每个板块的大体判断",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.35,
+        "reason": "fresh context needed",
+        "confidence": 0.43,
+        "evidence_count": 1
+      }
+    ],
+    "inactive_intents": [
+      {
+        "intent_id": "risk_sensitivity.broaden_macro_geopolitical_context_as_a_top_down",
+        "zone": "risk_sensitivity",
+        "label": "Broaden macro-geopolitical context as a top-down overlay on US equity market out",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.22,
+        "reason": "keyword match: market",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_clarify",
+        "zone": "object_behavior",
+        "label": "User often intends to clarify",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.2,
+        "reason": "repeated evidence",
+        "confidence": 0.51,
+        "evidence_count": 2
+      },
+      {
+        "intent_id": "content_requirements.forward_looking_probabilistic_forecasting_with_team_form_and",
+        "zone": "content_requirements",
+        "label": "forward-looking probabilistic forecasting with team-form and matchup reasoning",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_anticipate",
+        "zone": "object_behavior",
+        "label": "User often intends to anticipate",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_compare",
+        "zone": "object_behavior",
+        "label": "User often intends to compare",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_decide",
+        "zone": "object_behavior",
+        "label": "User often intends to decide",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_monitor",
+        "zone": "object_behavior",
+        "label": "User often intends to monitor",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_predict",
+        "zone": "object_behavior",
+        "label": "User often intends to predict",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.broaden_from_headline_ai_names_into_upstream_and",
+        "zone": "risk_sensitivity",
+        "label": "Broaden from headline AI names into upstream and adjacent supply chain component",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.broaden_macro_context_by_layering_geopolitical_risk_assessment",
+        "zone": "risk_sensitivity",
+        "label": "Broaden macro context by layering geopolitical risk assessment onto near-term US",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "source_preferences.async_test",
+        "zone": "source_preferences",
+        "label": "async_test",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "source_preferences.test",
+        "zone": "source_preferences",
+        "label": "test",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "workflow_preferences.respect_object_scoped_intent_for_initial_render",
+        "zone": "workflow_preferences",
+        "label": "Respect object-scoped intent for initial_render",
+        "principle": "Use the target object and operation as part of task interpretation, not merely the user's text.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      }
+    ]
+  },
+  "intent_rubric": {
+    "ts": "2026-06-30T20:51:31.483379",
+    "rubric_id": "rubric_20260630205131483379",
+    "domain": "general",
+    "question": "\\market 今日美股市场盘前简报",
+    "criteria": [
+      {
+        "criterion_id": "rubric.satisfy_content_requirements",
+        "label": "Satisfy active content requirements",
+        "weight": 0.95,
+        "score": 1.07,
+        "reward_targets": [
+          "intent_coverage",
+          "relevance"
+        ],
+        "matched_zones": [
+          "content_requirements"
+        ],
+        "source_policy_id": "policy.satisfy_content_requirements",
+        "source_intent_ids": [
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+          "content_requirements.market_今日美股市场盘前预测简报_宏观信号_板块轮动_风险事件",
+          "content_requirements.brain_今日美股市场前瞻简报_宏观信号_板块轮动_风险事件",
+          "content_requirements.呈现今日盘前最重要的几条新闻_然后划分到市场各个板块_详细阐述每个板块的大体判断"
+        ],
+        "checks": [
+          "Evaluate whether the result translate active content intents into explicit output requirements.",
+          "Evaluate whether the result add or revise sections so the generated page visibly satisfies the requirement."
+        ]
+      },
+      {
+        "criterion_id": "rubric.retrieve_or_surface_fresh_context",
+        "label": "Retrieve or surface fresh context when required",
+        "weight": 0.766,
+        "score": 0.89,
+        "reward_targets": [
+          "freshness",
+          "decision_usefulness"
+        ],
+        "matched_zones": [
+          "content_requirements"
+        ],
+        "source_policy_id": "policy.retrieve_or_surface_fresh_context",
+        "source_intent_ids": [
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+          "content_requirements.market_今日美股市场盘前预测简报_宏观信号_板块轮动_风险事件",
+          "content_requirements.brain_今日美股市场前瞻简报_宏观信号_板块轮动_风险事件",
+          "content_requirements.呈现今日盘前最重要的几条新闻_然后划分到市场各个板块_详细阐述每个板块的大体判断"
+        ],
+        "checks": [
+          "Evaluate whether the result identify whether the active intent requires recent context.",
+          "Evaluate whether the result ask relevant hands/tools for fresh context or mark freshness gaps explicitly."
+        ]
+      },
+      {
+        "criterion_id": "rubric.add_risk_and_reversal_checks",
+        "label": "Add risk and reversal checks",
+        "weight": 0.634,
+        "score": 0.75,
+        "reward_targets": [
+          "risk_coverage",
+          "decision_usefulness"
+        ],
+        "matched_zones": [
+          "risk_sensitivity"
+        ],
+        "source_policy_id": "policy.add_risk_and_reversal_checks",
+        "source_intent_ids": [
+          "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件",
+          "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+          "risk_sensitivity.market_今日美股市场盘前预测简报_宏观信号_板块轮动_风险事件"
+        ],
+        "checks": [
+          "Evaluate whether the result include counterarguments, uncertainty, downside triggers, or reversal conditions.",
+          "Evaluate whether the result avoid generic risks; tie each risk to the current object or decision."
+        ]
+      },
+      {
+        "criterion_id": "rubric.resource_source_fit",
+        "label": "Use relevant captured resources at the right confidence level",
+        "weight": 0.16,
+        "score": 0.7,
+        "reward_targets": [
+          "source_fit",
+          "freshness"
+        ],
+        "matched_zones": [
+          "source_preferences"
+        ],
+        "source_policy_id": "",
+        "source_intent_ids": [],
+        "source_refs": [
+          {
+            "type": "resource",
+            "id": "channel_external_async_test",
+            "title": "async_test",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_unittest",
+            "title": "unittest",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_empty",
+            "title": "empty",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_test",
+            "title": "test",
+            "tier": "F",
+            "url": ""
+          }
+        ],
+        "checks": [
+          "Evaluate whether the result uses relevant captured resources without treating weak social signals as verified facts.",
+          "Evaluate whether source tier, freshness, and provenance are visible when they matter to the decision."
+        ]
+      }
+    ],
+    "suppressed_policies": [
+      {
+        "policy_id": "policy.preserve_user_style",
+        "label": "Preserve user style and granularity",
+        "actions": [
+          "match the user's preferred density, language, and structure",
+          "prefer reusable formatting choices that have received positive reward"
+        ],
+        "reward_targets": [
+          "style_fit",
+          "relevance"
+        ],
+        "score": 0.48,
+        "matched_zones": [],
+        "weight": 0.48,
+        "reason": "no matching active intent zone"
+      },
+      {
+        "policy_id": "policy.respect_object_scoped_operations",
+        "label": "Respect object-scoped user behavior",
+        "actions": [
+          "ground the task in the target anchor/card/object before interpreting the instruction",
+          "avoid applying local edits globally unless the user asks for global changes"
+        ],
+        "reward_targets": [
+          "intent_coverage",
+          "relevance"
+        ],
+        "score": 0.91,
+        "matched_zones": [],
+        "weight": 0.905,
+        "reason": "no matching active intent zone"
+      }
+    ],
+    "resource_context": {
+      "version": 1,
+      "domain": "general",
+      "query_terms": [
+        "general",
+        "market",
+        "今日美股市场盘前简报"
+      ],
+      "resources": [
+        {
+          "resource_id": "channel_external_async_test",
+          "domain": "general",
+          "kind": "note",
+          "title": "async_test",
+          "url": "",
+          "tags": [],
+          "source_platform": "external",
+          "source_author": "async_test",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "async_test"
+          }
+        },
+        {
+          "resource_id": "channel_external_unittest",
+          "domain": "general",
+          "kind": "note",
+          "title": "unittest",
+          "url": "",
+          "tags": [
+            "test"
+          ],
+          "source_platform": "external",
+          "source_author": "unittest",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "unittest"
+          }
+        },
+        {
+          "resource_id": "channel_external_empty",
+          "domain": "general",
+          "kind": "note",
+          "title": "empty",
+          "url": "",
+          "tags": [],
+          "source_platform": "external",
+          "source_author": "empty",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "empty"
+          }
+        },
+        {
+          "resource_id": "channel_external_test",
+          "domain": "general",
+          "kind": "note",
+          "title": "test",
+          "url": "",
+          "tags": [
+            "test"
+          ],
+          "source_platform": "external",
+          "source_author": "test",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "test"
+          }
+        }
+      ],
+      "strategy_primitives": []
+    }
+  },
+  "intent_reward_report": {
+    "ts": "2026-06-30T20:52:08.101667",
+    "episode_id": "ep_20260630205208101667",
+    "plan_id": "rubric_20260630205131483379",
+    "overall_reward": 0.61,
+    "evaluator_scores": {
+      "intent_coverage": 0.906,
+      "relevance": 0.545,
+      "freshness": 0.82,
+      "risk_coverage": 0.57,
+      "decision_usefulness": 0.49,
+      "style_fit": 0.55,
+      "source_fit": 0.4,
+      "framework_fit": 0.6
+    },
+    "policy_rewards": {
+      "policy.satisfy_content_requirements": 0.726,
+      "policy.retrieve_or_surface_fresh_context": 0.655,
+      "policy.add_risk_and_reversal_checks": 0.53,
+      "rubric.resource_source_fit": 0.61
+    },
+    "intent_rewards": {
+      "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件": 0.906,
+      "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件": 0.57,
+      "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等": 0.906,
+      "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件等等": 0.57,
+      "content_requirements.market_今日美股市场盘前预测简报_宏观信号_板块轮动_风险事件": 0.906,
+      "risk_sensitivity.market_今日美股市场盘前预测简报_宏观信号_板块轮动_风险事件": 0.57,
+      "content_requirements.brain_今日美股市场前瞻简报_宏观信号_板块轮动_风险事件": 0.906,
+      "content_requirements.呈现今日盘前最重要的几条新闻_然后划分到市场各个板块_详细阐述每个板块的大体判断": 0.906
+    },
+    "diagnosis": "strong: freshness, intent_coverage; needs work: source_fit"
+  },
+  "profile_signals": [],
+  "strategy_signals": []
+}

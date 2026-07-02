@@ -1,0 +1,30 @@
+{
+  "goal_id": "goal-1781977026175-0136f5",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-20T17:37:06.175319Z",
+  "updated_at": "2026-06-20T17:40:31.029469Z",
+  "status": "open",
+  "title": "考虑地缘政治等影响，进行下周美股市场分析",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1781977231026-92ecf699",
+      "ts": "2026-06-20T17:40:31.026104Z",
+      "stance": "hold",
+      "confidence": 0.55,
+      "key_drivers": [
+        "Market breadth is at historical extremes — mega-cap tech concentration masks underlying index fragility; a breadth-driven correction risk is elevated",
+        "The Fed is likely holding rates steady through summer, with markets pricing out rate cuts until at least Q3 2026, keeping equity multiples under structural pressure",
+        "Geopolitical risk premia are elevated entering late June 2026, with US-China tech friction, Russia-Ukraine stalemate, and Middle East instability as the top three vectors",
+        "Next week's key catalyst is the PCE inflation report (month-end): an upside surprise could trigger a correlated selloff by fusing rate fears with geopolitical anxiety",
+        "Defense, energy, and AI infrastructure sectors offer relative resilience; consumer discretionary and financials face asymmetric downside in elevated geopolitical risk"
+      ],
+      "reversal_condition": "以下任一条件满足可重新评估升级为 buy：(1) 月末 PCE 通胀数据低于或符合预期且 VIX 回落至 25 以下；(2) 中美科技贸易摩擦、俄乌或中东任一向量出现实质性缓和信号；(3) 市场广度改善（突破日 advance/decline 比例回归正常区间）。若 VIX 确认突破 25 或 PCE 超预期上行，则应进一步下调至 reduce"
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1781977231026-92ecf699"
+  ]
+}

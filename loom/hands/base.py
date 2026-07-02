@@ -105,13 +105,25 @@ class BaseHand:
         if hand_prompt.exists():
             parts.append(hand_prompt.read_text("utf-8"))
 
-        skill_md = ROOT / "skills" / "investment-research-framework" / "SKILL.md"
-        if skill_md.exists():
-            parts.append("\n\n# Investment Research Framework (skill index)\n\n")
-            parts.append(skill_md.read_text("utf-8"))
+        # Domain adapter config injected by brain.py _brain_hand_runner
+        domain_cfg = context.get("_domain_adapter_config", {}) or {}
 
+        # Skill index
+        skill_path = domain_cfg.get("skill_path") or "skills/investment-research-framework"
+        skill_md = ROOT / skill_path / "SKILL.md" if skill_path else None
+        if skill_md and skill_md.exists():
+            parts.append("\n\n# Skill Index\n\n")
+            parts.append(skill_md.read_text("utf-8"))
+        elif not domain_cfg:  # backward compat
+            fallback = ROOT / "skills" / "investment-research-framework" / "SKILL.md"
+            if fallback.exists():
+                parts.append("\n\n# Investment Research Framework (skill index)\n\n")
+                parts.append(fallback.read_text("utf-8"))
+
+        # Personal context files
         personal_dir = ROOT / "hands" / self.hand_id / "personal"
-        for fname in ["profile.md", "themes.md", "watchlist.md", "sources.md"]:
+        fnames = domain_cfg.get("personal_file_names") or ["profile.md", "themes.md", "watchlist.md", "sources.md"]
+        for fname in fnames:
             p = personal_dir / fname
             if p.exists() and p.stat().st_size > 0:
                 parts.append(f"\n\n## (personal) {fname}\n\n{p.read_text('utf-8')}")
@@ -121,9 +133,11 @@ class BaseHand:
             txt = notes.read_text("utf-8")
             parts.append(f"\n\n## (personal) learned-notes (tail)\n\n{txt[-4000:]}")
 
-        snap = ROOT / "hands" / self.hand_id / "context" / "regime-snapshot.md"
+        # Context snapshot
+        snap_name = domain_cfg.get("context_snapshot_name") or "regime-snapshot.md"
+        snap = ROOT / "hands" / self.hand_id / "context" / snap_name
         if snap.exists() and (time.time() - snap.stat().st_mtime) < 86400:
-            parts.append(f"\n\n## (context) regime-snapshot\n\n{snap.read_text('utf-8')}")
+            parts.append(f"\n\n## (context) {snap_name}\n\n{snap.read_text('utf-8')}")
 
         return "".join(parts)
 

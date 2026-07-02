@@ -1,4 +1,4 @@
-"""WorkflowEpisode — per-run typed event log for BrainOrchestrator.
+﻿"""WorkflowEpisode 鈥?per-run typed event log for BrainOrchestrator.
 
 One episode = one analyze() call. Events are appended incrementally to:
   brain/episodes/<episode_id>.jsonl
@@ -14,7 +14,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 TerminationReason = Literal[
     "synthesis_success",
@@ -39,6 +39,16 @@ EpisodeState = Literal[
 
 _EPISODE_DIR = "brain/episodes"
 
+# ── Event name constants (plan: Task 4) ──
+EVENT_STATE_PROPOSED = "state.proposed"
+EVENT_CLAIM_CREATED = "claim.created"
+EVENT_GAP_DETECTED = "gap.detected"
+EVENT_BOTTLENECK_DETECTED = "bottleneck.detected"
+EVENT_VISUAL_QUERY_CREATED = "visual.query_created"
+EVENT_VISUAL_INTERACTION = "visual.interaction"
+EVENT_STATE_USED_BY_SYNTHESIS = "state.used_by_synthesis"
+EVENT_INTERACTION_CONSUMED = "interaction.consumed"
+
 
 @dataclass
 class WorkflowEpisode:
@@ -52,7 +62,7 @@ class WorkflowEpisode:
     started_at: float = field(default_factory=time.time)
     finished_at: float | None = None
 
-    # Budget tracking — filled by BudgetGovernor
+    # Budget tracking 鈥?filled by BudgetGovernor
     budget_token_used: int = 0
     budget_cost_used_usd: float = 0.0
 
@@ -62,8 +72,9 @@ class WorkflowEpisode:
 
     # Append-only in-memory event buffer (not included in to_summary)
     _events: list[dict] = field(default_factory=list, repr=False)
+    _event_sink: Callable[[dict[str, Any]], None] | None = field(default=None, repr=False)
 
-    # ── Factory ────────────────────────────────────────────────────────────
+    # 鈹€鈹€ Factory 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     @classmethod
     def new(
@@ -71,15 +82,17 @@ class WorkflowEpisode:
         goal: str,
         domain: str = "general",
         goal_type: str = "ad_hoc",
+        event_sink: Callable[[dict[str, Any]], None] | None = None,
     ) -> "WorkflowEpisode":
         return cls(
             episode_id=str(uuid.uuid4()),
             goal=goal,
             domain=domain,
             goal_type=goal_type,
+            _event_sink=event_sink,
         )
 
-    # ── Event API ──────────────────────────────────────────────────────────
+    # 鈹€鈹€ Event API 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     def write_event(
         self,
@@ -102,8 +115,13 @@ class WorkflowEpisode:
         log_path = ep_dir / f"{self.episode_id}.jsonl"
         with log_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(event, ensure_ascii=False) + "\n")
+        if self._event_sink is not None:
+            try:
+                self._event_sink(dict(event))
+            except Exception:
+                pass
 
-    # ── State transitions ──────────────────────────────────────────────────
+    # 鈹€鈹€ State transitions 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     def transition(
         self,
@@ -126,7 +144,7 @@ class WorkflowEpisode:
         target: EpisodeState = "Persisted" if termination_reason == "synthesis_success" else "Failed"
         self.transition(root, target, payload)
 
-    # ── Summary (safe to serialize, no Path objects) ───────────────────────
+    # 鈹€鈹€ Summary (safe to serialize, no Path objects) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     def to_summary(self) -> dict[str, Any]:
         return {

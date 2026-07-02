@@ -1,0 +1,26 @@
+{
+  "goal_id": "goal-1782823032928-df673c",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-30T12:37:12.928846Z",
+  "updated_at": "2026-06-30T12:46:47.077012Z",
+  "status": "open",
+  "title": "\\brain 今日美股市场前瞻简报：宏观信号、板块轮动、风险事件",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1782823607072-71eb2d55",
+      "ts": "2026-06-30T12:46:47.072914Z",
+      "stance": "n/a",
+      "confidence": 0.0,
+      "key_drivers": [
+        "当前无实时数据支撑任何市场方向性判断；所有数据源因权限未授予而无法访问"
+      ],
+      "reversal_condition": "当Loom获得网络访问权限或配置有效数据源，能够获取宏观、情绪、板块及事件数据时，重新评估"
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1782823607072-71eb2d55"
+  ]
+}

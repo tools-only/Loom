@@ -1,0 +1,27 @@
+{
+  "goal_id": "goal-1781976786484-838748",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-20T17:33:06.484365Z",
+  "updated_at": "2026-06-20T17:35:53.329933Z",
+  "status": "open",
+  "title": "预测6月21日世界杯比赛结果",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1781976953326-7e1461dc",
+      "ts": "2026-06-20T17:35:53.326756Z",
+      "stance": "n/a",
+      "confidence": 0.0,
+      "key_drivers": [
+        "hand 返回错误，未产出任何 artifact，无法获取2026年6月21日世界杯赛程、球队信息或比赛数据",
+        "review gaps 确认全部关键维度均为 LOW CONFIDENCE：缺少赛程安排、积分榜、阵容伤病、近期状态及交锋历史"
+      ],
+      "reversal_condition": "用户提供6月21日具体对阵信息，且 hand 成功返回球队状态、阵容、交锋历史等数据后可重新评估"
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1781976953326-7e1461dc"
+  ]
+}

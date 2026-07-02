@@ -1,0 +1,24 @@
+{
+  "goal_id": "goal-1781978139862-7dc11b",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-20T17:55:39.862323Z",
+  "updated_at": "2026-06-20T17:57:23.043180Z",
+  "status": "open",
+  "title": "考虑地缘政治等影响，进行下周美股市场分析。返回结果的公网ip地址",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1781978243042-333edb12",
+      "ts": "2026-06-20T17:57:23.042173Z",
+      "stance": "n/a",
+      "confidence": 0.0,
+      "key_drivers": [],
+      "reversal_condition": ""
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1781978243042-333edb12"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "goal_id": "goal-1782826988670-4d38d2",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-30T13:43:08.670022Z",
+  "updated_at": "2026-06-30T13:53:08.646548Z",
+  "status": "open",
+  "title": "今日美股市场前瞻报告，尤其侧重在CPO、存储和其他AI产业链，以及黄金、原油",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1782827588642-45797e12",
+      "ts": "2026-06-30T13:53:08.642679Z",
+      "stance": "n/a",
+      "confidence": 0.0,
+      "key_drivers": [],
+      "reversal_condition": ""
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1782827588642-45797e12"
+  ]
+}

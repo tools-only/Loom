@@ -1,0 +1,24 @@
+{
+  "goal_id": "goal-1782099573069-89f96d",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-22T03:39:33.069129Z",
+  "updated_at": "2026-06-22T03:40:37.624983Z",
+  "status": "open",
+  "title": "say hello world in one sentence",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1782099637622-1f9ec030",
+      "ts": "2026-06-22T03:40:37.622979Z",
+      "stance": "n/a",
+      "confidence": 0.0,
+      "key_drivers": [],
+      "reversal_condition": ""
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1782099637622-1f9ec030"
+  ]
+}

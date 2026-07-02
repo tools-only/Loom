@@ -1,0 +1,599 @@
+{
+  "episode_id": "ep-1781975726209-4e64781d",
+  "goal_id": "goal-1781975580288-743bcd",
+  "ts": "2026-06-20T17:15:26.209382Z",
+  "question": "预测下一轮世界杯比赛的结果",
+  "domain": "general",
+  "brain_self_eval": {
+    "episode_id": "ep-1781975726209-4e64781d",
+    "confidence": 0.0,
+    "stance": "n/a",
+    "key_driver_count": 0,
+    "has_reversal_condition": false,
+    "cold_start": false,
+    "hand_count": 1,
+    "overall_quality": 0.503
+  },
+  "hand_evaluations": [
+    {
+      "hand_id": "t0",
+      "artifact_present": true,
+      "claim_count": 4,
+      "gap_count": 3,
+      "source_tier": "unknown"
+    }
+  ],
+  "hand_artifacts": {
+    "t0": {
+      "metadata": {
+        "key_claims": [
+          {
+            "claim": "The 2026 FIFA World Cup (Jun 11 – Jul 19) is in its group stage as of Jun 21, with 48 teams across 16 groups of 3",
+            "rubric": "综合分析",
+            "confidence": 0.95
+          },
+          {
+            "claim": "Without real-time match data from Jun 11–21, specific next-round predictions cannot be reliably made; pre-tournament FIFA rankings provide only a baseline prior",
+            "rubric": "综合分析",
+            "confidence": 0.5
+          },
+          {
+            "claim": "Traditional powerhouses (Argentina, France, Brazil, England, Spain, Germany) enter as favorites based on pre-tournament form and squad depth",
+            "rubric": "综合分析",
+            "confidence": 0.7
+          },
+          {
+            "claim": "The expanded 48-team format introduces higher upset probability in group stage due to single-match variance in 3-team groups",
+            "rubric": "综合分析",
+            "confidence": 0.8
+          }
+        ],
+        "gaps": [
+          {
+            "level": "L0",
+            "description": "No real-time match results from June 11–21, 2026 are available. All analysis relies on pre-tournament data frozen at January 2026 cutoff.",
+            "severity": "critical",
+            "impacts": [
+              "match_result_prediction",
+              "group_standings",
+              "form_assessment"
+            ]
+          },
+          {
+            "level": "L1",
+            "description": "Player injuries, squad changes, and tactical adjustments made after January 2026 are unknown.",
+            "severity": "high",
+            "impacts": [
+              "team_strength_assessment",
+              "starting_XI_prediction"
+            ]
+          },
+          {
+            "level": "L2",
+            "description": "In-match performance data (xG, possession, passing networks) from already-played group matches is unavailable.",
+            "severity": "high",
+            "impacts": [
+              "form_rating",
+              "momentum_assessment"
+            ]
+          }
+        ],
+        "confidence": 0.35,
+        "source_notes": [
+          {
+            "source": "FIFA Official World Cup 2026 page",
+            "tier": "A",
+            "freshness": "stale (pre-tournament)",
+            "notes": "Tournament structure, qualified teams, schedule framework confirmed pre-Jan 2026."
+          },
+          {
+            "source": "FIFA Men's World Ranking (pre-tournament)",
+            "tier": "A",
+            "freshness": "stale",
+            "notes": "Last ranking snapshot before Jan 2026. Does not reflect pre-tournament friendlies or camp form."
+          }
+        ],
+        "hand_id": "runtime-inline-0",
+        "executor_id": "brain-inline",
+        "task_id": "t0",
+        "dimension": "Brain-generated fallback dimension",
+        "system_prompt": "You are a Brain-generated analysis agent. Produce a run.artifact JSON with narrative and metadata.",
+        "capabilities": []
+      },
+      "narrative": "截至2026年6月21日，2026美加墨世界杯已进行约10天，处于小组赛阶段。48队16组3队的赛制使单场方差极大，传统强队（阿根廷、法国、巴西、英格兰）虽为纸面热门，但缺乏6月11日以来的实时赛果，任何具体预测置信度均低。需先接入实时数据源（FIFA API、Opta、ESPN）获取当前积分榜、xG数据及伤病报告后再生成定向预测。",
+      "sections": [
+        {
+          "id": "tournament_state",
+          "title": "Tournament State (~Jun 21, 2026)",
+          "summary": "Approximately 10 days into the group stage. 48 teams, 16 groups of 3, each team plays 2 group matches. Most teams have played 1 match by now.",
+          "bullets": [
+            "Jun 11 – Jul 19, 2026; 16 host cities",
+            "48 teams, 16 groups of 3, top 2 advance (32 to knockout)",
+            "Round of 32 begins ~June 28",
+            "Knockout path: R32 → R16 → QF → SF → Final"
+          ]
+        },
+        {
+          "id": "pre_tournament_favorites",
+          "title": "Pre-Tournament Favorite Tiering",
+          "summary": "Based on pre-tournament FIFA rankings, recent major tournament performance, and squad depth.",
+          "bullets": [
+            "Tier 1: Argentina, France, Brazil, England",
+            "Tier 2: Spain, Germany, Portugal, Netherlands",
+            "Tier 3 (dark horses): Uruguay, Morocco, Japan, USA"
+          ]
+        },
+        {
+          "id": "format_volatility",
+          "title": "Format-Driven Volatility",
+          "summary": "The 3-team group format introduces structural unpredictability.",
+          "bullets": [
+            "2 group matches per team — single loss can eliminate a favorite",
+            "No simultaneous final matchday; fairness concerns",
+            "Possible penalty shootouts in group stage",
+            "Expanded 32-team knockout means more R32 mismatches",
+            "Significant North America travel distances"
+          ]
+        },
+        {
+          "id": "prediction_framework",
+          "title": "Prediction Framework (requires live data)",
+          "summary": "When live data is available, apply this framework for next-round predictions.",
+          "bullets": [
+            "Input: current standings + remaining fixtures",
+            "Input: xG differential, conversion rate, defensive metrics from played matches",
+            "Input: injuries, suspensions, rotation risk",
+            "Input: rest days and travel distance",
+            "Output: per-match W/D/L probabilities with key driver narratives"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "claim": "Argentina enters as defending champion with core intact",
+          "support": "Won 2022 World Cup and 2024 Copa America",
+          "source": "FIFA rankings + tournament history",
+          "source_tier": "A",
+          "freshness": "stale",
+          "confidence": 0.75,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "France has deepest squad by transfer value, led by Mbappe",
+          "support": "2022 finalist, 2018 champion; elite midfield depth",
+          "source": "FIFA rankings + Transfermarkt",
+          "source_tier": "B",
+          "freshness": "stale",
+          "confidence": 0.7,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "3-team group format increases upset probability",
+          "support": "Fewer matches = higher variance; no recovery match after a loss",
+          "source": "FIFA tournament regulations",
+          "source_tier": "A",
+          "freshness": "current",
+          "confidence": 0.85,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "Home advantage for USA/Mexico/Canada is material",
+          "support": "Host nations historically overperform xG by 0.3-0.5 at home",
+          "source": "Historical World Cup data",
+          "source_tier": "B",
+          "freshness": "stale",
+          "confidence": 0.6,
+          "rubric": "综合分析"
+        }
+      ],
+      "raw_items": [
+        {
+          "url": "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026",
+          "data_type": "tournament_structure",
+          "freshness": "live (not retrieved)"
+        },
+        {
+          "url": "https://www.espn.com/soccer/fifa-world-cup",
+          "data_type": "live_results",
+          "freshness": "live (not retrieved)"
+        },
+        {
+          "url": "https://fbref.com/en/comps/1/World-Cup-Stats",
+          "data_type": "advanced_metrics",
+          "freshness": "live (not retrieved)"
+        }
+      ],
+      "raw_sources": [
+        "FIFA.com",
+        "ESPN FC",
+        "FBref / StatsBomb",
+        "Opta Sports"
+      ]
+    }
+  },
+  "orchestration_trace": [],
+  "human_feedback": [],
+  "intent_activation": {
+    "ts": "2026-06-21T01:15:17.329059",
+    "run_id": "run_20260621011517329059",
+    "question": "预测下一轮世界杯比赛的结果",
+    "domain": "general",
+    "active_intents": [
+      {
+        "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
+        "zone": "content_requirements",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.3,
+        "reason": "repeated evidence; high confidence",
+        "confidence": 0.95,
+        "evidence_count": 11
+      },
+      {
+        "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件",
+        "zone": "risk_sensitivity",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.3,
+        "reason": "repeated evidence; high confidence",
+        "confidence": 0.95,
+        "evidence_count": 11
+      },
+      {
+        "intent_id": "source_preferences.empty",
+        "zone": "source_preferences",
+        "label": "empty",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.3,
+        "reason": "repeated evidence; high confidence",
+        "confidence": 0.75,
+        "evidence_count": 5
+      },
+      {
+        "intent_id": "source_preferences.unittest",
+        "zone": "source_preferences",
+        "label": "unittest",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.3,
+        "reason": "repeated evidence; high confidence",
+        "confidence": 0.75,
+        "evidence_count": 5
+      }
+    ],
+    "inactive_intents": [
+      {
+        "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+        "zone": "content_requirements",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件等等",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.2,
+        "reason": "repeated evidence",
+        "confidence": 0.51,
+        "evidence_count": 2
+      },
+      {
+        "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+        "zone": "risk_sensitivity",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件等等",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.2,
+        "reason": "repeated evidence",
+        "confidence": 0.51,
+        "evidence_count": 2
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_clarify",
+        "zone": "object_behavior",
+        "label": "User often intends to clarify",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_compare",
+        "zone": "object_behavior",
+        "label": "User often intends to compare",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "source_preferences.async_test",
+        "zone": "source_preferences",
+        "label": "async_test",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "source_preferences.test",
+        "zone": "source_preferences",
+        "label": "test",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "workflow_preferences.respect_object_scoped_intent_for_initial_render",
+        "zone": "workflow_preferences",
+        "label": "Respect object-scoped intent for initial_render",
+        "principle": "Use the target object and operation as part of task interpretation, not merely the user's text.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      }
+    ]
+  },
+  "intent_rubric": {
+    "ts": "2026-06-21T01:15:17.331057",
+    "rubric_id": "rubric_20260621011517331057",
+    "domain": "general",
+    "question": "预测下一轮世界杯比赛的结果",
+    "criteria": [
+      {
+        "criterion_id": "rubric.retrieve_or_surface_fresh_context",
+        "label": "Retrieve or surface fresh context when required",
+        "weight": 0.619,
+        "score": 0.86,
+        "reward_targets": [
+          "freshness",
+          "decision_usefulness"
+        ],
+        "matched_zones": [
+          "content_requirements",
+          "source_preferences"
+        ],
+        "source_policy_id": "policy.retrieve_or_surface_fresh_context",
+        "source_intent_ids": [
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
+          "source_preferences.empty",
+          "source_preferences.unittest"
+        ],
+        "checks": [
+          "Evaluate whether the result identify whether the active intent requires recent context.",
+          "Evaluate whether the result ask relevant hands/tools for fresh context or mark freshness gaps explicitly."
+        ]
+      },
+      {
+        "criterion_id": "rubric.satisfy_content_requirements",
+        "label": "Satisfy active content requirements",
+        "weight": 0.703,
+        "score": 0.82,
+        "reward_targets": [
+          "intent_coverage",
+          "relevance"
+        ],
+        "matched_zones": [
+          "content_requirements"
+        ],
+        "source_policy_id": "policy.satisfy_content_requirements",
+        "source_intent_ids": [
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件"
+        ],
+        "checks": [
+          "Evaluate whether the result translate active content intents into explicit output requirements.",
+          "Evaluate whether the result add or revise sections so the generated page visibly satisfies the requirement."
+        ]
+      },
+      {
+        "criterion_id": "rubric.add_risk_and_reversal_checks",
+        "label": "Add risk and reversal checks",
+        "weight": 0.546,
+        "score": 0.67,
+        "reward_targets": [
+          "risk_coverage",
+          "decision_usefulness"
+        ],
+        "matched_zones": [
+          "risk_sensitivity"
+        ],
+        "source_policy_id": "policy.add_risk_and_reversal_checks",
+        "source_intent_ids": [
+          "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件"
+        ],
+        "checks": [
+          "Evaluate whether the result include counterarguments, uncertainty, downside triggers, or reversal conditions.",
+          "Evaluate whether the result avoid generic risks; tie each risk to the current object or decision."
+        ]
+      },
+      {
+        "criterion_id": "rubric.resource_source_fit",
+        "label": "Use relevant captured resources at the right confidence level",
+        "weight": 0.16,
+        "score": 0.7,
+        "reward_targets": [
+          "source_fit",
+          "freshness"
+        ],
+        "matched_zones": [
+          "source_preferences"
+        ],
+        "source_policy_id": "",
+        "source_intent_ids": [],
+        "source_refs": [
+          {
+            "type": "resource",
+            "id": "channel_external_async_test",
+            "title": "async_test",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_unittest",
+            "title": "unittest",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_empty",
+            "title": "empty",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_test",
+            "title": "test",
+            "tier": "F",
+            "url": ""
+          }
+        ],
+        "checks": [
+          "Evaluate whether the result uses relevant captured resources without treating weak social signals as verified facts.",
+          "Evaluate whether source tier, freshness, and provenance are visible when they matter to the decision."
+        ]
+      }
+    ],
+    "suppressed_policies": [
+      {
+        "policy_id": "policy.preserve_user_style",
+        "label": "Preserve user style and granularity",
+        "actions": [
+          "match the user's preferred density, language, and structure",
+          "prefer reusable formatting choices that have received positive reward"
+        ],
+        "reward_targets": [
+          "style_fit",
+          "relevance"
+        ],
+        "score": 0.48,
+        "matched_zones": [],
+        "weight": 0.48,
+        "reason": "no matching active intent zone"
+      },
+      {
+        "policy_id": "policy.respect_object_scoped_operations",
+        "label": "Respect object-scoped user behavior",
+        "actions": [
+          "ground the task in the target anchor/card/object before interpreting the instruction",
+          "avoid applying local edits globally unless the user asks for global changes"
+        ],
+        "reward_targets": [
+          "intent_coverage",
+          "relevance"
+        ],
+        "score": 0.66,
+        "matched_zones": [],
+        "weight": 0.66,
+        "reason": "no matching active intent zone"
+      }
+    ],
+    "resource_context": {
+      "version": 1,
+      "domain": "general",
+      "query_terms": [
+        "general",
+        "预测下一轮世界杯比赛的结果"
+      ],
+      "resources": [
+        {
+          "resource_id": "channel_external_async_test",
+          "domain": "general",
+          "kind": "note",
+          "title": "async_test",
+          "url": "",
+          "tags": [],
+          "source_platform": "external",
+          "source_author": "async_test",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "async_test"
+          }
+        },
+        {
+          "resource_id": "channel_external_unittest",
+          "domain": "general",
+          "kind": "note",
+          "title": "unittest",
+          "url": "",
+          "tags": [
+            "test"
+          ],
+          "source_platform": "external",
+          "source_author": "unittest",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "unittest"
+          }
+        },
+        {
+          "resource_id": "channel_external_empty",
+          "domain": "general",
+          "kind": "note",
+          "title": "empty",
+          "url": "",
+          "tags": [],
+          "source_platform": "external",
+          "source_author": "empty",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "empty"
+          }
+        },
+        {
+          "resource_id": "channel_external_test",
+          "domain": "general",
+          "kind": "note",
+          "title": "test",
+          "url": "",
+          "tags": [
+            "test"
+          ],
+          "source_platform": "external",
+          "source_author": "test",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "test"
+          }
+        }
+      ],
+      "strategy_primitives": []
+    }
+  },
+  "intent_reward_report": {
+    "ts": "2026-06-21T01:15:26.205880",
+    "episode_id": "ep_20260621011526205880",
+    "plan_id": "rubric_20260621011517331057",
+    "overall_reward": 0.503,
+    "evaluator_scores": {
+      "intent_coverage": 0.625,
+      "relevance": 0.35,
+      "freshness": 0.6,
+      "risk_coverage": 0.41,
+      "decision_usefulness": 0.49,
+      "style_fit": 0.55,
+      "source_fit": 0.4,
+      "framework_fit": 0.6
+    },
+    "policy_rewards": {
+      "policy.retrieve_or_surface_fresh_context": 0.545,
+      "policy.satisfy_content_requirements": 0.487,
+      "policy.add_risk_and_reversal_checks": 0.45,
+      "rubric.resource_source_fit": 0.5
+    },
+    "intent_rewards": {
+      "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件": 0.625,
+      "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件": 0.41,
+      "source_preferences.empty": 0.6,
+      "source_preferences.unittest": 0.6
+    },
+    "diagnosis": "needs work: relevance, risk_coverage, source_fit"
+  },
+  "profile_signals": [],
+  "strategy_signals": []
+}

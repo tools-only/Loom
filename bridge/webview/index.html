@@ -9,6 +9,8 @@
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="anchor-debate.css">
 <link rel="stylesheet" href="loom-detail-overlay.css">
+<link rel="stylesheet" href="brush-tool.css">
+<link rel="stylesheet" href="layout-tool.css">
 </head>
 <body data-loom-entry="fin">
 
@@ -41,14 +43,23 @@
   <button id="anchor-debate-trigger" type="button" title="Launch structured adversarial debate to produce a PRD">
     <i class="ph-bold ph-sword"></i> Debate
   </button>
+  <button id="brush-mode-toggle" type="button" title="Selection Brush — draw a rectangle to select content (B)">
+    <i class="ph-bold ph-selection"></i>
+  </button>
   <a id="anchor-intent-wiki-btn" class="toolbar-intelligence-link" href="#intent-wiki" title="View Intent Wiki and feedback attribution inside Loom">
     <i class="ph-bold ph-graph"></i> Intelligence
   </a>
   <button id="anchor-intent-stream-btn" type="button" title="View intent stream — structured log of all human interactions" onclick="window.open('http://localhost:3002/intent-stream','_blank')">
     <i class="ph-bold ph-brain"></i> Intents
   </button>
+  <a id="anchor-harness-btn" class="toolbar-intelligence-link" href="#harness" title="Harness — system architecture: agent states, adapters, config, runtime bindings">
+    <i class="ph-bold ph-graph"></i> Harness
+  </a>
   <button class="toolbar-loom-config" id="anchor-hands-config-btn" title="Settings" type="button">
     <i class="ph-bold ph-gear-six"></i>
+  </button>
+  <button class="toolbar-loom-config" id="anchor-channels-config-btn" title="Channels" type="button">
+    <i class="ph-bold ph-chats-circle"></i>
   </button>
   <button class="toolbar-shutdown" id="anchor-shutdown" title="Shutdown Anchor services" type="button">
     <i class="ph-bold ph-power"></i>
@@ -323,6 +334,8 @@
     <div id="anchor-content"></div>
   </main>
 
+  <canvas id="brush-canvas"></canvas>
+  <div id="brush-cursor"></div>
 </div>
 
 <!-- Phase 3 — Floating selection toolbar (positioned dynamically) -->
@@ -464,6 +477,10 @@
           </div>
         </div>
         <div class="loom-section-label" style="margin-top:14px">各 Hand 配置 <span class="loom-hint">· 选 API 填写模型信息，选 Agent 填写 endpoint</span></div>
+        <div class="loom-runtime-note">
+          <i class="ph-bold ph-cpu"></i>
+          选择 <strong>Agent Adapter</strong> 后可使用 <strong>Codex App Server · SDK</strong> 或其他已注册 Agent。
+        </div>
         <div class="loom-hand-table">
           <div class="loom-hand-header loom-hand-header--unified">
             <span>Hand</span><span>模式</span><span>配置</span>
@@ -472,6 +489,7 @@
           <div class="loom-hand-row loom-hand-row--unified">
             <span>📊 Market</span>
             <select class="hand-mode-select" id="hmode-market">
+              <option value="runtime">Agent Adapter</option>
               <option value="api">API 配置</option>
               <option value="agent">外部 Agent</option>
             </select>
@@ -480,6 +498,9 @@
               <input id="lm-market-model" type="text" placeholder="模型名">
               <input id="lm-market-apikey" type="password" placeholder="API Key">
               <input id="lm-market-baseurl" type="text" placeholder="Base URL">
+            </div>
+            <div class="hand-fields-runtime" id="hf-runtime-market">
+              <select id="rt-market"><option value="codex-app-server">Codex App Server · SDK</option></select>
             </div>
             <div class="hand-fields-agent" id="hf-agent-market">
               <input id="ag-ep-market" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace">
@@ -490,6 +511,7 @@
           <div class="loom-hand-row loom-hand-row--unified">
             <span>🌡️ Sentiment</span>
             <select class="hand-mode-select" id="hmode-sentiment">
+              <option value="runtime">Agent Adapter</option>
               <option value="api">API 配置</option>
               <option value="agent">外部 Agent</option>
             </select>
@@ -498,6 +520,9 @@
               <input id="lm-sentiment-model" type="text" placeholder="模型名">
               <input id="lm-sentiment-apikey" type="password" placeholder="API Key">
               <input id="lm-sentiment-baseurl" type="text" placeholder="Base URL">
+            </div>
+            <div class="hand-fields-runtime" id="hf-runtime-sentiment">
+              <select id="rt-sentiment"><option value="codex-app-server">Codex App Server · SDK</option></select>
             </div>
             <div class="hand-fields-agent" id="hf-agent-sentiment">
               <input id="ag-ep-sentiment" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace">
@@ -508,6 +533,7 @@
           <div class="loom-hand-row loom-hand-row--unified">
             <span>🎯 Target</span>
             <select class="hand-mode-select" id="hmode-target">
+              <option value="runtime">Agent Adapter</option>
               <option value="api">API 配置</option>
               <option value="agent">外部 Agent</option>
             </select>
@@ -516,6 +542,9 @@
               <input id="lm-target-model" type="text" placeholder="模型名">
               <input id="lm-target-apikey" type="password" placeholder="API Key">
               <input id="lm-target-baseurl" type="text" placeholder="Base URL">
+            </div>
+            <div class="hand-fields-runtime" id="hf-runtime-target">
+              <select id="rt-target"><option value="codex-app-server">Codex App Server · SDK</option></select>
             </div>
             <div class="hand-fields-agent" id="hf-agent-target">
               <input id="ag-ep-target" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace">
@@ -526,6 +555,7 @@
           <div class="loom-hand-row loom-hand-row--unified">
             <span>💼 Portfolio</span>
             <select class="hand-mode-select" id="hmode-position">
+              <option value="runtime">Agent Adapter</option>
               <option value="api">API 配置</option>
               <option value="agent">外部 Agent</option>
             </select>
@@ -534,6 +564,9 @@
               <input id="lm-position-model" type="text" placeholder="模型名">
               <input id="lm-position-apikey" type="password" placeholder="API Key">
               <input id="lm-position-baseurl" type="text" placeholder="Base URL">
+            </div>
+            <div class="hand-fields-runtime" id="hf-runtime-position">
+              <select id="rt-position"><option value="codex-app-server">Codex App Server · SDK</option></select>
             </div>
             <div class="hand-fields-agent" id="hf-agent-position">
               <input id="ag-ep-position" type="url" placeholder="http://localhost:8080/v1/chat/completions" style="font-family:monospace">
@@ -564,11 +597,43 @@
 <script src="loom-detail-overlay.js"></script>
 <script src="target-debate-page.js"></script>
 <script src="loom-intelligence-page.js"></script>
-<script src="anchor-client.js"></script>
-<script src="prompt-panel.js"></script>
+<script src="anchor-client.js?v=6"></script>
+<script src="prompt-panel.js?v=3"></script>
 <script src="anchor-debate-overlay.js"></script>
 <script src="hand-feedback-widget.js"></script>
 <script src="hand-settings-panel.js"></script>
+<script src="channel-settings-panel.js"></script>
+<script src="brush-tool.js"></script>
+<script src="layout-tool.js"></script>
+<script src="card-density.js"></script>
+<script src="harness-summary.js?v=3"></script>
+<script src="orchestration-view.js?v=3"></script>
+<script src="live-state-canvas.js?v=1"></script>
+<script src="checkpoint-review-deck.js?v=1"></script>
+
+<!-- Brush dialog (floating, shown after marquee selection) -->
+<div id="brush-dialog">
+  <div class="brush-dialog-header">
+    <i class="ph-bold ph-selection"></i>
+    <span id="brush-dialog-title">Selected area</span>
+    <span class="brush-dialog-badge" id="brush-dialog-badge">0 elements</span>
+  </div>
+  <textarea id="brush-dialog-input" class="brush-dialog-textarea"
+    placeholder="Describe what to change about the painted area... (Ctrl+Enter to send)"></textarea>
+  <div class="brush-dialog-actions">
+    <button class="btn btn--ghost btn--sm" id="brush-dialog-dismiss">Cancel</button>
+    <button class="btn btn--brand btn--sm" data-brush-op="refine">
+      <i class="ph-bold ph-sparkle"></i> Refine area
+    </button>
+    <button class="btn btn--sm" data-brush-op="restructure">
+      <i class="ph-bold ph-squares-four"></i> Restructure layout
+    </button>
+    <button class="btn btn--ghost btn--sm" data-brush-op="delete" style="color:var(--accent-coral, #e04e4e)">
+      <i class="ph-bold ph-trash"></i> Delete
+    </button>
+  </div>
+  <div class="brush-dialog-hint">Ctrl+Enter to send &middot; Esc to close</div>
+</div>
 
 <!-- Global Execute All button -->
 <div id="anchor-execute-all" class="hidden">

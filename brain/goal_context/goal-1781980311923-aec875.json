@@ -1,0 +1,24 @@
+{
+  "goal_id": "goal-1781980311923-aec875",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-20T18:31:51.923460Z",
+  "updated_at": "2026-06-20T18:36:32.933814Z",
+  "status": "open",
+  "title": "分析下周黄金、原油、AI科技股、CPO、存储、MLCC、AI产业相关原料资源等市场。将分析结果页面公网地址发送给我",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1781980592932-73ffbf8c",
+      "ts": "2026-06-20T18:36:32.932814Z",
+      "stance": "n/a",
+      "confidence": 0.0,
+      "key_drivers": [],
+      "reversal_condition": ""
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1781980592932-73ffbf8c"
+  ]
+}

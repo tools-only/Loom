@@ -1,0 +1,20 @@
+{"ts": 1781977734.464988, "type": "episode.start", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "context_keys": ["source", "entrypoint", "task_family", "session_id", "social", "response_mode", "channel_settings", "bridgeManagedReply", "responseMode", "verification", "social_channel", "social_route", "goal_id"]}
+{"ts": 1781977737.2380195, "type": "phase.start", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "phase": "plan"}
+{"ts": 1781977737.2390265, "type": "state.transition", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "from": "Planning", "to": "Planning"}
+{"ts": 1781977737.2390265, "type": "projection-binding", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "fn": "plan", "state_version": 2, "schema_version": "1.0", "content_id": "sha256:2c964d6e5db78861"}
+{"ts": 1781977744.573052, "type": "phase.end", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "phase": "plan", "rubric_count": 1, "registered_shells": []}
+{"ts": 1781977744.5740585, "type": "projection-binding", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "fn": "decompose", "state_version": 2, "schema_version": "1.0", "content_id": "sha256:2c964d6e5db78861"}
+{"ts": 1781977752.01989, "type": "plan.tasks_decomposed", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "task_count": 1, "decomposition_source": "llm", "rationale": "Goal is a simple greeting ('hello') with no substantive analytical request. One lightweight task suffices to acknowledge the user and, given the prior synthesis context about US equities and geopolitical risk, optionally surface a brief session-opening prompt without over-decomposing a non-analytical intent."}
+{"ts": 1781977752.0204296, "type": "state.transition", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "from": "Planning", "to": "Dispatching"}
+{"ts": 1781977752.0210276, "type": "phase.start", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "phase": "dispatch", "dispatch_targets": ["runtime-greeting-orchestrator-0"]}
+{"ts": 1781977752.0215452, "type": "dispatch.batch", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "task_ids": ["t1"], "priority": 1}
+{"ts": 1781977752.0220778, "type": "dispatch.sent", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "hand_id": "runtime-greeting-orchestrator-0", "executor_id": "brain-inline", "task_id": "t1", "dimension": "session greeting & context handoff", "is_repair": false}
+{"ts": 1781977761.1289265, "type": "dispatch.error", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "hand_id": "runtime-greeting-orchestrator-0", "task_id": "t1", "message": "hand brain-inline returned no artifact"}
+{"ts": 1781977761.1309283, "type": "phase.end", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "phase": "dispatch", "hand_count": 1}
+{"ts": 1781977761.1309283, "type": "state.transition", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "from": "Dispatching", "to": "Reviewing"}
+{"ts": 1781977761.1321826, "type": "phase.start", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "phase": "review"}
+{"ts": 1781977766.1379185, "type": "phase.end", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "phase": "review", "follow_up_count": 0}
+{"ts": 1781977766.1379185, "type": "state.transition", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "from": "Reviewing", "to": "Synthesizing"}
+{"ts": 1781977766.1389143, "type": "phase.start", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "phase": "synthesize"}
+{"ts": 1781977770.352225, "type": "phase.end", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "phase": "synthesize"}
+{"ts": 1781977770.3532243, "type": "state.transition", "episode_id": "7430e26f-1330-4c18-8039-228d651eaca3", "from": "Synthesizing", "to": "Persisted"}

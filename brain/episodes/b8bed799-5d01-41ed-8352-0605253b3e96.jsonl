@@ -1,0 +1,3 @@
+{"ts": 1781880808.9684706, "type": "episode.start", "episode_id": "b8bed799-5d01-41ed-8352-0605253b3e96", "context_keys": ["source", "entrypoint", "task_family", "session_id", "social", "response_mode", "channel_settings", "bridgeManagedReply", "responseMode", "verification", "social_channel", "social_route", "goal_id"]}
+{"ts": 1781880988.9965568, "type": "episode.error", "episode_id": "b8bed799-5d01-41ed-8352-0605253b3e96", "message": "Brain agent command timed out after 180s"}
+{"ts": 1781880988.9978108, "type": "state.transition", "episode_id": "b8bed799-5d01-41ed-8352-0605253b3e96", "from": "Planning", "to": "Failed", "message": "Brain agent command timed out after 180s"}

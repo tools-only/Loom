@@ -16,6 +16,13 @@ if PROJECT_ROOT not in sys.path:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "channels":
+        from loom_core.channel_admin import run as run_channel_admin
+        raise SystemExit(run_channel_admin(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] in {"agents", "runtimes"}:
+        from loom_core.agent_runtime_admin import run as run_agent_runtime_admin
+        raise SystemExit(run_agent_runtime_admin(sys.argv[2:]))
+
     from loom_core.runtime.app import LoomCoreRuntime
     from loom_core.runtime.http_api import start_http_server
     from loom_core.agent_adapters.registry import create_adapter_registry

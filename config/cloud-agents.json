@@ -1,8 +1,35 @@
 {
-  "_comment": "Add cloud agent adapters here. Keys starting with _ are ignored. Set tokens in .env.",
+  "_comment": "Add HTTP or process agent adapters here. Keys starting with _ are ignored. Set tokens in .env.",
   "_template": {
+    "transport": "http",
+    "protocol": "loom",
     "endpoint": "https://your-agent.example.com/run",
     "capabilities": ["market.analysis"],
+    "timeout_s": 120,
+    "token_env": "YOUR_AGENT_TOKEN",
+    "require_auth": true
+  },
+  "_process_template": {
+    "transport": "process",
+    "protocol": "loom",
+    "command": ["codex", "run"],
+    "capabilities": ["runtime.hand", "workspace.patch"],
+    "timeout_s": 120,
+    "require_auth": false
+  },
+  "_codex_app_server_template": {
+    "transport": "process",
+    "protocol": "codex",
+    "codex_backend": "sdk",
+    "capabilities": ["runtime.hand", "workspace.patch"],
+    "timeout_s": 120,
+    "require_auth": false
+  },
+  "_openai_compatible_template": {
+    "transport": "http",
+    "protocol": "openai",
+    "endpoint": "https://your-agent.example.com/v1/chat/completions",
+    "capabilities": ["runtime.hand"],
     "timeout_s": 120,
     "token_env": "YOUR_AGENT_TOKEN",
     "require_auth": true

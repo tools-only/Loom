@@ -100,8 +100,8 @@
       widget.querySelectorAll('.hfw-thumb').forEach(b => { b.style.color = 'var(--ink-3)'; });
     });
 
-    el.appendChild(widget);
     el.setAttribute(ATTR, '1');
+    el.appendChild(widget);
   }
 
   function mountAll(root) {

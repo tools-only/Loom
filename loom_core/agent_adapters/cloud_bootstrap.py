@@ -8,8 +8,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from loom_core.agent_adapters.adapter import AgentAdapter
 from loom_core.agent_adapters.cloud_config import load_cloud_agents
+from loom_core.agent_adapters.factory import adapter_from_config
 
 
 def register_cloud_adapters(
@@ -25,18 +25,10 @@ def register_cloud_adapters(
     registered: list[str] = []
 
     for adapter_id, cfg in cfgs.items():
-        protocol = cfg.get("protocol", "loom")
-        adapter = AgentAdapter(
-            adapter_id=adapter_id,
-            transport="http",
-            protocol=protocol,
-            endpoint=cfg["endpoint"],
-            auth_token=cfg["auth_token"],
-            timeout_s=cfg["timeout_s"],
-            runtime=runtime if protocol == "loom" else None,
-            hands_root=hands_root if protocol == "loom" else None,
-            capabilities=cfg["capabilities"],
-            system_prompt=cfg.get("system_prompt"),
+        adapter = adapter_from_config(
+            {"adapter_id": adapter_id, **cfg},
+            runtime=runtime,
+            hands_root=hands_root,
         )
         try:
             registry.register(adapter)

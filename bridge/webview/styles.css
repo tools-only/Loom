@@ -259,6 +259,126 @@ tr:hover td { background: rgba(122,90,248,0.04); }
   50% { box-shadow: 0 0 0 4px rgba(122,90,248,0.08), 0 0 20px rgba(122,90,248,0.06); }
 }
 
+/* Channel settings panel */
+.channel-panel {
+  width: min(420px, 92vw);
+}
+
+#anchor-channel-panel {
+  top: 68px;
+  bottom: 18px;
+  width: min(420px, 92vw);
+  max-height: none;
+  z-index: 2002;
+}
+
+.channel-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.channel-panel-status {
+  font-size: 12px;
+  color: var(--fg-2);
+}
+
+.channel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.channel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-1);
+}
+
+.channel-row-main {
+  min-width: 0;
+  flex: 1 1 190px;
+}
+
+.channel-row strong,
+.channel-row span {
+  display: block;
+}
+
+.channel-row strong {
+  font-size: 13px;
+}
+
+.channel-row span {
+  font-size: 11px;
+  color: var(--fg-2);
+}
+
+.channel-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.channel-row-actions button,
+.channel-form button {
+  white-space: nowrap;
+}
+
+.channel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.channel-dynamic-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.channel-form h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.channel-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+
+.channel-form input,
+.channel-form select {
+  width: 100%;
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  background: var(--paper);
+  color: var(--fg-1);
+  font: inherit;
+}
+
+.channel-form .channel-check {
+  flex-direction: row;
+  align-items: center;
+  font-weight: 500;
+}
+
+.channel-form .channel-check input {
+  width: auto;
+}
+
 .toolbar-brand {
   font-family: var(--font-display-cjk);
   font-weight: var(--fw-black);
@@ -875,48 +995,7 @@ tr:hover td { background: rgba(122,90,248,0.04); }
 .anc-element {
   position: relative;
 }
-.anc-element:hover {
-  outline: 1.5px dashed rgba(122,90,248,0.3);
-  outline-offset: 4px;
-  border-radius: 6px;
-}
-
-/* Floating handle trigger — clean circle */
-.anc-handle {
-  position: absolute;
-  top: -6px; right: -6px;
-  width: 26px; height: 26px;
-  border-radius: var(--r-pill);
-  background: var(--bg-2);
-  border: 1.5px solid var(--border-1);
-  cursor: pointer;
-  display: none;
-  align-items: center; justify-content: center;
-  font-size: 14px; font-weight: var(--fw-bold);
-  color: var(--accent-iris);
-  z-index: 100;
-  box-shadow: var(--shadow-sm);
-  user-select: none;
-  transition:
-    transform var(--dur-base) var(--ease-out),
-    box-shadow var(--dur-base) var(--ease-out);
-}
-.anc-handle:hover {
-  transform: scale(1.22);
-  box-shadow: var(--shadow-md), 0 0 0 3px rgba(122,90,248,0.12);
-  background: var(--accent-iris);
-  color: #fff;
-  border-color: var(--accent-iris);
-}
-.anc-handle:active {
-  transform: scale(0.9);
-  transition: transform 0.06s var(--ease-out);
-}
-
-.anc-element:hover > .anc-handle,
-.anc-handle.open {
-  display: flex;
-}
+/* anc-handle and anc-handle-popup removed — user wants no hover identifiers */
 
 /* ── 10. Handle Popup Menu ────────────────── */
 .anc-handle-popup {
@@ -2235,6 +2314,12 @@ tr:hover td { background: rgba(122,90,248,0.04); }
 .loom-hand-table {
   border: 1px solid var(--border, #e5e7eb); border-radius: 10px; overflow: hidden;
 }
+.loom-runtime-note {
+  display: flex; align-items: center; gap: 6px; margin: -2px 0 9px;
+  padding: 7px 10px; border-radius: 7px; font-size: 11px;
+  color: var(--ink-dim, #666); background: var(--paper-2, #f9fafb);
+}
+.loom-runtime-note i { color: var(--accent-iris, #7A5AF8); }
 .loom-hand-header, .loom-hand-row {
   display: grid; grid-template-columns: 120px 1fr 1fr 1fr 1fr; gap: 8px;
   padding: 8px 12px; align-items: center;
@@ -2278,15 +2363,19 @@ tr:hover td { background: rgba(122,90,248,0.04); }
   display: none; grid-template-columns: 2fr 1fr; gap: 5px;
 }
 .hand-fields-agent.is-active { display: grid; }
+.hand-fields-runtime { display: none; }
+.hand-fields-runtime.is-active { display: block; }
 .hand-fields-api input, .hand-fields-api select,
-.hand-fields-agent input {
+.hand-fields-agent input,
+.hand-fields-runtime select {
   border: 1.5px solid var(--border, #e5e7eb); border-radius: 6px;
   padding: 5px 7px; font-size: 12px; font-family: inherit;
   background: var(--paper, #fff); color: var(--ink, #1a1a1a); width: 100%;
   outline: none; transition: border-color 0.15s;
 }
 .hand-fields-api input:focus, .hand-fields-api select:focus,
-.hand-fields-agent input:focus { border-color: var(--accent-iris, #7A5AF8); }
+.hand-fields-agent input:focus,
+.hand-fields-runtime select:focus { border-color: var(--accent-iris, #7A5AF8); }
 .hand-fields-api input[type="password"] { letter-spacing: 2px; }
 
 /* Agent mount table — same visual pattern as hand table but 4 cols */
@@ -3407,12 +3496,13 @@ body::before {
 }
 
 #anchor-stage {
-  width: min(100%, 1500px);
-  max-width: 1500px;
-  padding: 34px clamp(24px, 4vw, 64px) 90px;
+  width: 100%;
+  max-width: none;
+  padding: 24px 32px 90px;
 }
 
 #anchor-content {
+  position: relative;
   overflow-x: visible;
 }
 
@@ -3711,7 +3801,7 @@ body::before {
 /* Generated reports are unpredictable. These constraints make long AI prose,
    KPI grids, and nested cards adapt to the workspace instead of fighting it. */
 #anchor-content > .anc-section {
-  width: min(100%, 100%);
+  width: 100%;
 }
 
 #anchor-content > .anc-section > h1,
@@ -3724,7 +3814,7 @@ body::before {
 #anchor-content > .anc-section > p,
 #anchor-content > .anc-section > div:not(.anc-kpi-grid):not(.anc-pill-row):not(.blog-card-grid),
 #anchor-content > .anc-section > footer {
-  max-width: 88ch;
+  max-width: none;
 }
 
 #anchor-content .anc-section > .anc-section {
@@ -4826,6 +4916,158 @@ body.sta-mode .prompt-hover-zone,
 body.sta-mode .prompt-panel-trigger,
 body.sta-mode .anc-panel-trigger,
 body.sta-mode .workspace-panel,
+/* ── Card Density: L0-L3 progressive reveal ──────────────────────────── */
+.anc-density-card {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Density layers: base state */
+.anc-density-layer {
+  will-change: max-height, opacity, margin;
+  transition:
+    max-height 0.38s cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity   0.26s cubic-bezier(0.22, 0.61, 0.36, 1),
+    margin    0.38s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.anc-density-layer--l3 {
+  max-height: none;
+  opacity: 1;
+}
+
+.anc-density-layer[hidden] {
+  display: block !important;  /* override display:none so transitions work */
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.anc-density-layer:not([hidden]) {
+  max-height: 3200px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Enter / exit transition helpers */
+.anc-density--entering {
+  max-height: 3200px !important;
+  opacity: 1 !important;
+}
+
+.anc-density--exiting {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Mobile: hint horizontal pan affordance */
+.anc-density-card {
+  touch-action: pan-y;  /* vertical scroll passes through; horizontal is swipe */
+}
+
+/* ── Density indicator dots ──────────────────────────────────────────── */
+.anc-density-indicator {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  z-index: 10;
+}
+
+.anc-density-card:hover .anc-density-indicator,
+.anc-density-card.anc-density--locked .anc-density-indicator {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.anc-density-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border-1, rgba(20,21,43,0.15));
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.anc-density-dot:hover {
+  background: var(--accent-iris, #7A5AF8);
+  transform: scale(1.5);
+}
+
+.anc-density-dot.active {
+  background: var(--accent-iris, #7A5AF8);
+  box-shadow: 0 0 0 3px rgba(122,90,248,0.2);
+  transform: scale(1);
+}
+
+/* Locked state: dot pulses once */
+.anc-density--locked .anc-density-dot.active {
+  animation: density-lock-pulse 0.4s ease;
+}
+
+@keyframes density-lock-pulse {
+  0%   { box-shadow: 0 0 0 0px rgba(122,90,248,0.5); }
+  50%  { box-shadow: 0 0 0 8px rgba(122,90,248,0); }
+  100% { box-shadow: 0 0 0 0px rgba(122,90,248,0); }
+}
+
+/* Content within density layers — subtle separation */
+.anc-density-layer--l2,
+.anc-density-layer--l1,
+.anc-density-layer--l0 {
+  border-top: 1px solid rgba(20,21,43,0.06);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+
+/* Peek hint — subtle bottom gradient to indicate more content */
+.anc-density-card:not(.anc-density--locked)::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.72));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+.anc-density-card:hover:not(.anc-density--locked)::after {
+  opacity: 1;
+}
+
+/* In static mode, hide indicator and disable interaction */
+body.sta-mode .anc-density-indicator { display: none !important; }
+body.sta-mode .anc-density-card { touch-action: auto; }
+body.sta-mode .anc-density-layer[hidden] {
+  display: none !important;  /* fully hidden in static */
+}
+
+/* ── Mobile: swipe gesture hint (iOS-style) ──────────────────────────── */
+@media (hover: none) and (pointer: coarse) {
+  .anc-density-indicator {
+    opacity: 0.5;
+    right: 8px;
+    gap: 5px;
+  }
+  .anc-density-dot {
+    width: 9px;
+    height: 9px;
+  }
+}
+
 body.sta-mode .workspace-hover-zone,
 body.sta-mode .anc-handle-popup,
 body.sta-mode .anc-op-bar,
@@ -5704,3 +5946,372 @@ body.sta-mode #anchor-content .anc-section--gc { box-shadow: none; }
   .portfolio-provider-grid,
   .portfolio-metrics { grid-template-columns: 1fr; }
 }
+
+/* ── Orchestration Pipeline ─────────────────── */
+
+.orc-block {
+  margin-top: 4px;
+}
+
+.orc-pipeline {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  overflow-x: auto;
+  padding: 12px 0 8px;
+  scrollbar-width: none;
+}
+.orc-pipeline::-webkit-scrollbar { display: none; }
+
+.orc-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.orc-col-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  padding: 0 6px;
+}
+
+.orc-col-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.orc-node {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--paper, #fff);
+  border: 1px solid var(--surface-2, rgba(0,0,0,.08));
+  font-size: 12px;
+  transition: box-shadow 0.15s;
+  min-width: 100px;
+}
+.orc-node:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+
+.orc-node i { font-size: 16px; flex-shrink: 0; }
+
+.orc-node--brain   { border-left: 3px solid var(--accent-iris, #7A5AF8); }
+.orc-node--brain i { color: var(--accent-iris, #7A5AF8); }
+
+.orc-node--task    { border-left: 3px solid var(--accent-sky, #38BDF8); }
+.orc-node--task i  { color: var(--accent-sky, #38BDF8); }
+
+.orc-node--hand    { border-left: 3px solid var(--accent-lime, #84CC16); }
+.orc-node--hand i  { color: var(--accent-lime, #84CC16); }
+
+.orc-node--artifact { border-left: 3px solid var(--accent-coral, #FB7185); }
+.orc-node--artifact i { color: var(--accent-coral, #FB7185); }
+
+.orc-node--review  { border-left: 3px solid var(--accent-amber, #F59E0B); }
+.orc-node--review i { color: var(--accent-amber, #F59E0B); }
+
+.orc-node-label {
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.orc-node-task {
+  font-size: 10px;
+  color: var(--ink-3);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orc-node-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.orc-connector {
+  display: flex;
+  align-items: center;
+  padding: 16px 4px 0;
+  flex-shrink: 0;
+}
+.orc-connector i {
+  font-size: 18px;
+  color: var(--ink-4);
+}
+
+.orc-diag-details {
+  margin-top: 10px;
+  font-size: 12px;
+}
+.orc-diag-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink-2);
+  padding: 4px 0;
+}
+.orc-diag-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0 5px 8px;
+  border-left: 2px solid var(--surface-3, rgba(0,0,0,.1));
+  margin: 3px 0 3px 4px;
+}
+
+.orc-profiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 2px;
+}
+.orc-profile-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--surface-1, rgba(0,0,0,.03));
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+@media (max-width: 900px) {
+  .orc-pipeline {
+    flex-wrap: wrap;
+  }
+  .orc-connector {
+    transform: rotate(90deg);
+    padding: 2px 0;
+  }
+}
+
+/* ── Orchestration: Rich Hand Profiles ─── */
+.orc-hp-section { margin: 12px 0 8px; }
+.orc-hp-section h5 { margin: 10px 0 6px; font-size: 12px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+
+.orc-hand-profile {
+  background: var(--surface, #fafafa);
+  border: 1px solid var(--border, #e2e2e2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  transition: border-color 0.15s;
+}
+.orc-hand-profile:hover { border-color: var(--accent-iris, #7A5AF8); }
+
+.orc-hp-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.orc-hp-label {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+}
+.orc-hp-model {
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: var(--ink-3);
+  background: var(--surface-2, rgba(0,0,0,.04));
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+.orc-hp-desc {
+  font-size: 12px;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.orc-hp-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.orc-hp-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.orc-hp-tag i { font-size: 11px; }
+.orc-tag-cap   { background: #ede9fe; color: #6d28d9; }
+.orc-tag-tool  { background: #dbeafe; color: #1d4ed8; }
+.orc-tag-mcp   { background: #d1fae5; color: #065f46; }
+.orc-tag-skill { background: #fef3c7; color: #92400e; }
+
+.orc-hp-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+.orc-hp-task i { flex-shrink: 0; margin-top: 2px; color: var(--ink-3); }
+
+.orc-hp-prompt { margin-top: 4px; }
+.orc-hp-prompt summary {
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-3);
+  padding: 3px 0;
+}
+.orc-hp-prompt-body {
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: var(--ink-2);
+  background: var(--surface-2, rgba(0,0,0,.03));
+  border-radius: 6px;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+/* ── Orchestration: Artifact Quality Cards ─── */
+.orc-aq-section { margin: 12px 0 8px; }
+.orc-aq-section h5 { margin: 10px 0 6px; font-size: 12px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+
+.orc-aq-card {
+  background: var(--surface, #fafafa);
+  border: 1px solid var(--border, #e2e2e2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.orc-aq-header {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.orc-aq-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.orc-aq-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 6px;
+  background: var(--surface-2, rgba(0,0,0,.02));
+  border-radius: 6px;
+}
+.orc-aq-metric span { font-size: 9px; color: var(--ink-4); text-transform: uppercase; letter-spacing: 0.03em; }
+.orc-aq-metric strong { font-size: 13px; font-weight: 700; color: var(--ink); margin-top: 1px; }
+
+.orc-aq-scores {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.aq-metric { display: flex; align-items: center; gap: 8px; }
+.aq-metric-label { font-size: 10px; color: var(--ink-3); width: 75px; flex-shrink: 0; text-align: right; }
+.aq-metric-bar { flex: 1; height: 5px; border-radius: 3px; background: var(--surface-2, rgba(0,0,0,.06)); overflow: hidden; }
+.aq-metric-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.aq-metric-val { font-size: 10px; font-weight: 600; color: var(--ink-2); width: 35px; flex-shrink: 0; }
+
+.orc-aq-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.orc-aq-flag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.orc-aq-flag-good { background: #dcfce7; color: #166534; }
+.orc-aq-flag-warn { background: #fef3c7; color: #92400e; }
+.orc-aq-flag-bad  { background: #fee2e2; color: #991b1b; }
+.orc-aq-flag-info { background: #f3f4f6; color: #6b7280; }
+
+/* ── Orchestration: Inline Tags ─── */
+.orc-inline-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.orc-inline-tag i { font-size: 10px; }
+
+/* ── Orchestration: Expand/Collapse ─── */
+.orc-expand-btn {
+  background: none;
+  border: 1px solid var(--border, #e2e2e2);
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  color: var(--ink-3);
+  font-size: 14px;
+  transition: all 0.15s;
+}
+.orc-expand-btn:hover { background: var(--surface-2, rgba(0,0,0,.04)); color: var(--ink); }
+
+/* Full-screen expanded orchestration overlay */
+.orc-expanded {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9999 !important;
+  background: var(--paper, #fff) !important;
+  overflow-y: auto !important;
+  padding: 24px !important;
+  max-width: none !important;
+  width: 100vw !important;
+}
+
+.orc-harness-link { margin-top: 10px; }
+.orc-harness-link a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-iris, #7A5AF8);
+  color: var(--accent-iris, #7A5AF8);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+.orc-harness-link a:hover { background: var(--accent-iris, #7A5AF8); color: #fff; }
+
+/* ── Orchestration: Hand meta in node ─── */
+.orc-hand-meta { margin-top: 3px; }

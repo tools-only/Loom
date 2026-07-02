@@ -65,5 +65,6 @@ REGISTRY = {
         "domains": ["general"],
         "wiki_dir": str(ROOT.parent / "skills" / "canvas-codesign"),
         "config_schema": {},
+        "preferred_resources": [],
     },
 }

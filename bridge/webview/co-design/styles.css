@@ -528,29 +528,7 @@
   color: var(--accent-iris);
 }
 
-/* ── Handle overlay (Anchor protocol) ─────────────────────────────── */
-
-.anc-handle {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
-  border: 1px solid var(--pastel-iris);
-  background: var(--paper);
-  color: var(--accent-iris);
-  cursor: pointer;
-  transition: all 0.12s;
-  white-space: nowrap;
-  vertical-align: middle;
-  margin-left: 4px;
-}
-.anc-handle:hover {
-  background: var(--accent-iris);
-  color: #fff;
-}
+/* ── Handle overlay (Anchor protocol) — removed ──────────────────── */
 
 /* ── Processing indicator ─────────────────────────────────────────── */
 

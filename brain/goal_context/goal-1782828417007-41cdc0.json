@@ -1,0 +1,24 @@
+{
+  "goal_id": "goal-1782828417007-41cdc0",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-30T14:06:57.007820Z",
+  "updated_at": "2026-06-30T14:17:11.215285Z",
+  "status": "open",
+  "title": "Is NVIDIA a buy right now?",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1782829031213-009d42af",
+      "ts": "2026-06-30T14:17:11.213286Z",
+      "stance": "n/a",
+      "confidence": 0.0,
+      "key_drivers": [],
+      "reversal_condition": "当获取到至少三个分析维度的可靠数据后，触发重新评估"
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1782829031213-009d42af"
+  ]
+}

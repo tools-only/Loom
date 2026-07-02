@@ -1,0 +1,24 @@
+{
+  "goal_id": "goal-1782029917240-a7922a",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-21T08:18:37.240788Z",
+  "updated_at": "2026-06-21T08:20:18.057575Z",
+  "status": "open",
+  "title": "将该html文件发送给我",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1782030018055-f2843194",
+      "ts": "2026-06-21T08:20:18.055575Z",
+      "stance": "n/a",
+      "confidence": 0.0,
+      "key_drivers": [],
+      "reversal_condition": ""
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1782030018055-f2843194"
+  ]
+}

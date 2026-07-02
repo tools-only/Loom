@@ -27,6 +27,13 @@ class AtomicTask:
     depends_on: list[str] = field(default_factory=list)
     system_prompt: str = ""                           # Brain-generated role contract for the hand agent
     capabilities: list[str] = field(default_factory=list)  # Brain-declared capability tags (e.g. ["portfolio"])
+    # State-aware decomposition fields (MVP):
+    state_slice: list[str] = field(default_factory=list)
+    target_state_ids: list[str] = field(default_factory=list)
+    target_gap_ids: list[str] = field(default_factory=list)
+    rubric_ids: list[str] = field(default_factory=list)
+    state_intent: str = "use"  # use, establish, verify, refresh, resolve
+    evidence_requirements: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -40,6 +47,12 @@ class AtomicTask:
             "depends_on": self.depends_on,
             "system_prompt": self.system_prompt,
             "capabilities": self.capabilities,
+            "state_slice": self.state_slice,
+            "target_state_ids": self.target_state_ids,
+            "target_gap_ids": self.target_gap_ids,
+            "rubric_ids": self.rubric_ids,
+            "state_intent": self.state_intent,
+            "evidence_requirements": self.evidence_requirements,
         }
 
 

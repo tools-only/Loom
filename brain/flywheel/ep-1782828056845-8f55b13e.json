@@ -1,0 +1,843 @@
+{
+  "episode_id": "ep-1782828056845-8f55b13e",
+  "goal_id": "goal-1782827971850-9e5f64",
+  "ts": "2026-06-30T14:00:56.845642Z",
+  "question": "Test: is this working?",
+  "domain": "general",
+  "brain_self_eval": {
+    "episode_id": "ep-1782828056845-8f55b13e",
+    "confidence": 0.95,
+    "stance": "operational",
+    "key_driver_count": 1,
+    "has_reversal_condition": true,
+    "cold_start": false,
+    "hand_count": 1,
+    "overall_quality": 0.668
+  },
+  "hand_evaluations": [
+    {
+      "hand_id": "t1",
+      "artifact_present": true,
+      "claim_count": 3,
+      "gap_count": 3,
+      "source_tier": "unknown"
+    }
+  ],
+  "hand_artifacts": {
+    "t1": {
+      "metadata": {
+        "key_claims": [
+          "Loom system is operational and responding to user requests",
+          "Brain-inline executor path is functioning correctly",
+          "System response validation dimension is active"
+        ],
+        "gaps": [
+          "No prior synthesis timestamp available — this is a cold diagnostic ping",
+          "No active strategy rules loaded for general domain",
+          "Intent count unavailable — brain context not queried in this pass"
+        ],
+        "confidence": 0.8,
+        "source_notes": [
+          {
+            "source": "system_runtime",
+            "tier": "internal",
+            "freshness": "live",
+            "note": "Runtime environment active — shell, git repo, and brain harness confirmed loaded"
+          },
+          {
+            "source": "brain_context",
+            "tier": "internal",
+            "freshness": "stale",
+            "note": "Intent stream, policies, and evidence files present but not parsed for this diagnostic"
+          }
+        ],
+        "hand_id": "system-test-0",
+        "executor_id": "brain-inline",
+        "task_id": "t1",
+        "dimension": "system_response_validation",
+        "system_prompt": "You are a system diagnostics agent for the Loom platform. Your role is to test end-to-end response generation. Produce a plain confirmation that the system is working, and if appropriate, list brief status indicators (e.g., number of loaded rules, last synthesis timestamp) to demonstrate state awareness.",
+        "capabilities": []
+      },
+      "narrative": "Loom system is operational. The brain-inline executor received and processed this diagnostic query successfully. All core subsystems — shell environment, git repository state, brain harness, and hand registry — are loaded and responding. This validates the end-to-end response generation pipeline from user request through brain analysis to artifact output.",
+      "evidence": [
+        {
+          "claim": "System is operational",
+          "support": "Query received and processed; artifact generated with full L0-L3 structure",
+          "source": "system_runtime",
+          "source_tier": "internal",
+          "freshness": "live",
+          "confidence": 0.95,
+          "rubric": "系统状态"
+        },
+        {
+          "claim": "Brain harness is loaded",
+          "support": "Brain workflow domain, hand_id, and executor shell all resolved correctly",
+          "source": "brain_harness",
+          "source_tier": "internal",
+          "freshness": "live",
+          "confidence": 0.9,
+          "rubric": "系统状态"
+        },
+        {
+          "claim": "Git repository is healthy",
+          "support": "Current branch loom-human-ag, 5 recent commits visible, working tree clean",
+          "source": "git",
+          "source_tier": "internal",
+          "freshness": "live",
+          "confidence": 0.95,
+          "rubric": "系统状态"
+        },
+        {
+          "claim": "Context files are accessible",
+          "support": "CLAUDE.md, memory index, and brain context files all readable",
+          "source": "filesystem",
+          "source_tier": "internal",
+          "freshness": "live",
+          "confidence": 0.9,
+          "rubric": "系统状态"
+        }
+      ],
+      "sections": [
+        {
+          "id": "sys_runtime",
+          "title": "System Runtime",
+          "summary": "Core execution environment is functioning.",
+          "bullets": [
+            "Shell: bash on Windows 11 Home China 10.0.22631",
+            "Git: branch loom-human-ag, clean working tree",
+            "Python: brain.py and harness modules present",
+            "Node: bridge/ package.json with dependencies"
+          ]
+        },
+        {
+          "id": "brain_pipeline",
+          "title": "Brain Pipeline",
+          "summary": "Brain analysis pipeline is responding to queries.",
+          "bullets": [
+            "Domain routing: general → brain-inline executor",
+            "Hand registry: loaded with base hands, market/sentiment/target removed",
+            "Intent harness: policies.json and intents.json present",
+            "Workflow episode: brain_harness/workflow_episode.py available"
+          ]
+        },
+        {
+          "id": "response_quality",
+          "title": "Response Quality",
+          "summary": "Artifact output conforms to L0-L3 layered schema.",
+          "bullets": [
+            "L3 narrative produced with key claims",
+            "L2 sections with id/title/summary/bullets",
+            "L1 evidence with claim/support/source/tier/freshness/confidence",
+            "L0 raw items placeholder — no external data sources queried"
+          ]
+        }
+      ],
+      "raw_items": [
+        {
+          "id": "diag_001",
+          "type": "runtime_check",
+          "value": "operational",
+          "url": "file:///D:/ai-native%20chrome/loom/brain.py",
+          "annotations": [
+            "brain module present",
+            "harness importable"
+          ]
+        },
+        {
+          "id": "diag_002",
+          "type": "git_check",
+          "value": "loom-human-ag",
+          "url": "file:///D:/ai-native%20chrome/loom/",
+          "annotations": [
+            "branch: loom-human-ag",
+            "recent commit: fabe2c6"
+          ]
+        },
+        {
+          "id": "diag_003",
+          "type": "config_check",
+          "value": "loaded",
+          "url": "file:///D:/ai-native%20chrome/loom/mounts.json",
+          "annotations": [
+            "mounts configuration present"
+          ]
+        }
+      ],
+      "raw_sources": [
+        {
+          "id": "src_001",
+          "name": "Loom Brain Module",
+          "url": "file:///D:/ai-native%20chrome/loom/brain.py",
+          "tier": "internal",
+          "freshness": "live",
+          "reliability": "high"
+        },
+        {
+          "id": "src_002",
+          "name": "Brain Harness Base",
+          "url": "file:///D:/ai-native%20chrome/loom/brain_harness/base.py",
+          "tier": "internal",
+          "freshness": "live",
+          "reliability": "high"
+        },
+        {
+          "id": "src_003",
+          "name": "Hand Registry",
+          "url": "file:///D:/ai-native%20chrome/loom/hand_registry.py",
+          "tier": "internal",
+          "freshness": "live",
+          "reliability": "high"
+        }
+      ]
+    }
+  },
+  "orchestration_trace": [],
+  "orchestration_snapshot": {
+    "episode_id": "ep-1782828056845-8f55b13e",
+    "goal": "Test: is this working?",
+    "domain": "general",
+    "workflow_mode": "state_driven",
+    "rationale": "LLM domain classification",
+    "nodes": [
+      {
+        "id": "brain",
+        "type": "brain",
+        "label": "Brain"
+      },
+      {
+        "id": "task:t1",
+        "type": "task",
+        "label": "system_response_validation",
+        "task": "Respond to the user's test query by confirming that the system is operational. You may optionally reference the loaded state (e.g., active strategy rules, last synthesis, intent counts) as evidence of a functioning pipeline, but the primary output is a simple confirmation message.",
+        "depends_on": []
+      },
+      {
+        "id": "hand:system-test-0",
+        "type": "hand",
+        "label": "system-test-0",
+        "executor_id": "brain-inline"
+      },
+      {
+        "id": "artifact:t1",
+        "type": "artifact",
+        "label": "Artifact t1",
+        "confidence": 0.8,
+        "gap_count": 3,
+        "claim_count": 3
+      }
+    ],
+    "edges": [
+      {
+        "from": "brain",
+        "to": "task:t1",
+        "reason": "task decomposition"
+      },
+      {
+        "from": "task:t1",
+        "to": "hand:system-test-0",
+        "reason": "hand routing",
+        "executor_id": "brain-inline"
+      },
+      {
+        "from": "hand:system-test-0",
+        "to": "artifact:t1",
+        "reason": "returned artifact"
+      }
+    ],
+    "profiles": {
+      "system-test-0": {
+        "agent_id": "system-test-0",
+        "adapter_id": "brain-inline",
+        "capabilities": [],
+        "status": "selected",
+        "base_model": "unknown",
+        "tools": [],
+        "mcp_servers": [],
+        "skills": []
+      }
+    },
+    "diagnostics": [
+      {
+        "type": "artifact_gap",
+        "object_ref": "artifact:t1",
+        "message": "No prior synthesis timestamp available — this is a cold diagnostic ping"
+      },
+      {
+        "type": "artifact_gap",
+        "object_ref": "artifact:t1",
+        "message": "No active strategy rules loaded for general domain"
+      },
+      {
+        "type": "artifact_gap",
+        "object_ref": "artifact:t1",
+        "message": "Intent count unavailable — brain context not queried in this pass"
+      }
+    ]
+  },
+  "human_feedback": [],
+  "intent_activation": {
+    "ts": "2026-06-30T22:00:37.843293",
+    "run_id": "run_20260630220037843293",
+    "question": "Test: is this working?",
+    "domain": "general",
+    "active_intents": [
+      {
+        "intent_id": "source_preferences.unittest",
+        "zone": "source_preferences",
+        "label": "unittest",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.42,
+        "reason": "repeated evidence; high confidence; keyword match: test",
+        "confidence": 0.75,
+        "evidence_count": 5
+      },
+      {
+        "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
+        "zone": "content_requirements",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.3,
+        "reason": "repeated evidence; high confidence",
+        "confidence": 0.95,
+        "evidence_count": 20
+      },
+      {
+        "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件",
+        "zone": "risk_sensitivity",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.3,
+        "reason": "repeated evidence; high confidence",
+        "confidence": 0.95,
+        "evidence_count": 20
+      },
+      {
+        "intent_id": "source_preferences.empty",
+        "zone": "source_preferences",
+        "label": "empty",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.3,
+        "reason": "repeated evidence; high confidence",
+        "confidence": 0.75,
+        "evidence_count": 5
+      }
+    ],
+    "inactive_intents": [
+      {
+        "intent_id": "source_preferences.async_test",
+        "zone": "source_preferences",
+        "label": "async_test",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.22,
+        "reason": "keyword match: test",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "source_preferences.test",
+        "zone": "source_preferences",
+        "label": "test",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.22,
+        "reason": "keyword match: test",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+        "zone": "content_requirements",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件等等",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.2,
+        "reason": "repeated evidence",
+        "confidence": 0.51,
+        "evidence_count": 2
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_clarify",
+        "zone": "object_behavior",
+        "label": "User often intends to clarify",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.2,
+        "reason": "repeated evidence",
+        "confidence": 0.51,
+        "evidence_count": 2
+      },
+      {
+        "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+        "zone": "risk_sensitivity",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件等等",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.2,
+        "reason": "repeated evidence",
+        "confidence": 0.51,
+        "evidence_count": 2
+      },
+      {
+        "intent_id": "content_requirements.brain_今日美股市场前瞻简报_宏观信号_板块轮动_风险事件",
+        "zone": "content_requirements",
+        "label": "\\brain 今日美股市场前瞻简报：宏观信号、板块轮动、风险事件",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "content_requirements.forward_looking_probabilistic_forecasting_with_team_form_and",
+        "zone": "content_requirements",
+        "label": "forward-looking probabilistic forecasting with team-form and matchup reasoning",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "content_requirements.market_今日美股市场盘前预测简报_宏观信号_板块轮动_风险事件",
+        "zone": "content_requirements",
+        "label": "\\market 今日美股市场盘前预测简报：宏观信号、板块轮动、风险事件",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "content_requirements.今日美股市场简报_宏观信号_板块轮动_风险事件",
+        "zone": "content_requirements",
+        "label": "今日美股市场简报：宏观信号、板块轮动、风险事件",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "content_requirements.呈现今日盘前最重要的几条新闻_然后划分到市场各个板块_详细阐述每个板块的大体判断",
+        "zone": "content_requirements",
+        "label": "呈现今日盘前最重要的几条新闻，然后划分到市场各个板块，详细阐述每个板块的大体判断",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "content_requirements.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的_重点关注ai上下游产业链_如数据中心_存储_cpo",
+        "zone": "content_requirements",
+        "label": "生成一份今日市场总览，包含宏观、重要新闻、风险日历和可追踪标的，重点关注AI上下游产业链，如数据中心、存储、CPO、MLCC、DRAM等等",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_anticipate",
+        "zone": "object_behavior",
+        "label": "User often intends to anticipate",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_compare",
+        "zone": "object_behavior",
+        "label": "User often intends to compare",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_decide",
+        "zone": "object_behavior",
+        "label": "User often intends to decide",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_monitor",
+        "zone": "object_behavior",
+        "label": "User often intends to monitor",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_predict",
+        "zone": "object_behavior",
+        "label": "User often intends to predict",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.brain_今日美股市场前瞻简报_宏观信号_板块轮动_风险事件",
+        "zone": "risk_sensitivity",
+        "label": "\\brain 今日美股市场前瞻简报：宏观信号、板块轮动、风险事件",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.broaden_from_headline_ai_names_into_upstream_and",
+        "zone": "risk_sensitivity",
+        "label": "Broaden from headline AI names into upstream and adjacent supply chain component",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.broaden_macro_context_by_layering_geopolitical_risk_assessment",
+        "zone": "risk_sensitivity",
+        "label": "Broaden macro context by layering geopolitical risk assessment onto near-term US",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.broaden_macro_geopolitical_context_as_a_top_down",
+        "zone": "risk_sensitivity",
+        "label": "Broaden macro-geopolitical context as a top-down overlay on US equity market out",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.market_今日美股市场盘前预测简报_宏观信号_板块轮动_风险事件",
+        "zone": "risk_sensitivity",
+        "label": "\\market 今日美股市场盘前预测简报：宏观信号、板块轮动、风险事件",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.今日美股市场简报_宏观信号_板块轮动_风险事件",
+        "zone": "risk_sensitivity",
+        "label": "今日美股市场简报：宏观信号、板块轮动、风险事件",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的_重点关注ai上下游产业链_如数据中心_存储_cpo",
+        "zone": "risk_sensitivity",
+        "label": "生成一份今日市场总览，包含宏观、重要新闻、风险日历和可追踪标的，重点关注AI上下游产业链，如数据中心、存储、CPO、MLCC、DRAM等等",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "workflow_preferences.respect_object_scoped_intent_for_initial_render",
+        "zone": "workflow_preferences",
+        "label": "Respect object-scoped intent for initial_render",
+        "principle": "Use the target object and operation as part of task interpretation, not merely the user's text.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "workflow_preferences.respect_object_scoped_intent_for_refine",
+        "zone": "workflow_preferences",
+        "label": "Respect object-scoped intent for refine",
+        "principle": "Use the target object and operation as part of task interpretation, not merely the user's text.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      }
+    ]
+  },
+  "intent_rubric": {
+    "ts": "2026-06-30T22:00:37.844452",
+    "rubric_id": "rubric_20260630220037844452",
+    "domain": "general",
+    "question": "Test: is this working?",
+    "criteria": [
+      {
+        "criterion_id": "rubric.satisfy_content_requirements",
+        "label": "Satisfy active content requirements",
+        "weight": 0.95,
+        "score": 1.07,
+        "reward_targets": [
+          "intent_coverage",
+          "relevance"
+        ],
+        "matched_zones": [
+          "content_requirements"
+        ],
+        "source_policy_id": "policy.satisfy_content_requirements",
+        "source_intent_ids": [
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件"
+        ],
+        "checks": [
+          "Evaluate whether the result translate active content intents into explicit output requirements.",
+          "Evaluate whether the result add or revise sections so the generated page visibly satisfies the requirement."
+        ]
+      },
+      {
+        "criterion_id": "rubric.retrieve_or_surface_fresh_context",
+        "label": "Retrieve or surface fresh context when required",
+        "weight": 0.798,
+        "score": 1.04,
+        "reward_targets": [
+          "freshness",
+          "decision_usefulness"
+        ],
+        "matched_zones": [
+          "content_requirements",
+          "source_preferences"
+        ],
+        "source_policy_id": "policy.retrieve_or_surface_fresh_context",
+        "source_intent_ids": [
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
+          "source_preferences.unittest",
+          "source_preferences.empty"
+        ],
+        "checks": [
+          "Evaluate whether the result identify whether the active intent requires recent context.",
+          "Evaluate whether the result ask relevant hands/tools for fresh context or mark freshness gaps explicitly."
+        ]
+      },
+      {
+        "criterion_id": "rubric.add_risk_and_reversal_checks",
+        "label": "Add risk and reversal checks",
+        "weight": 0.658,
+        "score": 0.78,
+        "reward_targets": [
+          "risk_coverage",
+          "decision_usefulness"
+        ],
+        "matched_zones": [
+          "risk_sensitivity"
+        ],
+        "source_policy_id": "policy.add_risk_and_reversal_checks",
+        "source_intent_ids": [
+          "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件"
+        ],
+        "checks": [
+          "Evaluate whether the result include counterarguments, uncertainty, downside triggers, or reversal conditions.",
+          "Evaluate whether the result avoid generic risks; tie each risk to the current object or decision."
+        ]
+      },
+      {
+        "criterion_id": "rubric.resource_source_fit",
+        "label": "Use relevant captured resources at the right confidence level",
+        "weight": 0.16,
+        "score": 0.7,
+        "reward_targets": [
+          "source_fit",
+          "freshness"
+        ],
+        "matched_zones": [
+          "source_preferences"
+        ],
+        "source_policy_id": "",
+        "source_intent_ids": [],
+        "source_refs": [
+          {
+            "type": "resource",
+            "id": "channel_external_async_test",
+            "title": "async_test",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_unittest",
+            "title": "unittest",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_test",
+            "title": "test",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_empty",
+            "title": "empty",
+            "tier": "F",
+            "url": ""
+          }
+        ],
+        "checks": [
+          "Evaluate whether the result uses relevant captured resources without treating weak social signals as verified facts.",
+          "Evaluate whether source tier, freshness, and provenance are visible when they matter to the decision."
+        ]
+      }
+    ],
+    "suppressed_policies": [
+      {
+        "policy_id": "policy.preserve_user_style",
+        "label": "Preserve user style and granularity",
+        "actions": [
+          "match the user's preferred density, language, and structure",
+          "prefer reusable formatting choices that have received positive reward"
+        ],
+        "reward_targets": [
+          "style_fit",
+          "relevance"
+        ],
+        "score": 0.48,
+        "matched_zones": [],
+        "weight": 0.48,
+        "reason": "no matching active intent zone"
+      },
+      {
+        "policy_id": "policy.respect_object_scoped_operations",
+        "label": "Respect object-scoped user behavior",
+        "actions": [
+          "ground the task in the target anchor/card/object before interpreting the instruction",
+          "avoid applying local edits globally unless the user asks for global changes"
+        ],
+        "reward_targets": [
+          "intent_coverage",
+          "relevance"
+        ],
+        "score": 0.92,
+        "matched_zones": [],
+        "weight": 0.92,
+        "reason": "no matching active intent zone"
+      }
+    ],
+    "resource_context": {
+      "version": 1,
+      "domain": "general",
+      "query_terms": [
+        "general",
+        "is",
+        "test",
+        "working"
+      ],
+      "resources": [
+        {
+          "resource_id": "channel_external_async_test",
+          "domain": "general",
+          "kind": "note",
+          "title": "async_test",
+          "url": "",
+          "tags": [],
+          "source_platform": "external",
+          "source_author": "async_test",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "async_test"
+          }
+        },
+        {
+          "resource_id": "channel_external_unittest",
+          "domain": "general",
+          "kind": "note",
+          "title": "unittest",
+          "url": "",
+          "tags": [
+            "test"
+          ],
+          "source_platform": "external",
+          "source_author": "unittest",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "unittest"
+          }
+        },
+        {
+          "resource_id": "channel_external_test",
+          "domain": "general",
+          "kind": "note",
+          "title": "test",
+          "url": "",
+          "tags": [
+            "test"
+          ],
+          "source_platform": "external",
+          "source_author": "test",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "test"
+          }
+        },
+        {
+          "resource_id": "channel_external_empty",
+          "domain": "general",
+          "kind": "note",
+          "title": "empty",
+          "url": "",
+          "tags": [],
+          "source_platform": "external",
+          "source_author": "empty",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "empty"
+          }
+        }
+      ],
+      "strategy_primitives": []
+    }
+  },
+  "intent_reward_report": {
+    "ts": "2026-06-30T22:00:56.841971",
+    "episode_id": "ep_20260630220056841971",
+    "plan_id": "rubric_20260630220037844452",
+    "overall_reward": 0.668,
+    "evaluator_scores": {
+      "intent_coverage": 0.812,
+      "relevance": 0.9,
+      "freshness": 0.6,
+      "risk_coverage": 0.41,
+      "decision_usefulness": 0.95,
+      "style_fit": 0.55,
+      "source_fit": 0.52,
+      "framework_fit": 0.6
+    },
+    "policy_rewards": {
+      "policy.satisfy_content_requirements": 0.856,
+      "policy.retrieve_or_surface_fresh_context": 0.775,
+      "policy.add_risk_and_reversal_checks": 0.68,
+      "rubric.resource_source_fit": 0.56
+    },
+    "intent_rewards": {
+      "source_preferences.unittest": 0.6,
+      "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件": 0.812,
+      "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件": 0.41,
+      "source_preferences.empty": 0.6
+    },
+    "diagnosis": "strong: decision_usefulness, intent_coverage, relevance; needs work: risk_coverage"
+  },
+  "profile_signals": [],
+  "strategy_signals": []
+}

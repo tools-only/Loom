@@ -1,4 +1,4 @@
-﻿// Anchor Client —injects interactive handles and captures user ops
+// Anchor Client —injects interactive handles and captures user ops
 // Uses WebSocket for receiving HTML and sending ops
 
 const Anchor = {
@@ -61,6 +61,9 @@ const Anchor = {
     if (window.HistoryPanel)     HistoryPanel.init(this);
     if (window.DebateOverlay)    DebateOverlay.init(this);
     if (window.SettingsPanel)   SettingsPanel.init(this);
+    if (window.BrushTool)       BrushTool.init(this);
+    if (window.LayoutTool)      LayoutTool.init(this);
+    if (window.CardDensity)     CardDensity.init(this);
     this._initSidePanelToggles();
     this._initExecuteAll();
     this._initShutdown();
@@ -70,6 +73,7 @@ const Anchor = {
     this._initHomeSuggestions();
     this._initHashRouting();
     this._initAnchorSelect();
+    this._initInlineEditing();
   },
 
   // Parse hash: "#sta/market" →{static:true, route:"market"}
@@ -116,6 +120,11 @@ const Anchor = {
       if (window.LoomIntelligencePage) window.LoomIntelligencePage.renderInto(this);
       this._syncHomeVisibility();
       this._updateToolbarTabs(route);
+    } else if (route === 'harness') {
+      this._showRouteShell(route);
+      this._renderHarnessRoute();
+      this._syncHomeVisibility();
+      this._updateToolbarTabs(route);
     } else if (['market','position','target','sentiment'].includes(route)) {
       this._showRouteShell(route);
       this._loadBlogDomain(route);
@@ -133,6 +142,22 @@ const Anchor = {
     if (home) home.classList.add('is-hidden');
     if (shell) shell.classList.add('has-content');
     this._updateToolbarTabs(next);
+  },
+
+  _renderHarnessRoute() {
+    const html = [
+      '<div class="blog-page harness-page">',
+      '<section class="blog-header anc-section anc-section--gc anc-section--arctic" data-anc="harness.page" data-detail-disabled="true">',
+      '<div class="blog-section-label"><i class="ph-bold ph-graph"></i> Harness</div>',
+      '<h1>Loom Agent Architecture</h1>',
+      '<p>Operational map for Brain, hand agents, adapter bindings, model configuration, mounts, and recent execution state.</p>',
+      '</section>',
+      '<section class="anc-section anc-section--gc harness-architecture-summary" data-anc="harness-summary" data-detail-disabled="true"></section>',
+      '</div>'
+    ].join('');
+    this.currentHtml = html;
+    this.container.innerHTML = html;
+    if (window.HarnessSummary) window.HarnessSummary.mountAll(this.container);
   },
 
   _initHashRouting() {
@@ -532,6 +557,7 @@ const Anchor = {
       tab.classList.toggle('active', tab.dataset.domain === activeDomain);
     });
     document.getElementById('anchor-intent-wiki-btn')?.classList.toggle('active', activeDomain === 'intent-wiki');
+    document.getElementById('anchor-harness-btn')?.classList.toggle('active', activeDomain === 'harness');
   },
 
   async _hydratePortfolioHub() {
@@ -805,6 +831,7 @@ const Anchor = {
     if (current === next) {
       if (next === 'overview') this._loadOverview();
       else if (BRANCH_DOMAINS.includes(next)) this._loadBlogDomain(next);
+      else this._routeHash(next);
       return;
     }
     window.location.hash = next;
@@ -916,37 +943,91 @@ const Anchor = {
     const slash = this._parseLoomSlashCommand(text);
     const promptText = slash ? slash.text : text;
     if (!promptText) { this.toast('Prompt text required'); return; }
-    const effectiveRoute = String(route || slash?.route || '').trim() || this._readPromptRouteChoice() || this._inferRoute(promptText);
-    let visualize = this._readVisualizeChoice();
-    if (slash && typeof slash.visualize === 'boolean') visualize = slash.visualize;
-    const routeContext = {
-      source: 'ui',
-      task_family: effectiveRoute === 'general' ? 'general' : 'monitor',
-      visualize,
-      presentation: visualize ? 'card' : 'none',
-      surface: this._loomSurface(),
-      visual_id: this._loomVisualId() || undefined,
-    };
-    if (visualize) this._navigateToRoute(effectiveRoute);
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.toast('Not connected —please wait');
+
+    // /loom or /loom-visual —legacy visual workspace (WebSocket CC path)
+    if (slash && (slash.command === 'loom' || slash.command === 'loom-visual')) {
+      const effectiveRoute = String(route || slash.route || '').trim() || this._readPromptRouteChoice() || this._inferRoute(promptText);
+      const visualize = slash.command === 'loom-visual';
+      const routeContext = {
+        source: 'ui',
+        task_family: effectiveRoute === 'general' ? 'general' : 'monitor',
+        visualize,
+        presentation: visualize ? 'card' : 'none',
+        surface: this._loomSurface(),
+        visual_id: this._loomVisualId() || undefined,
+      };
+      if (visualize) this._navigateToRoute(effectiveRoute);
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        this.toast('Not connected —please wait');
+        return;
+      }
+      this._allowIncomingHtml = visualize;
+      this._pendingPromptRoute = visualize ? effectiveRoute : '';
+      this._timing = {
+        op: 'prompt',
+        target: effectiveRoute,
+        t0_click: performance.now(),
+        t1_built: performance.now(),
+        _agentContext: this._activeBranch ? 'branch:' + this._activeBranch : 'content-agent',
+      };
+      if (visualize) this.container.innerHTML = '';
+      this.ws.send(JSON.stringify({ type: 'prompt', text: promptText, route: effectiveRoute, visualize, context: routeContext, ts: Date.now() }));
+      this._captureIntent('query', text, 'route:' + effectiveRoute + ';visualize:' + visualize);
+      this.showProcessing(visualize ? 'Generating...' : 'Running...');
+      this.toast('Prompt sent');
       return;
     }
-    this._allowIncomingHtml = visualize;
-    this._pendingPromptRoute = visualize ? effectiveRoute : '';
-    // Initialize timing for prompt-based generation
+
+    // Default: everything goes through Brain /analyze
+    this._submitBrainAnalyze(promptText);
+  },
+
+  // /brain — direct HTTP call to Brain /analyze; patches arrive via WS
+  async _submitBrainAnalyze(question) {
+    this.showProcessing('Brain analyzing...');
+    this.toast('Brain thinking...');
     this._timing = {
-      op: 'prompt',
-      target: effectiveRoute,
+      op: 'brain_analyze',
+      target: 'brain',
       t0_click: performance.now(),
       t1_built: performance.now(),
-      _agentContext: this._activeBranch ? 'branch:' + this._activeBranch : 'content-agent',
     };
-    if (visualize) this.container.innerHTML = '';
-    this.ws.send(JSON.stringify({ type: 'prompt', text: promptText, route: effectiveRoute, visualize, context: routeContext, ts: Date.now() }));
-    this._captureIntent('query', text, 'route:' + effectiveRoute + ';visualize:' + visualize);
-    this.showProcessing(visualize ? 'Generating...' : 'Running...');
-    this.toast('Prompt sent');
+    // Clear home and create content shell with patch targets
+    this.container.innerHTML =
+      '<section data-anc="brain-synthesis"></section>' +
+      '<section data-anc="orchestration-snapshot"></section>' +
+      '<section data-anc="harness-summary"></section>';
+    // Update URL to a stable route so the user can see where they are
+    window.location.hash = '#brain';
+    try {
+      const resp = await fetch('http://127.0.0.1:3002/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: question }),
+      });
+      const data = await resp.json();
+      this.hideProcessing();
+      if (data.ok) {
+        this.toast('Brain: ' + (data.synthesis?.stance || 'done') + ' (episode ' + (data.episode_id || '').slice(0, 8) + ')');
+        // Wait for patches to land then scroll to results
+        var self = this;
+        var attempts = 0;
+        var _scrollToResults = function() {
+          var el = self.container.querySelector('[data-anc="brain-synthesis"]');
+          if (el && el.textContent.trim().length > 10) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } else if (++attempts < 15) {
+            setTimeout(_scrollToResults, 400);
+          }
+        };
+        setTimeout(_scrollToResults, 300);
+      } else {
+        this.toast('Brain error: ' + (data.error || 'unknown'));
+      }
+    } catch (e) {
+      this.hideProcessing();
+      this.toast('Brain unreachable — is Brain on port 3002?');
+    }
   },
 
   _initExecuteAll() {
@@ -1028,6 +1109,12 @@ const Anchor = {
           this._navigateToRoute(d);
         }
       });
+    });
+
+    const harnessNav = document.getElementById('anchor-harness-btn');
+    harnessNav?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this._navigateToRoute('harness');
     });
   },
 
@@ -1374,10 +1461,16 @@ const Anchor = {
     this.currentHtml = html;
     if (window.OpBars) OpBars.clearAll();
     if (window.LoomDetailOverlay) window.LoomDetailOverlay.close();
+    // Save user positions before full re-render
+    var savedPositions = window.LayoutTool ? LayoutTool.savePositions() : null;
     this.container.innerHTML = html;
     if (!this._staticMode) {
       this.injectHandles();
       this.injectCollapse();
+      // Re-apply user positions and inject grips
+      if (savedPositions && window.LayoutTool) {
+        LayoutTool.restorePositions(savedPositions);
+      }
     }
     if (window.LoomDetailOverlay) window.LoomDetailOverlay.refresh(this.container);
     this.infoEl.textContent = this.countAnchors() + ' anchors';
@@ -1435,6 +1528,7 @@ const Anchor = {
           this.injectCollapseIn(newEl);
         }
         if (window.LoomDetailOverlay) window.LoomDetailOverlay.refresh(newEl);
+        if (window.CardDensity)       CardDensity.refresh(newEl);
         this._mountAnnotations(p.anchor_id);
         this._clearStreamingOverlay(p.anchor_id);
       }
@@ -1773,6 +1867,9 @@ const Anchor = {
   _tempOverride: null,  // per-op context override
 
   togglePopup(el, trigger, anchorId, handlesStr) {
+    // Suppress anchor popups during brush mode or layout dragging
+    if (document.body.classList.contains('brush-mode')) return;
+    if (document.body.classList.contains('layout-dragging')) return;
     this.closePopup();
     this._tempOverride = null;
     const handles = handlesStr.split(',').map(h => h.trim()).filter(Boolean);
@@ -2001,11 +2098,15 @@ const Anchor = {
     popup.style.left = left + 'px';
   },
 
-  buildEnvelope({ op, target_kind, target_ref, instruction, selection, overrideBundle }) {
+  buildEnvelope({ op, target_kind, target_ref, instruction, selection, overrideBundle, brushPayload }) {
     const eventId = 'evt_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
     const rawBundle = overrideBundle || (window.ContextPanel ? ContextPanel.getBundle() : null);
     const renderState = this._snapshotRenderState();
-    if (target_ref && target_kind === 'anchor') {
+    if (target_kind === 'brush_selection' && brushPayload) {
+      renderState.brush_targets = brushPayload.targets || [];
+      renderState.brush_rect = brushPayload.rect || null;
+      renderState.relevant_subtree = null;
+    } else if (target_ref && target_kind === 'anchor') {
       renderState.relevant_subtree = this._collectRelevantSubtree(target_ref);
     }
     // Resolve per-block →global default →null (main thread)
@@ -2133,6 +2234,8 @@ const Anchor = {
   // Multi-select card anchors —click to toggle context reference
   _initAnchorSelect() {
     this.container.addEventListener('click', (e) => {
+      // Only trigger on Shift+click
+      if (!e.shiftKey) return;
       if (e.target.closest('.anc-handle, .anc-handle-popup, .anc-op-btn, ' +
         'a, button, input, textarea, select, .anc-collapse-caret, ' +
         '.prompt-chip, .chip-remove')) return;
@@ -2152,6 +2255,64 @@ const Anchor = {
       const label = titleEl ? titleEl.textContent.trim().substring(0, 60) : anchorId;
 
       window.PromptPanel.toggleAnchor(anchorId, label, anchorEl.outerHTML);
+    });
+  },
+
+  /** Double-click any text element to edit it inline. */
+  _initInlineEditing() {
+    var self = this;
+    this.container.addEventListener('dblclick', function (e) {
+      if (document.body.classList.contains('layout-dragging')) return;
+      // Skip interactive elements
+      if (e.target.closest('a, button, input, textarea, select, .anc-handle, .anc-handle-popup, [contenteditable="true"]'))
+        return;
+
+      // Find best edit target: the nearest text-containing leaf
+      var target = e.target;
+      // If clicked on a large container, try the specific text node
+      var range = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null;
+      if (range && range.startContainer.nodeType === 3) {
+        target = range.startContainer.parentElement;
+      }
+
+      // Don't edit huge containers
+      if (target === self.container || target.id === 'anchor-content' || target.id === 'anchor-stage' || target.id === 'anchor-shell')
+        return;
+
+      // Don't edit invisible or zero-size elements
+      if (target.offsetWidth === 0 || target.offsetHeight === 0) return;
+
+      // Make editable
+      target.setAttribute('contenteditable', 'true');
+      target.focus();
+      // Place cursor at end
+      var sel = window.getSelection();
+      if (sel) {
+        sel.selectAllChildren(target);
+        sel.collapseToEnd();
+      }
+
+      function exitEdit() {
+        target.removeAttribute('contenteditable');
+        target.removeEventListener('blur', exitEdit);
+        target.removeEventListener('keydown', onKey);
+        // If the element has data-anc, notify anchor that content changed
+        var ancId = target.getAttribute('data-anc');
+        if (ancId && self.currentHtml) {
+          self.currentHtml = self.container.innerHTML;
+          if (window.WorkspacePanel) WorkspacePanel.persistCurrentHtml(self.container.innerHTML);
+        }
+      }
+
+      function onKey(ke) {
+        if (ke.key === 'Escape') {
+          ke.preventDefault();
+          target.blur();
+        }
+      }
+
+      target.addEventListener('blur', exitEdit, { once: true });
+      target.addEventListener('keydown', onKey);
     });
   },
 
@@ -3678,6 +3839,8 @@ window.SelectionToolbar = {
   },
 
   _evaluate() {
+    // Suppress text-selection toolbar during brush mode
+    if (document.body.classList.contains('brush-mode')) { this.hide(); return; }
     const sel = window.getSelection();
     const text = sel?.toString().trim();
     if (!text || !this._isWithinAnchorContent(sel)) {
@@ -4437,6 +4600,7 @@ const LoomHandsModal = {
   _HANDS_API: 'http://localhost:3000/loom',
   _HANDS: ['market', 'sentiment', 'target', 'position'],
   _activeTab: 'models',
+  _runtimeAdapterIds: new Set(),
 
   init() {
     this._backdrop  = document.getElementById('loom-hands-modal');
@@ -4458,6 +4622,7 @@ const LoomHandsModal = {
     // Mode select dropdowns
     this._HANDS.forEach(h => {
       document.getElementById('hmode-' + h)?.addEventListener('change', e => this._setHandMode(h, e.target.value));
+      this._setHandMode(h, 'api');
     });
 
     this._backdrop.addEventListener('click', e => { if (e.target === this._backdrop) this.close(); });
@@ -4588,15 +4753,83 @@ const LoomHandsModal = {
     const sel = document.getElementById('hmode-' + hand);
     if (sel) sel.value = mode;
     const apiEl   = document.getElementById('hf-api-'   + hand);
+    const runtimeEl = document.getElementById('hf-runtime-' + hand);
     const agentEl = document.getElementById('hf-agent-' + hand);
     if (apiEl)   apiEl.style.display   = mode === 'api'   ? '' : 'none';
+    if (runtimeEl) runtimeEl.style.display = mode === 'runtime' ? '' : 'none';
     if (agentEl) agentEl.style.display = mode === 'agent' ? '' : 'none';
     if (apiEl)   apiEl.classList.toggle('is-active', mode === 'api');
+    if (runtimeEl) runtimeEl.classList.toggle('is-active', mode === 'runtime');
     if (agentEl) agentEl.classList.toggle('is-active', mode === 'agent');
   },
 
   _getHandMode(hand) {
     return document.getElementById('hmode-' + hand)?.value || 'api';
+  },
+
+  _renderRuntimeOptions(data) {
+    const adapters = Array.isArray(data?.adapters) ? data.adapters : [];
+    const bindings = data?.bindings || {};
+    this._runtimeAdapterIds = new Set(adapters.map(adapter => adapter.id));
+    const choices = [
+      { id: 'codex-app-server', label: 'Codex App Server · SDK' },
+      { id: 'sdk', label: 'Loom built-in SDK' },
+      ...adapters
+        .filter(adapter => adapter?.id && !['codex-app-server', 'sdk'].includes(adapter.id))
+        .map(adapter => ({
+          id: adapter.id,
+          label: adapter.id + (adapter.protocol ? ' · ' + adapter.protocol : ''),
+        })),
+    ];
+    this._HANDS.forEach(hand => {
+      const select = document.getElementById('rt-' + hand);
+      if (!select) return;
+      const selected = bindings[hand] || select.value || 'codex-app-server';
+      select.innerHTML = '';
+      choices.forEach(choice => {
+        const option = document.createElement('option');
+        option.value = choice.id;
+        option.textContent = choice.label;
+        select.appendChild(option);
+      });
+      if (![...select.options].some(option => option.value === selected)) {
+        const option = document.createElement('option');
+        option.value = selected;
+        option.textContent = selected + ' · unavailable';
+        select.appendChild(option);
+      }
+      select.value = selected;
+    });
+  },
+
+  async _ensureCodexAppServer() {
+    if (this._runtimeAdapterIds.has('codex-app-server')) return;
+    const response = await fetch(this._HANDS_API + '/adapters/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        adapter_id: 'codex-app-server',
+        transport: 'process',
+        protocol: 'codex',
+        codex_backend: 'sdk',
+        capabilities: ['runtime.hand', 'workspace.patch'],
+        persist: true,
+      }),
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || 'Codex App Server registration failed');
+    this._runtimeAdapterIds.add('codex-app-server');
+  },
+
+  async _putHandRuntime(hand, adapterId) {
+    const response = await fetch(this._HANDS_API + '/hand/' + hand + '/runtime', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adapter_id: adapterId }),
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || hand + ' runtime update failed');
+    return data;
   },
 
   async _loadHands() {
@@ -4619,8 +4852,22 @@ const LoomHandsModal = {
         this._set('lm-' + h + '-apikey',   hc.api_key  || '');
         this._set('lm-' + h + '-baseurl',  hc.base_url || '');
       });
+      // Load persistent Hand -> Agent Adapter bindings. Codex remains visible
+      // as a one-click option even before its SDK adapter is registered.
+      let runtimeData = { bindings: {}, adapters: [] };
+      try {
+        const rr = await fetch(this._HANDS_API + '/hands/runtime-bindings', { signal: AbortSignal.timeout(3000) });
+        if (rr.ok) runtimeData = await rr.json();
+      } catch (_) { /* older Brain: keep the built-in Codex option visible */ }
+      this._renderRuntimeOptions(runtimeData);
       // Load mount states —set mode toggle based on current mount
       await Promise.all(this._HANDS.map(async h => {
+        const boundRuntime = runtimeData.bindings?.[h] || '';
+        if (boundRuntime) {
+          this._set('rt-' + h, boundRuntime);
+          this._setHandMode(h, 'runtime');
+          return;
+        }
         try {
           const mr = await fetch(this._HANDS_API + '/hand/' + h + '/mount', { signal: AbortSignal.timeout(2000) });
           if (!mr.ok) return;
@@ -4664,14 +4911,25 @@ const LoomHandsModal = {
       const d = await r.json();
       if (!d.ok) throw new Error(d.error || 'SDK config save failed');
 
-      // Handle agent mounts per hand
+      const usesCodexAppServer = this._HANDS.some(h =>
+        this._getHandMode(h) === 'runtime' && this._get('rt-' + h) === 'codex-app-server'
+      );
+      if (usesCodexAppServer) await this._ensureCodexAppServer();
+
+      // Keep runtime bindings and legacy HTTP mounts mutually exclusive.
       await Promise.all(this._HANDS.map(async h => {
         const mode     = this._getHandMode(h);
+        const runtime  = this._get('rt-' + h);
         const endpoint = this._get('ag-ep-' + h);
         const desc     = this._get('ag-desc-' + h);
         const curR     = await fetch(this._HANDS_API + '/hand/' + h + '/mount', { signal: AbortSignal.timeout(2000) }).catch(() => null);
         const cur      = curR?.ok ? await curR.json() : { mounted: false };
-        if (mode === 'agent' && endpoint) {
+        if (mode === 'runtime') {
+          if (!runtime) throw new Error('Select an Agent Adapter for ' + h);
+          if (cur.mounted) await fetch(this._HANDS_API + '/hand/' + h + '/mount', { method: 'DELETE' });
+          await this._putHandRuntime(h, runtime);
+        } else if (mode === 'agent' && endpoint) {
+          await this._putHandRuntime(h, 'default');
           if (!cur.mounted || cur.endpoint !== endpoint) {
             if (cur.mounted) await fetch(this._HANDS_API + '/hand/' + h + '/mount', { method: 'DELETE' });
             await fetch(this._HANDS_API + '/hand/' + h + '/mount', {
@@ -4679,8 +4937,11 @@ const LoomHandsModal = {
               body: JSON.stringify({ endpoint, description: desc }),
             });
           }
-        } else if (cur.mounted) {
-          await fetch(this._HANDS_API + '/hand/' + h + '/mount', { method: 'DELETE' });
+        } else {
+          await this._putHandRuntime(h, 'default');
+          if (cur.mounted) {
+            await fetch(this._HANDS_API + '/hand/' + h + '/mount', { method: 'DELETE' });
+          }
         }
       }));
 

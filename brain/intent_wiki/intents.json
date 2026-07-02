@@ -12,13 +12,75 @@
   },
   "intents": [
     {
+      "intent_id": "content_requirements.brain_今日美股市场前瞻简报_宏观信号_板块轮动_风险事件",
+      "zone": "content_requirements",
+      "label": "\\brain 今日美股市场前瞻简报：宏观信号、板块轮动、风险事件",
+      "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "brain",
+          "今日美股市场前瞻简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-30T20:46:47.069602",
+      "updated_at": "2026-06-30T20:46:47.069602",
+      "last_evidence_ts": "2026-06-30T20:37:23.208825"
+    },
+    {
+      "intent_id": "content_requirements.forward_looking_probabilistic_forecasting_with_team_form_and",
+      "zone": "content_requirements",
+      "label": "forward-looking probabilistic forecasting with team-form and matchup reasoning",
+      "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "forward",
+          "looking",
+          "probabilistic",
+          "forecasting",
+          "team",
+          "form",
+          "matchup",
+          "reasoning",
+          "预测6月21日世界杯比赛结果",
+          "goal",
+          "predict",
+          "outcomes"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-21T01:35:53.322299",
+      "updated_at": "2026-06-21T01:35:53.322299",
+      "last_evidence_ts": "2026-06-21T01:33:14.953573"
+    },
+    {
       "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
       "zone": "content_requirements",
       "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
       "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
       "status": "active",
       "confidence": 0.95,
-      "evidence_count": 11,
+      "evidence_count": 20,
       "activation_hints": {
         "keywords": [
           "market",
@@ -39,8 +101,8 @@
         "requires_fresh_context": true
       },
       "created_at": "2026-06-09T17:55:31.728583",
-      "updated_at": "2026-06-14T00:11:27.165091",
-      "last_evidence_ts": "2026-06-14T00:11:27.160571"
+      "updated_at": "2026-06-30T20:48:41.876247",
+      "last_evidence_ts": "2026-06-30T20:40:14.076369"
     },
     {
       "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
@@ -74,13 +136,520 @@
       "last_evidence_ts": "2026-06-13T01:20:52.807963"
     },
     {
+      "intent_id": "content_requirements.market_今日美股市场盘前预测简报_宏观信号_板块轮动_风险事件",
+      "zone": "content_requirements",
+      "label": "\\market 今日美股市场盘前预测简报：宏观信号、板块轮动、风险事件",
+      "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "market",
+          "今日美股市场盘前预测简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-30T20:02:02.864277",
+      "updated_at": "2026-06-30T20:02:02.864277",
+      "last_evidence_ts": "2026-06-30T20:02:02.861286"
+    },
+    {
+      "intent_id": "content_requirements.今日市场简报_宏观信号_板块轮动_风险事件",
+      "zone": "content_requirements",
+      "label": "今日市场简报：宏观信号、板块轮动、风险事件",
+      "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+      "status": "active",
+      "confidence": 0.51,
+      "evidence_count": 2,
+      "activation_hints": {
+        "keywords": [
+          "今日市场简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior",
+          "analytical"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-07-01T01:22:23.847014",
+      "updated_at": "2026-07-01T15:44:19.899106",
+      "last_evidence_ts": "2026-07-01T15:42:31.921313"
+    },
+    {
+      "intent_id": "content_requirements.今日美股市场简报_宏观信号_板块轮动_风险事件",
+      "zone": "content_requirements",
+      "label": "今日美股市场简报：宏观信号、板块轮动、风险事件",
+      "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "今日美股市场简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior",
+          "analytical"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-30T21:33:19.609633",
+      "updated_at": "2026-06-30T21:33:19.609633",
+      "last_evidence_ts": "2026-06-30T21:23:21.253453"
+    },
+    {
+      "intent_id": "content_requirements.呈现今日盘前最重要的几条新闻_然后划分到市场各个板块_详细阐述每个板块的大体判断",
+      "zone": "content_requirements",
+      "label": "呈现今日盘前最重要的几条新闻，然后划分到市场各个板块，详细阐述每个板块的大体判断",
+      "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "呈现今日盘前最重要的几条新闻",
+          "然后划分到市场各个板块",
+          "详细阐述每个板块的大体判断",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior",
+          "analytical",
+          "direction"
+        ],
+        "anchor_ops": [
+          "refine"
+        ],
+        "object_kinds": [
+          "anchor"
+        ],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-30T20:13:33.519168",
+      "updated_at": "2026-06-30T20:13:33.519168",
+      "last_evidence_ts": "2026-06-30T20:13:33.515168"
+    },
+    {
+      "intent_id": "content_requirements.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的",
+      "zone": "content_requirements",
+      "label": "生成一份今日市场总览，包含宏观、重要新闻、风险日历和可追踪标的",
+      "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "生成一份今日市场总览",
+          "包含宏观",
+          "重要新闻",
+          "风险日历和可追踪标的",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior",
+          "analytical"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-07-01T13:57:46.549861",
+      "updated_at": "2026-07-01T13:57:46.549861",
+      "last_evidence_ts": "2026-07-01T13:55:53.877376"
+    },
+    {
+      "intent_id": "content_requirements.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的_重点关注ai上下游产业链_如数据中心_存储_cpo",
+      "zone": "content_requirements",
+      "label": "生成一份今日市场总览，包含宏观、重要新闻、风险日历和可追踪标的，重点关注AI上下游产业链，如数据中心、存储、CPO、MLCC、DRAM等等",
+      "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "生成一份今日市场总览",
+          "包含宏观",
+          "重要新闻",
+          "风险日历和可追踪标的",
+          "重点关注ai上下游产业链",
+          "如数据中心",
+          "存储",
+          "cpo",
+          "mlcc",
+          "dram等等",
+          "goal",
+          "motivation"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-23T16:56:50.424881",
+      "updated_at": "2026-06-23T16:56:50.424881",
+      "last_evidence_ts": "2026-06-23T16:56:50.423884"
+    },
+    {
+      "intent_id": "object_behavior.user_often_intends_to_anticipate",
+      "zone": "object_behavior",
+      "label": "User often intends to anticipate",
+      "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "often",
+          "intends",
+          "to",
+          "anticipate",
+          "考虑地缘政治等影响",
+          "进行下周美股市场分析",
+          "goal",
+          "produce",
+          "forward",
+          "looking",
+          "of",
+          "us"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-21T01:40:31.022102",
+      "updated_at": "2026-06-21T01:40:31.022102",
+      "last_evidence_ts": "2026-06-21T01:37:14.881143"
+    },
+    {
+      "intent_id": "object_behavior.user_often_intends_to_clarify",
+      "zone": "object_behavior",
+      "label": "User often intends to clarify",
+      "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+      "status": "active",
+      "confidence": 0.51,
+      "evidence_count": 2,
+      "activation_hints": {
+        "keywords": [
+          "often",
+          "intends",
+          "to",
+          "clarify",
+          "请分析为什么",
+          "等于",
+          "并给出三步解释",
+          "goal",
+          "分析1",
+          "2的数学基础并给出三步结构化解释",
+          "motivation",
+          "用户希望通过逐步推导理解基本数学公理或皮亚诺算术的逻辑结构",
+          "hello",
+          "initiate",
+          "contact",
+          "research",
+          "system",
+          "via",
+          "discord"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-20T18:51:06.287376",
+      "updated_at": "2026-06-21T01:49:30.354223",
+      "last_evidence_ts": "2026-06-21T01:49:02.395874"
+    },
+    {
+      "intent_id": "object_behavior.user_often_intends_to_compare",
+      "zone": "object_behavior",
+      "label": "User often intends to compare",
+      "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "often",
+          "intends",
+          "to",
+          "compare",
+          "loom",
+          "生成下一轮世界杯胜负预测",
+          "goal",
+          "generate",
+          "structured",
+          "win",
+          "loss",
+          "predictions"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-19T15:33:43.832429",
+      "updated_at": "2026-06-19T15:33:43.832429",
+      "last_evidence_ts": "2026-06-19T15:24:01.063450"
+    },
+    {
+      "intent_id": "object_behavior.user_often_intends_to_decide",
+      "zone": "object_behavior",
+      "label": "User often intends to decide",
+      "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "often",
+          "intends",
+          "to",
+          "decide",
+          "考虑地缘政治等影响",
+          "进行下周美股市场分析",
+          "返回结果的公网ip地址",
+          "goal",
+          "produce",
+          "forward",
+          "looking",
+          "weekly"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-21T01:57:23.039879",
+      "updated_at": "2026-06-21T01:57:23.039879",
+      "last_evidence_ts": "2026-06-21T01:55:47.700229"
+    },
+    {
+      "intent_id": "object_behavior.user_often_intends_to_monitor",
+      "zone": "object_behavior",
+      "label": "User often intends to monitor",
+      "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "often",
+          "intends",
+          "to",
+          "monitor",
+          "分析下周黄金",
+          "原油",
+          "ai科技股",
+          "cpo",
+          "存储",
+          "mlcc",
+          "ai产业相关原料资源等市场",
+          "goal"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-21T02:15:19.571439",
+      "updated_at": "2026-06-21T02:15:19.571439",
+      "last_evidence_ts": "2026-06-21T02:08:00.624443"
+    },
+    {
+      "intent_id": "object_behavior.user_often_intends_to_predict",
+      "zone": "object_behavior",
+      "label": "User often intends to predict",
+      "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "often",
+          "intends",
+          "to",
+          "predict",
+          "预测6月21日世界杯比赛结果",
+          "goal",
+          "outcomes",
+          "of",
+          "world",
+          "cup",
+          "matches",
+          "scheduled"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-21T01:35:53.323390",
+      "updated_at": "2026-06-21T01:35:53.322299",
+      "last_evidence_ts": "2026-06-21T01:33:14.953573"
+    },
+    {
+      "intent_id": "risk_sensitivity.brain_今日美股市场前瞻简报_宏观信号_板块轮动_风险事件",
+      "zone": "risk_sensitivity",
+      "label": "\\brain 今日美股市场前瞻简报：宏观信号、板块轮动、风险事件",
+      "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "brain",
+          "今日美股市场前瞻简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-30T20:46:47.070777",
+      "updated_at": "2026-06-30T20:46:47.069602",
+      "last_evidence_ts": "2026-06-30T20:37:23.208825"
+    },
+    {
+      "intent_id": "risk_sensitivity.broaden_from_headline_ai_names_into_upstream_and",
+      "zone": "risk_sensitivity",
+      "label": "Broaden from headline AI names into upstream and adjacent supply chain component",
+      "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "broaden",
+          "from",
+          "headline",
+          "ai",
+          "names",
+          "into",
+          "upstream",
+          "adjacent",
+          "supply",
+          "chain",
+          "component",
+          "分析下周黄金"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-21T02:15:19.572721",
+      "updated_at": "2026-06-21T02:15:19.571439",
+      "last_evidence_ts": "2026-06-21T02:08:00.624443"
+    },
+    {
+      "intent_id": "risk_sensitivity.broaden_macro_context_by_layering_geopolitical_risk_assessment",
+      "zone": "risk_sensitivity",
+      "label": "Broaden macro context by layering geopolitical risk assessment onto near-term US",
+      "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "broaden",
+          "macro",
+          "context",
+          "by",
+          "layering",
+          "geopolitical",
+          "risk",
+          "assessment",
+          "onto",
+          "near",
+          "term",
+          "us"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-21T01:40:31.023125",
+      "updated_at": "2026-06-21T01:40:31.022102",
+      "last_evidence_ts": "2026-06-21T01:37:14.881143"
+    },
+    {
+      "intent_id": "risk_sensitivity.broaden_macro_geopolitical_context_as_a_top_down",
+      "zone": "risk_sensitivity",
+      "label": "Broaden macro-geopolitical context as a top-down overlay on US equity market out",
+      "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "broaden",
+          "macro",
+          "geopolitical",
+          "context",
+          "as",
+          "top",
+          "down",
+          "overlay",
+          "on",
+          "us",
+          "equity",
+          "market"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-21T01:57:23.040888",
+      "updated_at": "2026-06-21T01:57:23.039879",
+      "last_evidence_ts": "2026-06-21T01:55:47.700229"
+    },
+    {
       "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件",
       "zone": "risk_sensitivity",
       "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
       "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
       "status": "active",
       "confidence": 0.95,
-      "evidence_count": 11,
+      "evidence_count": 20,
       "activation_hints": {
         "keywords": [
           "market",
@@ -101,8 +670,8 @@
         "requires_fresh_context": true
       },
       "created_at": "2026-06-09T17:55:31.731061",
-      "updated_at": "2026-06-14T00:11:27.165091",
-      "last_evidence_ts": "2026-06-14T00:11:27.160571"
+      "updated_at": "2026-06-30T20:48:41.876247",
+      "last_evidence_ts": "2026-06-30T20:40:14.076369"
     },
     {
       "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
@@ -134,6 +703,260 @@
       "created_at": "2026-06-11T01:45:16.162379",
       "updated_at": "2026-06-13T01:20:52.807963",
       "last_evidence_ts": "2026-06-13T01:20:52.807963"
+    },
+    {
+      "intent_id": "risk_sensitivity.market_今日美股市场盘前预测简报_宏观信号_板块轮动_风险事件",
+      "zone": "risk_sensitivity",
+      "label": "\\market 今日美股市场盘前预测简报：宏观信号、板块轮动、风险事件",
+      "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "market",
+          "今日美股市场盘前预测简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-30T20:02:02.865279",
+      "updated_at": "2026-06-30T20:02:02.864277",
+      "last_evidence_ts": "2026-06-30T20:02:02.861286"
+    },
+    {
+      "intent_id": "risk_sensitivity.今日市场简报_宏观信号_板块轮动_风险事件",
+      "zone": "risk_sensitivity",
+      "label": "今日市场简报：宏观信号、板块轮动、风险事件",
+      "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+      "status": "active",
+      "confidence": 0.51,
+      "evidence_count": 2,
+      "activation_hints": {
+        "keywords": [
+          "今日市场简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior",
+          "analytical"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-07-01T01:22:23.848014",
+      "updated_at": "2026-07-01T15:44:19.899106",
+      "last_evidence_ts": "2026-07-01T15:42:31.921313"
+    },
+    {
+      "intent_id": "risk_sensitivity.今日美股市场简报_宏观信号_板块轮动_风险事件",
+      "zone": "risk_sensitivity",
+      "label": "今日美股市场简报：宏观信号、板块轮动、风险事件",
+      "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "今日美股市场简报",
+          "宏观信号",
+          "板块轮动",
+          "风险事件",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior",
+          "analytical"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-30T21:33:19.610659",
+      "updated_at": "2026-06-30T21:33:19.609633",
+      "last_evidence_ts": "2026-06-30T21:23:21.253453"
+    },
+    {
+      "intent_id": "risk_sensitivity.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的",
+      "zone": "risk_sensitivity",
+      "label": "生成一份今日市场总览，包含宏观、重要新闻、风险日历和可追踪标的",
+      "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "生成一份今日市场总览",
+          "包含宏观",
+          "重要新闻",
+          "风险日历和可追踪标的",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief",
+          "signal",
+          "behavior",
+          "analytical"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-07-01T13:57:46.550836",
+      "updated_at": "2026-07-01T13:57:46.549861",
+      "last_evidence_ts": "2026-07-01T13:55:53.877376"
+    },
+    {
+      "intent_id": "risk_sensitivity.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的_重点关注ai上下游产业链_如数据中心_存储_cpo",
+      "zone": "risk_sensitivity",
+      "label": "生成一份今日市场总览，包含宏观、重要新闻、风险日历和可追踪标的，重点关注AI上下游产业链，如数据中心、存储、CPO、MLCC、DRAM等等",
+      "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "生成一份今日市场总览",
+          "包含宏观",
+          "重要新闻",
+          "风险日历和可追踪标的",
+          "重点关注ai上下游产业链",
+          "如数据中心",
+          "存储",
+          "cpo",
+          "mlcc",
+          "dram等等",
+          "goal",
+          "motivation"
+        ],
+        "anchor_ops": [],
+        "object_kinds": [],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-23T16:56:50.425879",
+      "updated_at": "2026-06-23T16:56:50.424881",
+      "last_evidence_ts": "2026-06-23T16:56:50.423884"
+    },
+    {
+      "intent_id": "source_preferences.async_test",
+      "zone": "source_preferences",
+      "label": "async_test",
+      "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "async",
+          "test"
+        ],
+        "resource_ids": [
+          "channel_external_async_test"
+        ],
+        "channels": [
+          "external"
+        ],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-15T12:42:02.977Z",
+      "updated_at": "2026-06-15T12:42:02.977Z",
+      "last_evidence_ts": "2026-06-15T12:42:02.977Z"
+    },
+    {
+      "intent_id": "source_preferences.empty",
+      "zone": "source_preferences",
+      "label": "empty",
+      "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+      "status": "active",
+      "confidence": 0.75,
+      "evidence_count": 5,
+      "activation_hints": {
+        "keywords": [
+          "empty",
+          "item"
+        ],
+        "resource_ids": [
+          "channel_external_empty"
+        ],
+        "channels": [
+          "external"
+        ],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-15T12:42:02.950Z",
+      "updated_at": "2026-06-20T07:51:09.161Z",
+      "last_evidence_ts": "2026-06-20T07:51:09.161Z"
+    },
+    {
+      "intent_id": "source_preferences.test",
+      "zone": "source_preferences",
+      "label": "test",
+      "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "test"
+        ],
+        "resource_ids": [
+          "channel_external_test"
+        ],
+        "channels": [
+          "external"
+        ],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-15T12:40:49.965Z",
+      "updated_at": "2026-06-15T12:40:49.965Z",
+      "last_evidence_ts": "2026-06-15T12:40:49.965Z"
+    },
+    {
+      "intent_id": "source_preferences.unittest",
+      "zone": "source_preferences",
+      "label": "unittest",
+      "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+      "status": "active",
+      "confidence": 0.75,
+      "evidence_count": 5,
+      "activation_hints": {
+        "keywords": [
+          "unittest",
+          "test"
+        ],
+        "resource_ids": [
+          "channel_external_unittest"
+        ],
+        "channels": [
+          "external"
+        ],
+        "requires_fresh_context": false
+      },
+      "created_at": "2026-06-15T12:42:02.969Z",
+      "updated_at": "2026-06-20T07:51:09.179Z",
+      "last_evidence_ts": "2026-06-20T07:51:09.179Z"
     },
     {
       "intent_id": "workflow_preferences.respect_object_scoped_intent_for_initial_render",
@@ -169,6 +992,41 @@
       "created_at": "2026-06-12T01:18:50.079134",
       "updated_at": "2026-06-12T01:18:50.079134",
       "last_evidence_ts": "2026-06-12T01:18:50.066625"
+    },
+    {
+      "intent_id": "workflow_preferences.respect_object_scoped_intent_for_refine",
+      "zone": "workflow_preferences",
+      "label": "Respect object-scoped intent for refine",
+      "principle": "Use the target object and operation as part of task interpretation, not merely the user's text.",
+      "status": "active",
+      "confidence": 0.43,
+      "evidence_count": 1,
+      "activation_hints": {
+        "keywords": [
+          "respect",
+          "object",
+          "scoped",
+          "refine",
+          "呈现今日盘前最重要的几条新闻",
+          "然后划分到市场各个板块",
+          "详细阐述每个板块的大体判断",
+          "goal",
+          "motivation",
+          "decision",
+          "frame",
+          "belief"
+        ],
+        "anchor_ops": [
+          "refine"
+        ],
+        "object_kinds": [
+          "anchor"
+        ],
+        "requires_fresh_context": true
+      },
+      "created_at": "2026-06-30T20:13:33.520167",
+      "updated_at": "2026-06-30T20:13:33.519168",
+      "last_evidence_ts": "2026-06-30T20:13:33.515168"
     }
   ]
 }

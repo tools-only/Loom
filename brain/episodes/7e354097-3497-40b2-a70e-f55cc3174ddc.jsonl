@@ -1,0 +1,6 @@
+{"ts": 1781443421.4170687, "type": "episode.start", "episode_id": "7e354097-3497-40b2-a70e-f55cc3174ddc", "context_keys": ["source", "task_family", "visualize", "presentation", "surface", "domain_hint", "goal_id"]}
+{"ts": 1781443421.462571, "type": "phase.start", "episode_id": "7e354097-3497-40b2-a70e-f55cc3174ddc", "phase": "plan"}
+{"ts": 1781443421.4635713, "type": "state.transition", "episode_id": "7e354097-3497-40b2-a70e-f55cc3174ddc", "from": "Planning", "to": "Planning"}
+{"ts": 1781443421.4635713, "type": "projection-binding", "episode_id": "7e354097-3497-40b2-a70e-f55cc3174ddc", "fn": "plan", "state_version": 0, "schema_version": "1.0", "content_id": "sha256:11f747b0e506506b"}
+{"ts": 1781443421.6169891, "type": "episode.error", "episode_id": "7e354097-3497-40b2-a70e-f55cc3174ddc", "message": "\"Could not resolve authentication method. Expected either api_key or auth_token to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted\""}
+{"ts": 1781443421.6169891, "type": "state.transition", "episode_id": "7e354097-3497-40b2-a70e-f55cc3174ddc", "from": "Planning", "to": "Failed", "message": "\"Could not resolve authentication method. Expected either api_key or auth_token to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted\""}

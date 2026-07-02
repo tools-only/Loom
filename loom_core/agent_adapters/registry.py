@@ -13,10 +13,16 @@ class AgentAdapterRegistry:
     def set_default_runtime_adapter(self, adapter_id: str) -> None:
         self._default_runtime_adapter_id = adapter_id
 
+    def get_default_runtime_adapter(self) -> str:
+        return self._default_runtime_adapter_id
+
     def resolve_runtime_adapter(self, executor_id: str) -> str:
-        """If executor_id == 'brain-inline', substitute with the registered default."""
+        """If executor_id == 'brain-inline', substitute with the registered default.
+        If executor_id == 'codex', route to the direct codex app-server channel."""
         if executor_id == "brain-inline":
             return self._default_runtime_adapter_id
+        if executor_id == "codex":
+            return "codex-app-server"
         return executor_id
 
     def register(self, adapter: AgentAdapter) -> None:

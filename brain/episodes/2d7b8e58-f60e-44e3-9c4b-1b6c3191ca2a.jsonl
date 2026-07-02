@@ -1,0 +1,36 @@
+{"ts": 1781853827.6270788, "type": "episode.start", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "context_keys": ["source", "entrypoint", "task_family", "session_id", "social", "response_mode", "channel_settings", "bridgeManagedReply", "responseMode", "verification", "social_channel", "social_route", "goal_id"]}
+{"ts": 1781853836.8559065, "type": "phase.start", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "phase": "plan"}
+{"ts": 1781853836.8559065, "type": "state.transition", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "from": "Planning", "to": "Planning"}
+{"ts": 1781853836.856907, "type": "projection-binding", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "fn": "plan", "state_version": 0, "schema_version": "1.0", "content_id": "sha256:c9c01ca23c2c8647"}
+{"ts": 1781853853.965132, "type": "phase.end", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "phase": "plan", "rubric_count": 7, "registered_shells": []}
+{"ts": 1781853853.965132, "type": "projection-binding", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "fn": "decompose", "state_version": 0, "schema_version": "1.0", "content_id": "sha256:c9c01ca23c2c8647"}
+{"ts": 1781853888.8271055, "type": "plan.tasks_decomposed", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "task_count": 6, "decomposition_source": "llm", "rationale": "Decompose 世界杯胜负预测 into 5 parallel analytical dimensions (squad/form, tournament context, environment/history, tactics/coaching, injuries/availability) plus a synthesis task that integrates all findings into specific next-round match predictions with confidence scores."}
+{"ts": 1781853888.828105, "type": "state.transition", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "from": "Planning", "to": "Dispatching"}
+{"ts": 1781853888.829108, "type": "phase.start", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "phase": "dispatch", "dispatch_targets": ["runtime-worldcup-synthesis-5", "runtime-worldcup-squad-form-0", "runtime-worldcup-bracket-1", "runtime-worldcup-env-history-2", "runtime-worldcup-tactics-3", "runtime-worldcup-injuries-4"]}
+{"ts": 1781853888.8301036, "type": "dispatch.batch", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "task_ids": ["t1", "t2", "t3", "t4", "t5"], "priority": 0}
+{"ts": 1781853888.8301036, "type": "dispatch.sent", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "runtime-worldcup-squad-form-0", "executor_id": "brain-inline", "dimension": "球队硬实力与近期竞技状态", "is_repair": false}
+{"ts": 1781853888.8365002, "type": "dispatch.sent", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "runtime-worldcup-bracket-1", "executor_id": "brain-inline", "dimension": "赛事路径与分组形势", "is_repair": false}
+{"ts": 1781853888.8421102, "type": "dispatch.sent", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "runtime-worldcup-env-history-2", "executor_id": "brain-inline", "dimension": "主场环境与历史心理因素", "is_repair": false}
+{"ts": 1781853888.8480146, "type": "dispatch.sent", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "runtime-worldcup-tactics-3", "executor_id": "brain-inline", "dimension": "战术体系与教练能力", "is_repair": false}
+{"ts": 1781853888.8547282, "type": "dispatch.sent", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "runtime-worldcup-injuries-4", "executor_id": "brain-inline", "dimension": "伤病停赛与阵容可用性", "is_repair": false}
+{"ts": 1781853905.843962, "type": "dispatch.error", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "runtime-worldcup-squad-form-0", "message": "hand brain-inline returned no artifact"}
+{"ts": 1781853910.8403566, "type": "dispatch.error", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "runtime-worldcup-injuries-4", "message": "hand brain-inline returned no artifact"}
+{"ts": 1781853918.8973618, "type": "dispatch.error", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "runtime-worldcup-bracket-1", "message": "hand brain-inline returned no artifact"}
+{"ts": 1781854117.7687445, "type": "dispatch.artifact", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "runtime-worldcup-tactics-3", "executor_id": "brain-inline", "is_repair": false}
+{"ts": 1781854156.3775659, "type": "dispatch.artifact", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "runtime-worldcup-env-history-2", "executor_id": "brain-inline", "is_repair": false}
+{"ts": 1781854156.3780751, "type": "dispatch.skipped", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "task_id": "t6", "cause": "t1"}
+{"ts": 1781854156.3790944, "type": "phase.end", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "phase": "dispatch", "hand_count": 6}
+{"ts": 1781854156.3800926, "type": "state.transition", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "from": "Dispatching", "to": "Reviewing"}
+{"ts": 1781854156.3800926, "type": "phase.start", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "phase": "review"}
+{"ts": 1781854176.0845428, "type": "state.transition", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "from": "Reviewing", "to": "Repairing"}
+{"ts": 1781854176.0855439, "type": "dispatch.sent", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "market", "executor_id": "brain-inline", "dimension": "球队硬实力与近期竞技状态", "is_repair": true}
+{"ts": 1781854393.120275, "type": "dispatch.artifact", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "hand_id": "market", "executor_id": "brain-inline", "is_repair": true}
+{"ts": 1781854393.120275, "type": "review.repair_dispatch", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "target_key": "t1", "replacement_key": "t1", "hand_id": "market", "executor_id": "brain-inline", "attempt": 1}
+{"ts": 1781854393.121275, "type": "review.repair_budget_exceeded", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "target_key": "t2", "hand_id": "market", "max_repair_attempts": 1}
+{"ts": 1781854393.1222758, "type": "review.repair_budget_exceeded", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "target_key": "t5", "hand_id": "market", "max_repair_attempts": 1}
+{"ts": 1781854393.1222758, "type": "review.repair_budget_exceeded", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "target_key": "t6", "hand_id": "market", "max_repair_attempts": 1}
+{"ts": 1781854393.1232748, "type": "phase.end", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "phase": "review", "follow_up_count": 4}
+{"ts": 1781854393.1232748, "type": "state.transition", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "from": "Repairing", "to": "Synthesizing"}
+{"ts": 1781854393.1242778, "type": "phase.start", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "phase": "synthesize"}
+{"ts": 1781854423.8274152, "type": "phase.end", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "phase": "synthesize"}
+{"ts": 1781854423.82843, "type": "state.transition", "episode_id": "2d7b8e58-f60e-44e3-9c4b-1b6c3191ca2a", "from": "Synthesizing", "to": "Persisted"}

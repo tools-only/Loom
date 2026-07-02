@@ -76,6 +76,12 @@ class FlywheelRecord:
     # Derived in P4 by FlywheelAnalyzer:
     profile_signals: list[dict] = field(default_factory=list)
     strategy_signals: list[dict] = field(default_factory=list)
+    # State-aware harness fields (MVP):
+    state_transitions: list[dict] = field(default_factory=list)
+    bottlenecks: list[dict] = field(default_factory=list)
+    visual_queries: list[dict] = field(default_factory=list)
+    visual_interactions: list[dict] = field(default_factory=list)
+    interaction_consumption: list[dict] = field(default_factory=list)
 
     @staticmethod
     def new(
@@ -215,6 +221,22 @@ class FlywheelWriter:
     def append_confirmed_correction(self, episode_id: str, correction: dict[str, Any]) -> bool:
         """Append a user-confirmed correction to an episode detail file."""
         return self._append_to_detail_list(episode_id, "confirmed_corrections", correction)
+
+    def append_state_transition(self, episode_id: str, transition: dict[str, Any]) -> bool:
+        return self._append_to_detail_list(episode_id, "state_transitions", transition)
+
+    def append_bottleneck(self, episode_id: str, bottleneck: dict[str, Any]) -> bool:
+        return self._append_to_detail_list(episode_id, "bottlenecks", bottleneck)
+
+    def append_visual_query(self, episode_id: str, query: dict[str, Any]) -> bool:
+        return self._append_to_detail_list(episode_id, "visual_queries", query)
+
+    def append_visual_interaction(self, episode_id: str, trace: dict[str, Any]) -> bool:
+        return self._append_to_detail_list(episode_id, "visual_interactions", trace)
+
+    def append_interaction_consumption(self, episode_id: str, interaction_id: str, consumption: dict[str, Any]) -> bool:
+        return self._append_to_detail_list(episode_id, "interaction_consumption",
+                                           {"interaction_id": interaction_id, **consumption})
 
     def read_summary_log(self, limit: int = 100) -> list[dict]:
         if not self._log.exists():

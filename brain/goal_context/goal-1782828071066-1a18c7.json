@@ -1,0 +1,28 @@
+{
+  "goal_id": "goal-1782828071066-1a18c7",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-30T14:01:11.066323Z",
+  "updated_at": "2026-06-30T14:03:42.912491Z",
+  "status": "open",
+  "title": "test",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1782828222909-1f795204",
+      "ts": "2026-06-30T14:03:42.909481Z",
+      "stance": "operational",
+      "confidence": 0.85,
+      "key_drivers": [
+        "Brain agent pipeline is operational and can produce a structured run.artifact from a test input",
+        "All required artifact layers (L0-L3) populated successfully in this test run",
+        "No downstream dependencies or external data sources are required for this health-check pass"
+      ],
+      "reversal_condition": "If a subsequent test query fails to produce a valid output or encounters errors, re-evaluate system health."
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1782828222909-1f795204"
+  ]
+}

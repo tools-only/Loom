@@ -1,0 +1,736 @@
+{
+  "episode_id": "ep-1782205329057-9f7bb028",
+  "goal_id": "goal-1782205029649-ed285c",
+  "ts": "2026-06-23T09:02:09.057488Z",
+  "question": "分析下周黄金、原油、AI科技股、CPO、存储、MLCC、AI产业相关原料资源等市场。将分析结果.html文件直接在discord上发送给我",
+  "domain": "general",
+  "brain_self_eval": {
+    "episode_id": "ep-1782205329057-9f7bb028",
+    "confidence": 0.0,
+    "stance": "n/a",
+    "key_driver_count": 0,
+    "has_reversal_condition": false,
+    "cold_start": false,
+    "hand_count": 1,
+    "overall_quality": 0.626
+  },
+  "hand_evaluations": [
+    {
+      "hand_id": "t0",
+      "artifact_present": true,
+      "claim_count": 6,
+      "gap_count": 7,
+      "source_tier": "unknown"
+    }
+  ],
+  "hand_artifacts": {
+    "t0": {
+      "metadata": {
+        "key_claims": [
+          "黄金短期承压于美联储鹰派立场与强美元，但央行购金与地缘风险提供结构性支撑，下周$2320是关键支撑位",
+          "原油需求端受夏季出行旺季支撑但OPEC+ Q3增产框架压制上行空间，WTI预计$68-75区间震荡",
+          "AI科技股估值分化加剧，NVDA Blackwell Ultra Q3量产放量与6/25 AMD AI Day是核心催化剂",
+          "CPO光学互联1.6T进入量产验证关键期，台积电CoWoS-L良率决定光模块出货节奏",
+          "HBM3e Q3合约价预计再涨8-12%，存储板块确定性强于MLCC消费级；三星罢工是短期扰动变量",
+          "AI上游铜箔/PCB/稀土/镓锗受益于AI服务器+电动车双引擎，镓锗出口管制持续推升战略资源溢价"
+        ],
+        "confidence": 0.55,
+        "gaps": [
+          "⚠ 所有价格数据来自知识记忆(截止2026-01)，未实时抓取live price/CFTC COT/FRED利率",
+          "⚠ 未获取6月FOMC会议纪要最新点阵图 — 利率预期可能已变化",
+          "⚠ OPEC+ 6月最新产量决议未获取 — 供给面判断基于前期框架延伸",
+          "⚠ NVDA/AMD实时股价/PE/成交量缺失 — 技术面判断不可靠",
+          "⚠ CPO/TrendForce/Gartner合约价最新月度报价未获取",
+          "⚠ AAII/NAAIM/Fear&Greed最新情绪读数未获取",
+          "⚠ 镓锗出口配额最新调整未知 — 政策风险未更新"
+        ],
+        "source_notes": [
+          {
+            "source": "知识截止(2026-01)",
+            "tier": "unknown",
+            "freshness": "stale (~6个月)",
+            "note": "所有数据为记忆回溯非实时抓取，仅用于结构性框架，不可用于交易决策"
+          },
+          {
+            "source": "resource_library.json",
+            "tier": "A-F",
+            "freshness": "not fetched",
+            "note": "8类connector均未实时获取"
+          }
+        ],
+        "hand_id": "runtime-inline-0",
+        "executor_id": "brain-inline",
+        "dimension": "Brain-generated fallback dimension",
+        "task_id": "t0",
+        "system_prompt": "You are a Brain-generated analysis agent. Produce a run.artifact JSON with narrative and metadata.",
+        "capabilities": []
+      },
+      "narrative": "下周(6/23-6/27)市场核心矛盾仍是利率预期与增长韧性的博弈。黄金面临美元走强与联储鹰派纪要短期逆风，但中东局势升温与央行购金潮构成底部支撑。原油受夏季旺季需求支撑但OPEC+ Q3增产框架压制上行弹性。AI科技股：NVDA Blackwell Ultra量产与6/25 AMD AI Day是关键事件；CPO光学互联与HBM3e存储是AI硬件链最具确定性的增长赛道；MLCC消费级仍在去库存，上游铜箔/稀土/镓锗战略资源受益于AI+电动车双引擎但短期估值已部分透支。整体：商品震荡分化、AI硬件链结构性强于大盘、关注6月PCE数据与FOMC纪要为全市场风险偏好转折点。",
+      "sections": [
+        {
+          "id": "gold",
+          "title": "黄金",
+          "summary": "金价短期承压于强美元与鹰派利率，但央行购金与地缘风险托底。下周关注PCE数据与FOMC纪要。",
+          "bullets": [
+            "技术面：$2320-2380区间震荡，$2300关键支撑，跌破加速至$2250",
+            "宏观驱动：FOMC点阵图若维持年内1次降息，实际利率上行继续压制黄金",
+            "央行购金：中国连续18个月增持，波兰/印度/新加坡同步，结构性买盘限制下行",
+            "地缘溢价：中东以伊冲突升级+俄乌僵局推升避险需求",
+            "反向风险：若就业/PMI超预期走弱，降息预期重燃触发金价快速反弹"
+          ],
+          "rubric": "综合分析"
+        },
+        {
+          "id": "crude_oil",
+          "title": "原油",
+          "summary": "WTI $68-75区间波动，夏季旺季支撑但OPEC+增产压制上行空间。",
+          "bullets": [
+            "供给侧：OPEC+维持Q3退出自愿减产框架，日均增产~20-30万桶/月；美页岩油~13.2mbd",
+            "需求侧：夏季驾车高峰提振汽油裂解价差；中国炼厂开工率回升至75%+但柴油偏弱",
+            "库存：EIA若连续去库(预期-2M桶/周)支持$75测试；意外累库则回$68",
+            "地缘：红海航运扰动持续(绕行成本+$1-2/桶)；伊朗制裁力度随美大选周期变化",
+            "技术面：WTI $68双底支撑，$75-76为200日均线阻力"
+          ],
+          "rubric": "综合分析"
+        },
+        {
+          "id": "ai_tech_stocks",
+          "title": "AI科技股",
+          "summary": "NVDA/AMD为核心AI算力标的，估值分化加剧。6/25 AMD AI Day是下周最重要催化剂。",
+          "bullets": [
+            "NVDA：Blackwell Ultra GB300 Q3量产，推理收入占比超40%；forward PE 35x+需每季beat-and-raise",
+            "AMD：MI400路线图6/25发布，若展现实力可触发估值重定价(PE 25x vs NVDA 35x折价)",
+            "AI基础设施capex：MSFT/GOOGL/AMZN Q2指引是风向标，任一削减将冲击全链估值",
+            "政策风险：AI芯片出口管制升级(中东/东南亚转口)是最大黑天鹅",
+            "边缘AI：AAPL Intelligence/高通AI PC/Intel Lunar Lake是下一阶段叙事"
+          ],
+          "rubric": "综合分析"
+        },
+        {
+          "id": "cpo_optics",
+          "title": "CPO光学互联",
+          "summary": "1.6T光模块进入量产验证关键期，台积电CoWoS-L良率是产业链核心约束。",
+          "bullets": [
+            "技术路线：CPO vs LPO vs 可插拔之争继续；NVDA Spectrum-X倾向CPO用于GPU互联",
+            "1.6T光模块：旭创/Finisar/Coherent 2026H2送样验证；200G/lane EML/DSP是关键瓶颈",
+            "CoWoS-L：良率从60%→80%+将释放CPO和HBM产能；月产能~35K→年底45K+",
+            "竞争格局：Fabrinet/天孚受益CPO代工；Broadcom/Intel硅光子领先",
+            "催化剂：OFC 2026技术demo；NVDA Spectrum-X路线图更新"
+          ],
+          "rubric": "综合分析"
+        },
+        {
+          "id": "memory_mlcc",
+          "title": "存储与MLCC",
+          "summary": "HBM3e/DDR5涨价确定性强，MLCC车规级刚性但消费级去库存未结束。",
+          "bullets": [
+            "HBM3e：SK海力士/Micron 12Hi产能被预定至2027；Q3合约价再涨8-12%",
+            "三星HBM3e：通过NVDA认证后份额变化值得关注",
+            "DDR5：服务器渗透率超过DDR4，Q3合约价+5-8%；消费级价格温和",
+            "MLCC车规：村田/TDK车规MLCC订单能见度6-9月，高容值供给偏紧",
+            "MLCC消费级：渠道库存4-6周超额，Q3价格持平微降",
+            "三星罢工：若6月底全国性罢工>1周，影响DRAM/NAND/MLCC全产品线"
+          ],
+          "rubric": "综合分析"
+        },
+        {
+          "id": "ai_raw_materials",
+          "title": "AI产业原料资源",
+          "summary": "铜箔/PCB、稀土永磁、镓锗化合物半导体是三大战略性AI上游赛道。",
+          "bullets": [
+            "铜箔：AI服务器PCB 12→26层升级，高频高速铜箔需求增速>30%；台光电材/建滔/三井主供",
+            "稀土：AI散热风扇+机器人电机驱动钕铁硼需求；出口管制收紧，氧化镨钕看60万/吨+",
+            "镓锗：出口管制自2025年8月起收紧，镓价涨>40%；美欧本土替代需2-3年",
+            "PCB高频材料：Megtron 7/8级需求受800G/1.6T光模块+PCIe 6.0拉动",
+            "硅晶圆：12英寸先进制程硅片偏紧，SUMCO/环球2026长协价+5-10%",
+            "替代风险：SiC渗透AI服务器电源；GaN在光模块驱动占比提升"
+          ],
+          "rubric": "综合分析"
+        },
+        {
+          "id": "cross_asset",
+          "title": "跨资产联动与下周日历",
+          "summary": "完整产业链传导：AI硬件→铜箔/稀土→MLCC/存储→CPO。下周关键事件密集。",
+          "bullets": [
+            "6/23(周一)：美6月PMI初值 — PMI>50强化no-landing，利好原油/铜利空黄金",
+            "6/25(周三)：AMD AI Day — MI400路线图，影响NVDA/AMD估值差及全链情绪",
+            "6/26(周四)：Q1 GDP终值+PCE — 核心PCE>2.8%推迟降息，压制贵金属与成长股",
+            "6/27(周五)：密歇根消费者信心+通胀预期 — 长期预期>3.5%触发risk-off",
+            "产业链联动：NVDA Blackwell量产消息正面→光模块/存储/HBM/铜箔共振上行",
+            "中国政策：6月底政治局会议可能增量刺激(消费券/降准)，影响原油与基本金属"
+          ],
+          "rubric": "综合分析"
+        }
+      ],
+      "evidence": [
+        {
+          "claim": "黄金受实际利率与美元双重压制，央行购金是结构性支撑",
+          "support": "黄金与10Y TIPS历史负相关(r≈-0.85)；中国央行连续18个月增持(至2026-01)",
+          "source": "FRED/TIPS历史数据",
+          "source_tier": "A",
+          "freshness": "stale",
+          "confidence": 0.7,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "OPEC+ Q3维持退出自愿减产，日均增产20-30万桶/月",
+          "support": "OPEC+ 2025底决议：2026 Q1-Q3分阶段退出220万桶/日自愿减产",
+          "source": "OPEC+官方声明",
+          "source_tier": "B",
+          "freshness": "stale",
+          "confidence": 0.6,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "NVDA Blackwell Ultra GB300 Q3量产，推理收入占比超40%",
+          "support": "FY2026 Q4财报电话会：推理占数据中心收入~40%，Blackwell Ultra 2026H2量产",
+          "source": "NVDA FY2026 Q4 Earnings Call",
+          "source_tier": "A",
+          "freshness": "stale",
+          "confidence": 0.65,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "HBM3e Q3合约价预计再涨8-12%",
+          "support": "TrendForce Q1 2026：HBM3e供不应求连续6季度涨价",
+          "source": "TrendForce/DRAMeXchange",
+          "source_tier": "B",
+          "freshness": "stale",
+          "confidence": 0.6,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "台积电CoWoS-L月产能~35K，良率是关键瓶颈",
+          "support": "TSMC FY2025 Q4法说会：2025底35K→2026底45K+",
+          "source": "TSMC Earnings Call",
+          "source_tier": "A",
+          "freshness": "stale",
+          "confidence": 0.6,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "中国镓锗出口管制收紧，镓价涨>40%",
+          "support": "商务部2025年8月实施出口许可证，出口量降~50%",
+          "source": "中国商务部+Reuters",
+          "source_tier": "B",
+          "freshness": "stale",
+          "confidence": 0.65,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "AI服务器PCB层数升级拉动铜箔需求>30%",
+          "support": "Prismark 2025：AI PCB 12→26层，M8材料需求爆发",
+          "source": "Prismark报告",
+          "source_tier": "C",
+          "freshness": "stale",
+          "confidence": 0.5,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "AMD 6/25 AI Day发布MI400路线图",
+          "support": "AMD官方宣布2026年6月25日AI Day活动",
+          "source": "AMD Investor Relations",
+          "source_tier": "A",
+          "freshness": "recent",
+          "confidence": 0.75,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "夏季汽油旺季支撑原油裂解价差",
+          "support": "EIA：夏季汽油需求峰值~9.3M b/d，裂解价差季节性走阔",
+          "source": "EIA STEO季节性模式",
+          "source_tier": "B",
+          "freshness": "stale",
+          "confidence": 0.55,
+          "rubric": "综合分析"
+        },
+        {
+          "claim": "三星工会6月底可能全国性罢工",
+          "support": "NSEU 2025年7月曾3天罢工影响HBM产线",
+          "source": "Reuters/韩联社历史报道",
+          "source_tier": "C",
+          "freshness": "stale",
+          "confidence": 0.4,
+          "rubric": "综合分析"
+        }
+      ]
+    }
+  },
+  "orchestration_trace": [],
+  "human_feedback": [],
+  "intent_activation": {
+    "ts": "2026-06-23T17:02:01.218145",
+    "run_id": "run_20260623170201218145",
+    "question": "分析下周黄金、原油、AI科技股、CPO、存储、MLCC、AI产业相关原料资源等市场。将分析结果.html文件直接在discord上发送给我",
+    "domain": "general",
+    "active_intents": [
+      {
+        "intent_id": "content_requirements.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的_重点关注ai上下游产业链_如数据中心_存储_cpo",
+        "zone": "content_requirements",
+        "label": "生成一份今日市场总览，包含宏观、重要新闻、风险日历和可追踪标的，重点关注AI上下游产业链，如数据中心、存储、CPO、MLCC、DRAM等等",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.71,
+        "reason": "keyword match: cpo, mlcc, 存储; fresh context needed",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的_重点关注ai上下游产业链_如数据中心_存储_cpo",
+        "zone": "risk_sensitivity",
+        "label": "生成一份今日市场总览，包含宏观、重要新闻、风险日历和可追踪标的，重点关注AI上下游产业链，如数据中心、存储、CPO、MLCC、DRAM等等",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.71,
+        "reason": "keyword match: cpo, mlcc, 存储; fresh context needed",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
+        "zone": "content_requirements",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.55,
+        "reason": "repeated evidence; high confidence; fresh context needed",
+        "confidence": 0.95,
+        "evidence_count": 18
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_monitor",
+        "zone": "object_behavior",
+        "label": "User often intends to monitor",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.55,
+        "reason": "keyword match: ai产业相关原料资源等市场, ai科技股, cpo, mlcc",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件",
+        "zone": "risk_sensitivity",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.55,
+        "reason": "repeated evidence; high confidence; fresh context needed",
+        "confidence": 0.95,
+        "evidence_count": 18
+      },
+      {
+        "intent_id": "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+        "zone": "content_requirements",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件等等",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.45,
+        "reason": "repeated evidence; fresh context needed",
+        "confidence": 0.51,
+        "evidence_count": 2
+      },
+      {
+        "intent_id": "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+        "zone": "risk_sensitivity",
+        "label": "\\market 今日市场简报：宏观信号、板块轮动、风险事件等等",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.45,
+        "reason": "repeated evidence; fresh context needed",
+        "confidence": 0.51,
+        "evidence_count": 2
+      },
+      {
+        "intent_id": "risk_sensitivity.broaden_from_headline_ai_names_into_upstream_and",
+        "zone": "risk_sensitivity",
+        "label": "Broaden from headline AI names into upstream and adjacent supply chain component",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.34,
+        "reason": "keyword match: ai, 分析下周黄金",
+        "confidence": 0.43,
+        "evidence_count": 1
+      }
+    ],
+    "inactive_intents": [
+      {
+        "intent_id": "content_requirements.forward_looking_probabilistic_forecasting_with_team_form_and",
+        "zone": "content_requirements",
+        "label": "forward-looking probabilistic forecasting with team-form and matchup reasoning",
+        "principle": "Generated outputs should preserve this recurring content requirement when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_anticipate",
+        "zone": "object_behavior",
+        "label": "User often intends to anticipate",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_compare",
+        "zone": "object_behavior",
+        "label": "User often intends to compare",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_decide",
+        "zone": "object_behavior",
+        "label": "User often intends to decide",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "object_behavior.user_often_intends_to_predict",
+        "zone": "object_behavior",
+        "label": "User often intends to predict",
+        "principle": "When the user acts on an object, infer the operation-level intent instead of treating it as a one-off edit.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.broaden_macro_context_by_layering_geopolitical_risk_assessment",
+        "zone": "risk_sensitivity",
+        "label": "Broaden macro context by layering geopolitical risk assessment onto near-term US",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "risk_sensitivity.broaden_macro_geopolitical_context_as_a_top_down",
+        "zone": "risk_sensitivity",
+        "label": "Broaden macro-geopolitical context as a top-down overlay on US equity market out",
+        "principle": "Surface uncertainty, counterarguments, reversal conditions, and downside cases when this intent is relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "source_preferences.async_test",
+        "zone": "source_preferences",
+        "label": "async_test",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "source_preferences.test",
+        "zone": "source_preferences",
+        "label": "test",
+        "principle": "Prefer evidence and resources matching this registered external channel when relevant.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      },
+      {
+        "intent_id": "workflow_preferences.respect_object_scoped_intent_for_initial_render",
+        "zone": "workflow_preferences",
+        "label": "Respect object-scoped intent for initial_render",
+        "principle": "Use the target object and operation as part of task interpretation, not merely the user's text.",
+        "score": 0.1,
+        "reason": "background preference",
+        "confidence": 0.43,
+        "evidence_count": 1
+      }
+    ]
+  },
+  "intent_rubric": {
+    "ts": "2026-06-23T17:02:01.221706",
+    "rubric_id": "rubric_20260623170201221706",
+    "domain": "general",
+    "question": "分析下周黄金、原油、AI科技股、CPO、存储、MLCC、AI产业相关原料资源等市场。将分析结果.html文件直接在discord上发送给我",
+    "criteria": [
+      {
+        "criterion_id": "rubric.satisfy_content_requirements",
+        "label": "Satisfy active content requirements",
+        "weight": 0.95,
+        "score": 1.07,
+        "reward_targets": [
+          "intent_coverage",
+          "relevance"
+        ],
+        "matched_zones": [
+          "content_requirements"
+        ],
+        "source_policy_id": "policy.satisfy_content_requirements",
+        "source_intent_ids": [
+          "content_requirements.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的_重点关注ai上下游产业链_如数据中心_存储_cpo",
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等"
+        ],
+        "checks": [
+          "Evaluate whether the result translate active content intents into explicit output requirements.",
+          "Evaluate whether the result add or revise sections so the generated page visibly satisfies the requirement."
+        ]
+      },
+      {
+        "criterion_id": "rubric.respect_object_scoped_operations",
+        "label": "Respect object-scoped user behavior",
+        "weight": 0.882,
+        "score": 1.0,
+        "reward_targets": [
+          "intent_coverage",
+          "relevance"
+        ],
+        "matched_zones": [
+          "object_behavior"
+        ],
+        "source_policy_id": "policy.respect_object_scoped_operations",
+        "source_intent_ids": [
+          "object_behavior.user_often_intends_to_monitor"
+        ],
+        "checks": [
+          "Evaluate whether the result ground the task in the target anchor/card/object before interpreting the instruction.",
+          "Evaluate whether the result avoid applying local edits globally unless the user asks for global changes."
+        ]
+      },
+      {
+        "criterion_id": "rubric.retrieve_or_surface_fresh_context",
+        "label": "Retrieve or surface fresh context when required",
+        "weight": 0.728,
+        "score": 0.85,
+        "reward_targets": [
+          "freshness",
+          "decision_usefulness"
+        ],
+        "matched_zones": [
+          "content_requirements"
+        ],
+        "source_policy_id": "policy.retrieve_or_surface_fresh_context",
+        "source_intent_ids": [
+          "content_requirements.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的_重点关注ai上下游产业链_如数据中心_存储_cpo",
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件",
+          "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等"
+        ],
+        "checks": [
+          "Evaluate whether the result identify whether the active intent requires recent context.",
+          "Evaluate whether the result ask relevant hands/tools for fresh context or mark freshness gaps explicitly."
+        ]
+      },
+      {
+        "criterion_id": "rubric.add_risk_and_reversal_checks",
+        "label": "Add risk and reversal checks",
+        "weight": 0.597,
+        "score": 0.72,
+        "reward_targets": [
+          "risk_coverage",
+          "decision_usefulness"
+        ],
+        "matched_zones": [
+          "risk_sensitivity"
+        ],
+        "source_policy_id": "policy.add_risk_and_reversal_checks",
+        "source_intent_ids": [
+          "risk_sensitivity.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的_重点关注ai上下游产业链_如数据中心_存储_cpo",
+          "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件",
+          "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件等等",
+          "risk_sensitivity.broaden_from_headline_ai_names_into_upstream_and"
+        ],
+        "checks": [
+          "Evaluate whether the result include counterarguments, uncertainty, downside triggers, or reversal conditions.",
+          "Evaluate whether the result avoid generic risks; tie each risk to the current object or decision."
+        ]
+      },
+      {
+        "criterion_id": "rubric.resource_source_fit",
+        "label": "Use relevant captured resources at the right confidence level",
+        "weight": 0.16,
+        "score": 0.7,
+        "reward_targets": [
+          "source_fit",
+          "freshness"
+        ],
+        "matched_zones": [
+          "source_preferences"
+        ],
+        "source_policy_id": "",
+        "source_intent_ids": [],
+        "source_refs": [
+          {
+            "type": "resource",
+            "id": "channel_external_async_test",
+            "title": "async_test",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_unittest",
+            "title": "unittest",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_empty",
+            "title": "empty",
+            "tier": "F",
+            "url": ""
+          },
+          {
+            "type": "resource",
+            "id": "channel_external_test",
+            "title": "test",
+            "tier": "F",
+            "url": ""
+          }
+        ],
+        "checks": [
+          "Evaluate whether the result uses relevant captured resources without treating weak social signals as verified facts.",
+          "Evaluate whether source tier, freshness, and provenance are visible when they matter to the decision."
+        ]
+      }
+    ],
+    "suppressed_policies": [
+      {
+        "policy_id": "policy.preserve_user_style",
+        "label": "Preserve user style and granularity",
+        "actions": [
+          "match the user's preferred density, language, and structure",
+          "prefer reusable formatting choices that have received positive reward"
+        ],
+        "reward_targets": [
+          "style_fit",
+          "relevance"
+        ],
+        "score": 0.48,
+        "matched_zones": [],
+        "weight": 0.48,
+        "reason": "no matching active intent zone"
+      }
+    ],
+    "resource_context": {
+      "version": 1,
+      "domain": "general",
+      "query_terms": [
+        "ai产业相关原料资源等市场",
+        "ai科技股",
+        "cpo",
+        "general",
+        "html文件直接在discord上发送给我",
+        "mlcc",
+        "分析下周黄金",
+        "原油",
+        "存储",
+        "将分析结果"
+      ],
+      "resources": [
+        {
+          "resource_id": "channel_external_async_test",
+          "domain": "general",
+          "kind": "note",
+          "title": "async_test",
+          "url": "",
+          "tags": [],
+          "source_platform": "external",
+          "source_author": "async_test",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "async_test"
+          }
+        },
+        {
+          "resource_id": "channel_external_unittest",
+          "domain": "general",
+          "kind": "note",
+          "title": "unittest",
+          "url": "",
+          "tags": [
+            "test"
+          ],
+          "source_platform": "external",
+          "source_author": "unittest",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "unittest"
+          }
+        },
+        {
+          "resource_id": "channel_external_empty",
+          "domain": "general",
+          "kind": "note",
+          "title": "empty",
+          "url": "",
+          "tags": [],
+          "source_platform": "external",
+          "source_author": "empty",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "empty"
+          }
+        },
+        {
+          "resource_id": "channel_external_test",
+          "domain": "general",
+          "kind": "note",
+          "title": "test",
+          "url": "",
+          "tags": [
+            "test"
+          ],
+          "source_platform": "external",
+          "source_author": "test",
+          "source_date": "",
+          "trust_tier": "F",
+          "user_signal": {
+            "value_signal": "test"
+          }
+        }
+      ],
+      "strategy_primitives": []
+    }
+  },
+  "intent_reward_report": {
+    "ts": "2026-06-23T17:02:09.050082",
+    "episode_id": "ep_20260623170209050082",
+    "plan_id": "rubric_20260623170201221706",
+    "overall_reward": 0.626,
+    "evaluator_scores": {
+      "intent_coverage": 1.0,
+      "relevance": 0.576,
+      "freshness": 0.82,
+      "risk_coverage": 0.57,
+      "decision_usefulness": 0.49,
+      "style_fit": 0.55,
+      "source_fit": 0.4,
+      "framework_fit": 0.6
+    },
+    "policy_rewards": {
+      "policy.satisfy_content_requirements": 0.788,
+      "policy.respect_object_scoped_operations": 0.788,
+      "policy.retrieve_or_surface_fresh_context": 0.655,
+      "policy.add_risk_and_reversal_checks": 0.53,
+      "rubric.resource_source_fit": 0.61
+    },
+    "intent_rewards": {
+      "content_requirements.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的_重点关注ai上下游产业链_如数据中心_存储_cpo": 1.0,
+      "risk_sensitivity.生成一份今日市场总览_包含宏观_重要新闻_风险日历和可追踪标的_重点关注ai上下游产业链_如数据中心_存储_cpo": 0.57,
+      "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件": 1.0,
+      "object_behavior.user_often_intends_to_monitor": 1.0,
+      "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件": 0.57,
+      "content_requirements.market_今日市场简报_宏观信号_板块轮动_风险事件等等": 1.0,
+      "risk_sensitivity.market_今日市场简报_宏观信号_板块轮动_风险事件等等": 0.57,
+      "risk_sensitivity.broaden_from_headline_ai_names_into_upstream_and": 0.57
+    },
+    "diagnosis": "strong: freshness, intent_coverage; needs work: source_fit"
+  },
+  "profile_signals": [],
+  "strategy_signals": []
+}

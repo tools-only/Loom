@@ -1,0 +1,20 @@
+{"ts": 1782827971.851365, "type": "episode.start", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "context_keys": ["goal_id"]}
+{"ts": 1782827974.4045525, "type": "phase.start", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "phase": "plan"}
+{"ts": 1782827974.4055479, "type": "state.transition", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "from": "Planning", "to": "Planning"}
+{"ts": 1782827974.4055479, "type": "projection-binding", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "fn": "plan", "state_version": 2, "schema_version": "1.0", "content_id": "sha256:71e4795d7ac5bc9f"}
+{"ts": 1782827980.3655908, "type": "phase.end", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "phase": "plan", "rubric_count": 1, "registered_shells": []}
+{"ts": 1782827980.3655908, "type": "projection-binding", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "fn": "decompose", "state_version": 2, "schema_version": "1.0", "content_id": "sha256:71e4795d7ac5bc9f"}
+{"ts": 1782827993.567218, "type": "plan.tasks_decomposed", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "task_count": 1, "decomposition_source": "llm", "rationale": "The goal is a basic system verification test (Loom response check). Only one task is needed to confirm that the runtime can generate a response using the current state context. The dimension 'system_response_validation' directly addresses the test query without extraneous analytical work."}
+{"ts": 1782827993.5677538, "type": "state.transition", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "from": "Planning", "to": "Dispatching"}
+{"ts": 1782827993.5677538, "type": "phase.start", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "phase": "dispatch", "dispatch_targets": ["system-test-0"]}
+{"ts": 1782827993.5677538, "type": "dispatch.batch", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "task_ids": ["t1"], "priority": 0}
+{"ts": 1782827993.568897, "type": "dispatch.sent", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "hand_id": "system-test-0", "executor_id": "brain-inline", "task_id": "t1", "dimension": "system_response_validation", "is_repair": false}
+{"ts": 1782828016.045216, "type": "dispatch.artifact", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "hand_id": "system-test-0", "executor_id": "brain-inline", "task_id": "t1", "is_repair": false}
+{"ts": 1782828016.0462203, "type": "phase.end", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "phase": "dispatch", "hand_count": 1}
+{"ts": 1782828016.047223, "type": "state.transition", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "from": "Dispatching", "to": "Reviewing"}
+{"ts": 1782828016.047223, "type": "phase.start", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "phase": "review"}
+{"ts": 1782828037.8395028, "type": "phase.end", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "phase": "review", "follow_up_count": 0}
+{"ts": 1782828037.8400278, "type": "state.transition", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "from": "Reviewing", "to": "Synthesizing"}
+{"ts": 1782828037.8406312, "type": "phase.start", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "phase": "synthesize"}
+{"ts": 1782828056.8446345, "type": "phase.end", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "phase": "synthesize"}
+{"ts": 1782828056.8446345, "type": "state.transition", "episode_id": "20b10f42-623e-42e0-b9d1-394296dba93d", "from": "Synthesizing", "to": "Persisted"}

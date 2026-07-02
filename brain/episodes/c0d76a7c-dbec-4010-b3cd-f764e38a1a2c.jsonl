@@ -1,0 +1,22 @@
+{"ts": 1781952589.5724754, "type": "episode.start", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "context_keys": ["source", "entrypoint", "task_family", "session_id", "social", "response_mode", "verification", "social_channel", "social_route", "goal_id"]}
+{"ts": 1781952596.7897935, "type": "phase.start", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "phase": "plan"}
+{"ts": 1781952596.7897935, "type": "state.transition", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "from": "Planning", "to": "Planning"}
+{"ts": 1781952596.7912302, "type": "projection-binding", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "fn": "plan", "state_version": 0, "schema_version": "1.0", "content_id": "sha256:3498a7b494abb02b"}
+{"ts": 1781952607.762733, "type": "phase.end", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "phase": "plan", "rubric_count": 3, "registered_shells": []}
+{"ts": 1781952607.7637317, "type": "projection-binding", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "fn": "decompose", "state_version": 0, "schema_version": "1.0", "content_id": "sha256:3498a7b494abb02b"}
+{"ts": 1781952629.5239446, "type": "plan.tasks_decomposed", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "task_count": 3, "decomposition_source": "llm", "rationale": "Goal is a three-step mathematical explanation of 1+1=2. The initial rubrics map directly to three analytical dimensions: axiomatic foundation, formal derivation, and semantic validation. Each dimension is independent and can run in parallel. State context (trading strategy rules, World Cup intent) is irrelevant to this general math query."}
+{"ts": 1781952629.5249422, "type": "state.transition", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "from": "Planning", "to": "Dispatching"}
+{"ts": 1781952629.5249422, "type": "phase.start", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "phase": "dispatch", "dispatch_targets": ["runtime-formal-derivation-1", "runtime-semantic-validation-2", "runtime-axiomatic-foundation-0"]}
+{"ts": 1781952629.5259442, "type": "dispatch.batch", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "task_ids": ["t1"], "priority": 1}
+{"ts": 1781952629.5259442, "type": "dispatch.sent", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "hand_id": "runtime-axiomatic-foundation-0", "executor_id": "brain-inline", "task_id": "t1", "dimension": "公理体系基础", "is_repair": false}
+{"ts": 1781952634.4533896, "type": "dispatch.error", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "hand_id": "runtime-axiomatic-foundation-0", "task_id": "t1", "message": "{'additionalDetails': 'unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, url: wss://api.openai.com/v1/responses, cf-ray: a0ea36946eee2eab-LAX', 'codexErrorInfo': {'responseStreamDisconnected': {'httpStatusCode': 401}}, 'message': 'Reconnecting... 2/5'}"}
+{"ts": 1781952634.4543898, "type": "dispatch.skipped", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "task_id": "t3", "cause": "t1"}
+{"ts": 1781952634.4543898, "type": "dispatch.skipped", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "task_id": "t2", "cause": "t1"}
+{"ts": 1781952634.4553914, "type": "phase.end", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "phase": "dispatch", "hand_count": 3}
+{"ts": 1781952634.4553914, "type": "state.transition", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "from": "Dispatching", "to": "Reviewing"}
+{"ts": 1781952634.4553914, "type": "phase.start", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "phase": "review"}
+{"ts": 1781952650.9168112, "type": "phase.end", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "phase": "review", "follow_up_count": 0}
+{"ts": 1781952650.9178095, "type": "state.transition", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "from": "Reviewing", "to": "Synthesizing"}
+{"ts": 1781952650.9188106, "type": "phase.start", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "phase": "synthesize"}
+{"ts": 1781952666.2843785, "type": "phase.end", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "phase": "synthesize"}
+{"ts": 1781952666.2843785, "type": "state.transition", "episode_id": "c0d76a7c-dbec-4010-b3cd-f764e38a1a2c", "from": "Synthesizing", "to": "Persisted"}

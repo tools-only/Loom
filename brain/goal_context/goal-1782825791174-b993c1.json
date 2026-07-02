@@ -1,0 +1,24 @@
+{
+  "goal_id": "goal-1782825791174-b993c1",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-30T13:23:11.173699Z",
+  "updated_at": "2026-06-30T13:33:19.616121Z",
+  "status": "open",
+  "title": "今日美股市场简报：宏观信号、板块轮动、风险事件",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1782826399611-38d2c12a",
+      "ts": "2026-06-30T13:33:19.611821Z",
+      "stance": "n/a",
+      "confidence": 0.25,
+      "key_drivers": [],
+      "reversal_condition": "当获取到今日实时VIX、利率、就业、板块资金流向及具体风险事件后，重新评估策略规则条件（VIX>25或持仓比例>8%）。"
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1782826399611-38d2c12a"
+  ]
+}

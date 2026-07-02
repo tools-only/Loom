@@ -1,0 +1,455 @@
+#!/usr/bin/env python3
+"""
+Loom Desktop Float — Native Windows floating capture window.
+
+Pure tkinter (no external dependencies, native Win32 widgets).
+A persistent always-on-top floating ball for quick-capturing resources into Loom.
+
+Features:
+  - Floating ball (always-on-top, draggable)
+  - Click → native input panel for pasting content
+  - Ctrl+Enter to submit
+  - Sends to Loom /channels/capture → intent_wiki
+  - Remembers position across restarts
+"""
+
+import json
+import os
+import sys
+import threading
+import tkinter as tk
+from tkinter import ttk
+from pathlib import Path
+from urllib.request import Request, urlopen
+from urllib.error import URLError
+
+
+# ── Constants ──────────────────────────────────────────────────────────
+
+BALL_SIZE     = 56
+PANEL_W       = 400
+PANEL_H       = 500
+LOOM_HOST     = 'http://localhost:3000'
+CAPTURE_URL   = f'{LOOM_HOST}/channels/capture'
+CONFIG_DIR    = Path(os.environ.get('APPDATA', Path.home())) / 'LoomDesktopFloat'
+CONFIG_FILE   = CONFIG_DIR / 'config.json'
+
+COLORS = {
+    'accent':       '#7A5AF8',
+    'accent_dark':  '#5B3CD8',
+    'accent_light': '#9173FA',
+    'bg':           '#FAFAFC',
+    'bg_input':     '#F5F5FA',
+    'text':         '#1A1A2E',
+    'text_sec':     '#888888',
+    'border':       '#E6E6EB',
+    'green':        '#0F7A54',
+    'red':          '#C42B2B',
+    'white':        '#FFFFFF',
+}
+
+
+# ── Config ─────────────────────────────────────────────────────────────
+
+def load_config():
+    try:
+        if CONFIG_FILE.exists():
+            return json.loads(CONFIG_FILE.read_text('utf-8'))
+    except Exception:
+        pass
+    return {}
+
+def save_config(cfg):
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_FILE.write_text(json.dumps(cfg, indent=2), 'utf-8')
+    except Exception:
+        pass
+
+
+# ── HTTP helper (async) ────────────────────────────────────────────────
+
+def post_async(payload, callback):
+    """POST to Loom capture endpoint in a background thread."""
+    def _run():
+        try:
+            data = json.dumps(payload).encode('utf-8')
+            req = Request(CAPTURE_URL, data=data,
+                          headers={'Content-Type': 'application/json'})
+            resp = urlopen(req, timeout=10)
+            body = json.loads(resp.read().decode('utf-8'))
+            ok = resp.status == 200 and body.get('ok', False)
+            msg = body.get('error', 'Saved to Loom ✓' if ok else f'HTTP {resp.status}')
+            callback(ok, msg)
+        except URLError as e:
+            err = str(e.reason) if hasattr(e, 'reason') else str(e)
+            callback(False, f'Connection refused — is Loom running?\n{err}')
+        except Exception as e:
+            callback(False, str(e))
+    threading.Thread(target=_run, daemon=True).start()
+
+
+# ── Main Application ──────────────────────────────────────────────────
+
+class LoomDesktopFloat:
+    """The desktop floating ball application."""
+
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title('Loom Float')
+        self._setup_window()
+        self._build_ball()
+        self._build_panel()
+        self._load_position()
+        self._show_ball()
+        self.root.mainloop()
+
+    # ── Window setup ────────────────────────────────────────────────────
+
+    def _setup_window(self):
+        self.root.overrideredirect(True)           # Frameless
+        self.root.attributes('-topmost', True)      # Always-on-top
+        self.root.attributes('-toolwindow', True)   # No taskbar entry
+        self.root.configure(bg='')
+
+        # Transparent color trick: set transparent color to a color we don't use
+        try:
+            self.root.wm_attributes('-transparentcolor', '#010101')
+        except Exception:
+            pass
+
+        self.root.geometry(f'{BALL_SIZE + 2}x{BALL_SIZE + 2}')
+        self._is_expanded = False
+        self._dragging = False
+        self._drag_x = 0
+        self._drag_y = 0
+
+    # ── Floating Ball ───────────────────────────────────────────────────
+
+    def _build_ball(self):
+        self.ball_frame = tk.Frame(self.root, width=BALL_SIZE, height=BALL_SIZE,
+                                    bg='#010101', highlightthickness=0)
+        self.ball_frame.place(x=1, y=1)
+
+        self.canvas = tk.Canvas(self.ball_frame, width=BALL_SIZE, height=BALL_SIZE,
+                                 bg='#010101', highlightthickness=0)
+        self.canvas.pack()
+
+        # Draw the circular ball with gradient-like effect (tkinter doesn't do real gradients)
+        self._draw_ball(False)
+
+        # Bind events for dragging and clicking
+        self.canvas.bind('<Button-1>', self._on_ball_press)
+        self.canvas.bind('<B1-Motion>', self._on_ball_drag)
+        self.canvas.bind('<ButtonRelease-1>', self._on_ball_release)
+        self.canvas.bind('<Enter>', lambda e: self._draw_ball(True))
+        self.canvas.bind('<Leave>', lambda e: self._draw_ball(False))
+
+    def _draw_ball(self, hovered):
+        self.canvas.delete('all')
+        cx = cy = BALL_SIZE // 2
+        r = BALL_SIZE // 2 - 2
+
+        # Shadow
+        self.canvas.create_oval(cx - r + 1, cy - r + 2, cx + r + 1, cy + r + 2,
+                                 fill='', outline='', tags='shadow')
+
+        # Main circle — use layered arcs for gradient approximation
+        color = COLORS['accent_light'] if hovered else COLORS['accent']
+        self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r,
+                                 fill=color, outline='')
+
+        # Highlight arc (top-left lighter area)
+        self.canvas.create_arc(cx - r, cy - r, cx + r, cy + r,
+                                start=90, extent=180,
+                                fill='', outline='',
+                                style='arc', width=0)
+
+        # Plus icon
+        s = 7  # half-size of plus
+        lw = 2
+        self.canvas.create_line(cx - s, cy, cx + s, cy,
+                                 fill=COLORS['white'], width=lw, capstyle='round')
+        self.canvas.create_line(cx, cy - s, cx, cy + s,
+                                 fill=COLORS['white'], width=lw, capstyle='round')
+
+    # ── Expanded Panel ──────────────────────────────────────────────────
+
+    def _build_panel(self):
+        self.panel = tk.Frame(self.root, bg=COLORS['bg'], highlightthickness=0)
+        self.panel.place(x=0, y=0, width=PANEL_W, height=PANEL_H)
+        self.panel.place_forget()
+
+        # ── Header ──
+        header = tk.Frame(self.panel, bg=COLORS['bg'])
+        header.pack(fill='x', padx=16, pady=(12, 4))
+        header.columnconfigure(0, weight=1)
+
+        title_frame = tk.Frame(header, bg=COLORS['bg'])
+        title_frame.grid(row=0, column=0, sticky='w')
+
+        tk.Label(title_frame, text='Quick Capture', font=('Segoe UI', 13, 'bold'),
+                 bg=COLORS['bg'], fg=COLORS['text']).pack(side='left')
+        tk.Label(title_frame, text='→ Intent Wiki', font=('Segoe UI', 9),
+                 bg=COLORS['bg'], fg=COLORS['text_sec']).pack(side='left', padx=(4, 0))
+
+        close_btn = tk.Button(header, text='✕', font=('Segoe UI', 12),
+                               bg=COLORS['bg'], fg=COLORS['text_sec'],
+                               bd=0, cursor='hand2',
+                               activebackground='#e0e0e0', activeforeground='#333',
+                               command=self._collapse)
+        close_btn.grid(row=0, column=1, sticky='e')
+
+        # ── Main input ──
+        self._input = tk.Text(self.panel, font=('Segoe UI', 11),
+                               bg=COLORS['bg_input'], fg=COLORS['text'],
+                               bd=1, relief='solid', highlightthickness=0,
+                               padx=10, pady=10,
+                               height=6, wrap='word')
+        self._input.place(x=16, y=44, width=PANEL_W - 32, height=140)
+        self._input.bind('<Control-Return>', lambda e: self._submit())
+        self._input.bind('<KeyRelease>', self._on_input_key)
+        self._input.focus_set()
+
+        # Placeholder text
+        self._has_placeholder = True
+        self._input.insert('1.0', 'Paste notes, URLs, excerpts…\nLoom will distill into intent_wiki.')
+        self._input.bind('<FocusIn>', self._on_input_focus)
+        self._input.bind('<FocusOut>', self._on_input_blur)
+
+        # ── Quick chips ──
+        chips_frame = tk.Frame(self.panel, bg=COLORS['bg'])
+        chips_frame.place(x=16, y=192, width=PANEL_W - 32)
+
+        chip_style = {'font': ('Segoe UI', 9), 'bg': '#F0F0F5', 'fg': COLORS['text_sec'],
+                       'bd': 1, 'relief': 'solid', 'cursor': 'hand2',
+                       'padx': 10, 'pady': 2, 'activebackground': '#E8E0FF'}
+        for text, tag in [('📊 Market', 'market'), ('🎯 Target', 'target'),
+                           ('💼 Position', 'position'), ('📚 General', 'general')]:
+            btn = tk.Button(chips_frame, text=text, **chip_style)
+            btn.pack(side='left', padx=(0, 4))
+            btn.config(command=lambda t=tag: self._insert_chip(t))
+
+        # ── Toggle extras ──
+        self._extras_visible = False
+        self._extras_btn = tk.Button(self.panel, text='+ More options',
+                                      font=('Segoe UI', 9),
+                                      bg=COLORS['bg'], fg=COLORS['text_sec'],
+                                      bd=0, cursor='hand2', anchor='w',
+                                      activebackground=COLORS['bg'],
+                                      activeforeground=COLORS['accent'],
+                                      command=self._toggle_extras)
+        self._extras_btn.place(x=16, y=222, width=120, height=24)
+
+        # ── Extras (hidden) ──
+        self._extras_frame = tk.Frame(self.panel, bg=COLORS['bg'])
+        self._extras_frame.place(x=16, y=248, width=PANEL_W - 32, height=60)
+        self._extras_frame.place_forget()
+
+        tk.Label(self._extras_frame, text='Title', font=('Segoe UI', 8),
+                 bg=COLORS['bg'], fg=COLORS['text_sec']).grid(row=0, column=0, sticky='w')
+        self._title_entry = tk.Entry(self._extras_frame, font=('Segoe UI', 10),
+                                      bg=COLORS['bg_input'], fg=COLORS['text'],
+                                      bd=1, relief='solid')
+        self._title_entry.grid(row=1, column=0, sticky='ew', padx=(0, 4))
+
+        tk.Label(self._extras_frame, text='Tags (comma)', font=('Segoe UI', 8),
+                 bg=COLORS['bg'], fg=COLORS['text_sec']).grid(row=0, column=1, sticky='w')
+        self._tags_entry = tk.Entry(self._extras_frame, font=('Segoe UI', 10),
+                                     bg=COLORS['bg_input'], fg=COLORS['text'],
+                                     bd=1, relief='solid')
+        self._tags_entry.grid(row=1, column=1, sticky='ew', padx=(4, 0))
+
+        self._extras_frame.columnconfigure(0, weight=1)
+        self._extras_frame.columnconfigure(1, weight=1)
+
+        # ── Footer ──
+        footer = tk.Frame(self.panel, bg=COLORS['bg'])
+        footer.place(x=16, y=PANEL_H - 56, width=PANEL_W - 32, height=40)
+
+        self._status = tk.Label(footer, text='', font=('Segoe UI', 9),
+                                 bg=COLORS['bg'], fg=COLORS['text_sec'], anchor='w')
+        self._status.pack(side='left', fill='x', expand=True)
+
+        self._submit_btn = tk.Button(footer, text='Send to Loom',
+                                      font=('Segoe UI', 10, 'bold'),
+                                      bg=COLORS['accent'], fg=COLORS['white'],
+                                      bd=0, cursor='hand2', padx=16, pady=4,
+                                      activebackground=COLORS['accent_light'],
+                                      activeforeground=COLORS['white'],
+                                      command=self._submit)
+        self._submit_btn.pack(side='right')
+
+        # Bottom border line
+        line = tk.Frame(self.panel, bg=COLORS['border'], height=1)
+        line.place(x=0, y=PANEL_H - 58, width=PANEL_W)
+
+    # ── State transitions ───────────────────────────────────────────────
+
+    def _show_ball(self):
+        self._is_expanded = False
+        self.panel.place_forget()
+        self.ball_frame.place(x=1, y=1)
+        self.root.geometry(f'{BALL_SIZE + 2}x{BALL_SIZE + 2}')
+        self.root.attributes('-topmost', True)
+
+    def _expand(self):
+        self._is_expanded = True
+        self.ball_frame.place_forget()
+        self.root.geometry(f'{PANEL_W}x{PANEL_H}')
+        self.panel.place(x=0, y=0, width=PANEL_W, height=PANEL_H)
+        self.root.attributes('-topmost', True)
+        self.root.lift()
+        self._input.focus_set()
+
+    def _collapse(self):
+        self._clear_input()
+        self._show_ball()
+        self._save_position()
+
+    # ── Ball events ─────────────────────────────────────────────────────
+
+    def _on_ball_press(self, event):
+        if not self._is_expanded:
+            # Check if it's a click (no drag) vs start of drag
+            self._dragging = False
+            self._drag_x = event.x_root
+            self._drag_y = event.y_root
+            self._click_pos = (event.x_root, event.y_root)
+            self._win_x = self.root.winfo_x()
+            self._win_y = self.root.winfo_y()
+
+    def _on_ball_drag(self, event):
+        if not self._is_expanded:
+            dx = event.x_root - self._drag_x
+            dy = event.y_root - self._drag_y
+            if abs(dx) > 3 or abs(dy) > 3:
+                self._dragging = True
+                self.root.geometry(f'+{self._win_x + dx}+{self._win_y + dy}')
+
+    def _on_ball_release(self, event):
+        if not self._is_expanded:
+            if not self._dragging:
+                # It was a click, not a drag
+                self._expand()
+            else:
+                self._save_position()
+            self._dragging = False
+
+    # ── Panel events ────────────────────────────────────────────────────
+
+    def _on_input_focus(self, event):
+        if self._has_placeholder:
+            self._input.delete('1.0', 'end')
+            self._has_placeholder = False
+            self._input.config(fg=COLORS['text'])
+
+    def _on_input_blur(self, event):
+        if not self._input.get('1.0', 'end-1c').strip():
+            self._input.delete('1.0', 'end')
+            self._input.insert('1.0', 'Paste notes, URLs, excerpts…\nLoom will distill into intent_wiki.')
+            self._has_placeholder = True
+            self._input.config(fg=COLORS['text_sec'])
+
+    def _on_input_key(self, event):
+        pass  # Kept for future use if needed
+
+    def _insert_chip(self, tag):
+        self._on_input_focus(None)
+        current = self._input.get('1.0', 'end-1c').strip()
+        prefix = f'[{tag}] '
+        if current:
+            self._input.insert('end', '\n' + prefix)
+        else:
+            self._input.insert('1.0', prefix)
+        self._input.focus_set()
+        self._input.mark_set('insert', 'end')
+
+    def _toggle_extras(self):
+        self._extras_visible = not self._extras_visible
+        if self._extras_visible:
+            self._extras_frame.place(x=16, y=248, width=PANEL_W - 32, height=60)
+            self._extras_btn.config(text='- Less options')
+        else:
+            self._extras_frame.place_forget()
+            self._extras_btn.config(text='+ More options')
+
+    # ── Submit ──────────────────────────────────────────────────────────
+
+    def _submit(self):
+        if self._has_placeholder:
+            self._show_status('error', 'Paste something first.')
+            return
+
+        text = self._input.get('1.0', 'end-1c').strip()
+        if not text:
+            self._show_status('error', 'Paste something first.')
+            return
+
+        self._submit_btn.config(state='disabled', text='Sending…')
+        payload = {
+            'text': text,
+            'title': self._title_entry.get().strip(),
+            'tags': [t.strip() for t in self._tags_entry.get().split(',') if t.strip()],
+            'channel': '',
+            'trust_tier': '',
+            'resource_kind': 'note',
+        }
+        post_async(payload, self._on_result)
+
+    def _on_result(self, ok, msg):
+        self.root.after(0, lambda: self._handle_result(ok, msg))
+
+    def _handle_result(self, ok, msg):
+        self._submit_btn.config(state='normal', text='Send to Loom')
+        if ok:
+            self._show_status('ok', 'Saved to Loom ✓')
+            # Auto-collapse after 1.5s
+            self.root.after(1500, self._collapse)
+        else:
+            self._show_status('error', msg)
+
+    def _show_status(self, kind, msg):
+        color = COLORS['green'] if kind == 'ok' else (COLORS['red'] if kind == 'error' else COLORS['text_sec'])
+        self._status.config(text=msg, fg=color)
+
+    # ── Helpers ─────────────────────────────────────────────────────────
+
+    def _clear_input(self):
+        self._input.delete('1.0', 'end')
+        self._input.insert('1.0', 'Paste notes, URLs, excerpts…\nLoom will distill into intent_wiki.')
+        self._has_placeholder = True
+        self._input.config(fg=COLORS['text_sec'])
+        self._title_entry.delete(0, 'end')
+        self._tags_entry.delete(0, 'end')
+        self._show_status('', '')
+        if self._extras_visible:
+            self._toggle_extras()
+
+    def _load_position(self):
+        cfg = load_config()
+        pos = cfg.get('position')
+        if pos:
+            self.root.geometry(f'+{pos["x"]}+{pos["y"]}')
+        else:
+            self._position_bottom_right()
+
+    def _save_position(self):
+        x = self.root.winfo_x()
+        y = self.root.winfo_y()
+        save_config({'position': {'x': x, 'y': y}})
+
+    def _position_bottom_right(self):
+        w = self.root.winfo_screenwidth()
+        h = self.root.winfo_screenheight()
+        self.root.geometry(f'+{w - BALL_SIZE - 40}+{h - BALL_SIZE - 48}')
+
+
+# ── Entry Point ────────────────────────────────────────────────────────
+
+def main():
+    app = LoomDesktopFloat()
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())

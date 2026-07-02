@@ -1,4 +1,4 @@
-"""BrainHarness — Brain agent harness with programmatic state selection.
+﻿"""BrainHarness — Brain agent harness with programmatic state selection.
 
 Structural difference from hand harness:
   Hand harness: _assemble_prompt() bulk-loads .md files; LLM decides relevance.
@@ -803,6 +803,7 @@ class BrainHarness:
         model: str,
         analysis_plan: dict | None = None,
         review_result: dict | None = None,
+        environment_state_frame: dict | None = None,
     ) -> dict:
         """One LLM call: key_claims × pre-selected strategy rules → synthesis."""
         domain = workflow_decision.get("domain", "general")
@@ -866,6 +867,24 @@ class BrainHarness:
                 parts.append("Analysis rubrics (organize key_drivers by these):\n" + "\n".join(
                     f"  - {r['dimension']}: {r['requirements']}" for r in rubrics if isinstance(r, dict)))
             plan_text = "\n".join(parts) + "\n" if parts else ""
+                # -- Synthesis guard: prevent unsafe state usage --
+        guard_text = ""
+        if environment_state_frame:
+            try:
+                from .synthesis_guard import SynthesisGuard
+                from .environment_state import EnvironmentStateFrame, EnvironmentState
+                states_data = environment_state_frame.get("states", []) or []
+                states = [EnvironmentState(**s) for s in states_data]
+                frame = EnvironmentStateFrame(
+                    episode_id=environment_state_frame.get("episode_id", ""),
+                    states=states,
+                    active_state_ids=environment_state_frame.get("active_state_ids", []),
+                )
+                guard_result = SynthesisGuard.build_constraints(frame, review_result)
+                guard_text = SynthesisGuard.guard_prompt(guard_result)
+            except Exception:
+                pass
+
         review_text = ""
         if review_result and isinstance(review_result, dict):
             uncovered = review_result.get("uncovered_sub_questions", [])
@@ -880,6 +899,7 @@ class BrainHarness:
                 )
 
         user_msg = (
+            guard_text +
             f"User question: {question}\n\n"
             f"Workflow decision: {json.dumps(workflow_decision, ensure_ascii=False)}\n\n"
             f"Hand summaries:\n\n{hands_text}\n\n"

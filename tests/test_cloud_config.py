@@ -59,6 +59,7 @@ class CloudConfigTests(unittest.TestCase):
         cfg = result["test-cloud"]
         self.assertEqual(cfg["endpoint"], "https://example.com/run")
         self.assertEqual(cfg["auth_token"], "sk-test")
+        self.assertEqual(cfg["auth_token_env"], "TEST_CLOUD_TOKEN_ABC")
         self.assertEqual(cfg["capabilities"], ["market.analysis"])
         self.assertEqual(cfg["timeout_s"], 90.0)
 

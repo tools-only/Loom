@@ -1,0 +1,20 @@
+{"ts": 1782105724.7996984, "type": "episode.start", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "context_keys": ["goal_id"]}
+{"ts": 1782105735.1787038, "type": "phase.start", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "phase": "plan"}
+{"ts": 1782105735.1796997, "type": "state.transition", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "from": "Planning", "to": "Planning"}
+{"ts": 1782105735.1796997, "type": "projection-binding", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "fn": "plan", "state_version": 3, "schema_version": "1.0", "content_id": "sha256:2efa6e3637ba351c"}
+{"ts": 1782105742.020664, "type": "phase.end", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "phase": "plan", "rubric_count": 1, "registered_shells": []}
+{"ts": 1782105742.022672, "type": "projection-binding", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "fn": "decompose", "state_version": 3, "schema_version": "1.0", "content_id": "sha256:2efa6e3637ba351c"}
+{"ts": 1782105750.6812148, "type": "plan.tasks_decomposed", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "task_count": 1, "decomposition_source": "fallback", "rationale": "state-driven decomposition"}
+{"ts": 1782105750.6822166, "type": "state.transition", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "from": "Planning", "to": "Dispatching"}
+{"ts": 1782105750.6822166, "type": "phase.start", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "phase": "dispatch", "dispatch_targets": ["runtime-inline-0"]}
+{"ts": 1782105750.6822166, "type": "dispatch.batch", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "task_ids": ["t0"], "priority": 0}
+{"ts": 1782105750.6832147, "type": "dispatch.sent", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "hand_id": "runtime-inline-0", "executor_id": "brain-inline", "task_id": "t0", "dimension": "Brain-generated fallback dimension", "is_repair": false}
+{"ts": 1782105762.2819633, "type": "dispatch.artifact", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "hand_id": "runtime-inline-0", "executor_id": "brain-inline", "task_id": "t0", "is_repair": false}
+{"ts": 1782105762.2819633, "type": "phase.end", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "phase": "dispatch", "hand_count": 1}
+{"ts": 1782105762.2829704, "type": "state.transition", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "from": "Dispatching", "to": "Reviewing"}
+{"ts": 1782105762.2829704, "type": "phase.start", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "phase": "review"}
+{"ts": 1782105770.505142, "type": "phase.end", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "phase": "review", "follow_up_count": 0}
+{"ts": 1782105770.5061424, "type": "state.transition", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "from": "Reviewing", "to": "Synthesizing"}
+{"ts": 1782105770.5061424, "type": "phase.start", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "phase": "synthesize"}
+{"ts": 1782105779.458854, "type": "phase.end", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "phase": "synthesize"}
+{"ts": 1782105779.459854, "type": "state.transition", "episode_id": "2d3615b2-5176-41e1-a15b-d71ac420cfd1", "from": "Synthesizing", "to": "Persisted"}

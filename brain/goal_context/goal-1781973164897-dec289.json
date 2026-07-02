@@ -1,0 +1,24 @@
+{
+  "goal_id": "goal-1781973164897-dec289",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-20T16:32:44.897153Z",
+  "updated_at": "2026-06-20T16:35:14.825707Z",
+  "status": "open",
+  "title": "预测下一轮世界杯比赛的结果",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1781973314824-0a52b650",
+      "ts": "2026-06-20T16:35:14.824641Z",
+      "stance": "n/a",
+      "confidence": 0.0,
+      "key_drivers": [],
+      "reversal_condition": ""
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1781973314824-0a52b650"
+  ]
+}

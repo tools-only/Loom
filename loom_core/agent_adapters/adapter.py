@@ -12,7 +12,10 @@ brain.py sees the same async-generator interface regardless of cell in the matri
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import os
+import time
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -22,7 +25,7 @@ import httpx
 
 # Default system prompt injected for http×openai adapters.
 LOOM_HAND_CONTRACT = """\
-You are a Loom Fin hand agent. Analyze the task and output EXACTLY ONE JSON line:
+You are a Loom Fin hand agent. Analyze the task and output a JSON artifact:
 {"type":"run.artifact","artifact":{"metadata":{"resources_used":[...],"key_claims":[...],"gaps":[...]},"narrative":"..."}}
 
 - resources_used: every data source you accessed (e.g. "fred", "reuters-rss")
@@ -30,10 +33,10 @@ You are a Loom Fin hand agent. Analyze the task and output EXACTLY ONE JSON line
 - gaps: data you needed but could not access
 - narrative: 2-4 paragraph analysis in Chinese
 
-Optionally prepend wiki write-backs (one per line, before the artifact line):
+Optionally prepend wiki write-backs:
 {"type":"wiki.write","path":"filename.md","content":"..."}
 
-Output NO other text.\
+You may include brief reasoning or caveats before the artifact line if helpful.\
 """
 
 
@@ -47,6 +50,7 @@ class AgentAdapter:
         loom   — Loom-native NDJSON event stream
         openai — OpenAI ChatCompletion API (content parsed as run.artifact JSON)
     command      : required when transport="process"
+    codex_backend: "sdk" or "raw" for Codex adapters
     task_as_arg  : if True, appends task["task"] to *command* instead of stdin
     endpoint     : required when transport="http"
     auth_token   : Bearer token for http transport
@@ -60,13 +64,16 @@ class AgentAdapter:
     def __init__(
         self,
         adapter_id: str,
-        transport: Literal["process", "http"],
-        protocol: Literal["loom", "openai"],
+        transport: Literal["process", "http", "websocket"],
+        protocol: Literal["loom", "openai", "codex"],
         *,
         command: list[str] | None = None,
+        codex_backend: Literal["sdk", "raw"] = "sdk",
         task_as_arg: bool = False,
         endpoint: str | None = None,
         auth_token: str | None = None,
+        auth_token_env: str | None = None,
+        codex_home: str | None = None,
         timeout_s: float = 120.0,
         runtime: Any = None,
         hands_root: Path | None = None,
@@ -83,14 +90,20 @@ class AgentAdapter:
         self._transport_kind = transport
         self._protocol = protocol
         self._command = list(command or [])
+        self._codex_backend = codex_backend
         self._task_as_arg = task_as_arg
         self._endpoint = endpoint or ""
         self._auth_token = auth_token
+        self._auth_token_env = auth_token_env or ""
+        self._codex_home = str(codex_home or "").strip()
         self._timeout_s = timeout_s
         self._runtime = runtime
         self._hands_root = Path(hands_root) if hands_root else None
         self._system_prompt = system_prompt or LOOM_HAND_CONTRACT
         self._http_transport = _transport  # injected in tests
+        # Codex raw session pool: keyed by session_key, stores (proc, thread_id, request_counter)
+        self._codex_sessions: dict[str, dict[str, Any]] = {}
+        self._codex_session_ttl = 1800  # 30 min idle timeout
 
     # ── public interface ───────────────────────────────────────────────────
 

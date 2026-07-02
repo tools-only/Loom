@@ -327,7 +327,7 @@ for adapter in (_domain_registry.get("finance"), _domain_registry.get("general")
         if hand_id not in REGISTRY:
             REGISTRY[hand_id] = cfg
 
-_brain_harness = BrainHarness(_ROOT, domain_registry=_domain_registry)
+_brain_harness = BrainHarness(_ROOT)
 # _brain_client / _brain_model were initialized above for brain-inline adapter
 _brain_resolver = WorkflowResolver(_ROOT, REGISTRY, _brain_client, _brain_model)
 _brain_distiller = ResourceDistiller(_ROOT, _brain_client, _brain_model)
@@ -395,6 +395,46 @@ def _with_brain_portfolio_context(hand_id: str, context: dict) -> dict:
     return next_context
 
 
+def _ensure_web_search_capability(hand_id: str, ctx: dict) -> tuple:
+    """Ensure every hand has web_search capability by default.
+
+    When tools config is empty or missing web_search, inject it.
+    Reuses Codex/Claude Code native web search. Returns (ctx, injected).
+    """
+    spec = (ctx or {}).get("agentic_hand_spec", {}) or {}
+    capabilities = list(spec.get("capabilities", []) or [])
+    tools = list(spec.get("tools", []) or [])
+
+    info = REGISTRY.get(hand_id, {})
+    registry_tools = info.get("tools", []) or []
+    registry_capabilities = info.get("capabilities", []) or []
+
+    has_web = (
+        "web_search" in capabilities
+        or "web_search" in tools
+        or "web_search" in registry_tools
+        or "web_search" in registry_capabilities
+    )
+
+    if has_web:
+        return ctx, False
+
+    if "web_search" not in capabilities:
+        capabilities.append("web_search")
+        spec["capabilities"] = capabilities
+        ctx = dict(ctx or {})
+        ctx["agentic_hand_spec"] = spec
+
+    ctx["_web_search"] = {
+        "injected": True,
+        "source": "codex_default",
+        "note": "web_search injected as default; configure tools in registry to override",
+    }
+    print(f"[brain] web_search injected as default for hand={hand_id}", flush=True)
+    return ctx, True
+
+
+
 async def _brain_hand_runner(hand_id: str, task: str, ctx: dict) -> dict:
     """Run a single hand for Brain's /analyze 鈥?reuses sdk path.
 
@@ -420,6 +460,9 @@ async def _brain_hand_runner(hand_id: str, task: str, ctx: dict) -> dict:
         }
 
     # Runtime-generated hand: not registered statically and not mounted.
+    # Ensure every hand has web_search capability by default (reuses Codex/Claude Code native search)
+    ctx, _web_injected = _ensure_web_search_capability(hand_id, ctx)
+
     if hand_id not in REGISTRY and hand_id not in _mounted:
         spec = (ctx or {}).get("agentic_hand_spec", {}) or {}
         system_prompt = spec.get("system_prompt", "") or ""
@@ -432,7 +475,47 @@ async def _brain_hand_runner(hand_id: str, task: str, ctx: dict) -> dict:
         _executor_id = spec.get("executor_id") or "brain-inline"
         _resolved_id = _adapter_registry.resolve_runtime_adapter(_executor_id)
         if _resolved_id == _DIRECT_CODEX_RUNTIME_ID:
-            return await _run_direct_codex_hand(hand_id, task, ctx)
+            try:
+                artifact = await _run_direct_codex_hand(hand_id, task, ctx)
+                if artifact and isinstance(artifact, dict):
+                    artifact.setdefault("_degradation", {})
+                    artifact["_degradation"]["web_search"] = {
+                        "source": "codex_default",
+                        "note": "web_search provided by Codex/Claude Code native search",
+                    }
+                return artifact
+            except Exception as _codex_err:
+                print(f"[brain] codex-hand failed for hand={hand_id}, falling back to brain-inline: {_codex_err}", flush=True)
+                fallback_adapter = _adapter_registry.find_by_id("brain-inline")
+                if fallback_adapter is None:
+                    raise RuntimeError(f"codex-hand failed and brain-inline not available: {_codex_err}")
+                envelope = {
+                    "task": task,
+                    "context": ctx,
+                    "hand_id": hand_id,
+                    "system_prompt": system_prompt,
+                    "resource_api": "http://127.0.0.1:3001/resources",
+                }
+                artifact = None
+                async for event in fallback_adapter.invoke(envelope):
+                    if event.get("type") == "run.artifact":
+                        artifact = event.get("artifact")
+                    elif event.get("type") == "run.error":
+                        raise RuntimeError(event.get("message", "brain-inline adapter error"))
+                if artifact is None:
+                    raise RuntimeError(f"hand {hand_id} returned no artifact from fallback")
+                if isinstance(artifact, dict):
+                    artifact.setdefault("_degradation", {})
+                    artifact["_degradation"]["runtime"] = {
+                        "requested": "codex-app-server",
+                        "actual": "brain-inline",
+                        "reason": str(_codex_err)[:200],
+                    }
+                    artifact["_degradation"]["web_search"] = {
+                        "source": "codex_default",
+                        "note": "codex-hand failed; web_search downgraded to brain-inline with codex native search",
+                    }
+                return artifact
         adapter = _adapter_registry.find_by_id(_resolved_id)
         if adapter is None:
             adapter = _adapter_registry.find_by_id("brain-inline")  # fallback
@@ -2963,6 +3046,141 @@ async def visual_result(episode_id: str):
     return HTMLResponse(_render_visual_page(record, episode_id))
 
 
+
+
+def _render_harness_architecture_page() -> str:
+    """Standalone read-only Harness page for Loom agent architecture."""
+    script_path = _ROOT / "bridge" / "webview" / "harness-summary.js"
+    if script_path.exists():
+        summary_script = script_path.read_text(encoding="utf-8")
+        summary_script = summary_script.replace("var BRAIN = 'http://127.0.0.1:3002';", "var BRAIN = window.location.origin;")
+    else:
+        summary_script = "document.body.insertAdjacentHTML('beforeend', '<p>harness-summary.js not found</p>');"
+
+    page = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loom Harness Architecture</title>
+<style>
+  :root {
+    --bg-1: #f7f8fb;
+    --bg-2: #ffffff;
+    --bg-3: #eceff4;
+    --ink-1: #151722;
+    --ink-2: #4c5263;
+    --ink-3: #7d8494;
+    --accent-iris: #4657d8;
+    --success: #1f9d68;
+    --warning: #d27c1f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg-1);
+    color: var(--ink-1);
+    font: 14px/1.5 "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .harness-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 24px;
+    align-items: end;
+    padding: 36px clamp(20px, 5vw, 64px) 22px;
+    border-bottom: 1px solid rgba(21, 23, 34, 0.08);
+    background: #fff;
+  }
+  .harness-eyebrow {
+    margin: 0 0 6px;
+    color: var(--accent-iris);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .harness-hero h1 {
+    margin: 0;
+    font-size: clamp(28px, 4vw, 44px);
+    line-height: 1.05;
+    letter-spacing: 0;
+  }
+  .harness-hero p:last-child {
+    max-width: 760px;
+    margin: 10px 0 0;
+    color: var(--ink-2);
+  }
+  .harness-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .harness-links a,
+  .anc-pill {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(21, 23, 34, .10);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--ink-2);
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .harness-links a:hover { border-color: rgba(70, 87, 216, .35); color: var(--accent-iris); }
+  .harness-shell { width: min(1180px, calc(100vw - 40px)); margin: 24px auto 56px; }
+  .anc-section--gc {
+    background: var(--bg-2);
+    border: 1px solid rgba(21, 23, 34, .10);
+    border-radius: 8px;
+    padding: 18px;
+    box-shadow: 0 18px 48px -40px rgba(21, 23, 34, .42);
+  }
+  .anc-pill--done { background: #eaf7f0; color: #127148; }
+  .anc-pill--warn { background: #fff4df; color: #9a5a13; }
+  .anc-pill--gen { background: #edf0ff; color: #3342b4; }
+  .anc-pill--review { background: #eef8f6; color: #0b766b; }
+  code { font-family: "Cascadia Mono", Consolas, monospace; }
+  @media (max-width: 760px) {
+    .harness-hero { grid-template-columns: 1fr; }
+    .harness-links { justify-content: flex-start; }
+    .harness-shell { width: calc(100vw - 24px); }
+  }
+</style>
+</head>
+<body>
+<header class="harness-hero">
+  <div>
+    <p class="harness-eyebrow">Loom Harness</p>
+    <h1>Agent Architecture</h1>
+    <p>Read-only surface for Brain health, hand agent states, adapter registry, runtime bindings, mounts, model configuration, and recent execution state.</p>
+  </div>
+  <nav class="harness-links" aria-label="Harness data links">
+    <a href="/health">Health JSON</a>
+    <a href="/hands/runtime-bindings">Runtime Bindings</a>
+    <a href="/adapters">Adapters</a>
+    <a href="/intent-stream">Intent Stream</a>
+  </nav>
+</header>
+<main class="harness-shell">
+  <section class="anc-section anc-section--gc" data-anc="harness-summary" data-detail-disabled="true"></section>
+</main>
+<script>
+__HARNESS_SUMMARY_SCRIPT__
+</script>
+</body>
+</html>"""
+    return page.replace("__HARNESS_SUMMARY_SCRIPT__", summary_script)
+
+@app.get("/harness")
+async def harness_page():
+    """Read-only Harness page for agent states, configs, and runtime bindings."""
+    return HTMLResponse(_render_harness_architecture_page())
+
 @app.get("/intent-stream")
 async def intent_stream_page():
     from fastapi.responses import HTMLResponse
@@ -3603,6 +3821,12 @@ async def close_agent_session(session_id: str):
     ok = _session_registry.close(session_id)
     return {"ok": ok}
 
+
+
+@app.post("/loom/run")
+async def loom_run(req: RunRequest):
+    """Alias for /run for backward compatibility with harness panel."""
+    return await run(req)
 
 @app.post("/run")
 async def run(req: RunRequest):
@@ -4514,21 +4738,287 @@ def _enrich_error_artifact(artifact: dict, hand_id: str) -> dict:
     return artifact
 
 
+
 def _render_visual_page(record: dict, episode_id: str) -> str:
-    """Render a standalone HTML page for a /visual/<episode_id> result."""
+    """Render standalone HTML page for /visual/<episode_id> with full harness data."""
     question = record.get("question", "")
     domain = record.get("domain", "general")
-    ts = record.get("ts", "")[:19].replace("T", " ")
+    ts = str(record.get("ts", ""))[:19].replace("T", " ")
     brain = record.get("brain_self_eval", {}) or {}
     stance = brain.get("stance", "n/a")
     confidence = brain.get("confidence", 0.0)
     artifacts = record.get("hand_artifacts", {}) or {}
+    orch = record.get("orchestration_snapshot") or {}
+    profiles = orch.get("profiles", {}) if isinstance(orch, dict) else {}
+    nodes = orch.get("nodes", []) if isinstance(orch, dict) else []
+    diagnostics = orch.get("diagnostics", []) if isinstance(orch, dict) else []
+    quality_summary = orch.get("quality_summary", {}) if isinstance(orch, dict) else {}
 
     adapter = _domain_registry.get(domain) if _domain_registry else None
     stance_label = (adapter.stance_labels or {}).get(stance, stance)
     confidence_pct = int(float(confidence) * 100)
 
-    hand_blocks: list[str] = []
+    # ---- Quality KPI strip ----
+    kpi_html = ""
+    if quality_summary:
+        ac = quality_summary.get("artifact_count", 0)
+        tc = quality_summary.get("total_chars", 0)
+        tcl = quality_summary.get("total_claims", 0)
+        tg = quality_summary.get("total_gaps", 0)
+        acn = quality_summary.get("avg_confidence", 0)
+        sr = quality_summary.get("structured_ratio", 0)
+        tsr_qs = quality_summary.get("total_sources", 0)
+        ec = quality_summary.get("error_count", 0)
+        parts = [
+            f'<div class="vis-kpi"><span class="vis-kpi-val">{ac}</span><span class="vis-kpi-label">Artifacts</span></div>',
+            f'<div class="vis-kpi"><span class="vis-kpi-val">{tc:,}</span><span class="vis-kpi-label">Total Chars</span></div>',
+            f'<div class="vis-kpi"><span class="vis-kpi-val">{tcl}</span><span class="vis-kpi-label">Claims</span></div>',
+            f'<div class="vis-kpi"><span class="vis-kpi-val" style="color:var(--accent-rose)">{tg}</span><span class="vis-kpi-label">Gaps</span></div>' if tg else f'<div class="vis-kpi"><span class="vis-kpi-val" style="color:var(--accent-lime)">0</span><span class="vis-kpi-label">Gaps</span></div>',
+            f'<div class="vis-kpi"><span class="vis-kpi-val">{acn}%</span><span class="vis-kpi-label">Avg Conf</span></div>',
+            f'<div class="vis-kpi"><span class="vis-kpi-val">{sr}%</span><span class="vis-kpi-label">Structured</span></div>',
+            f'<div class="vis-kpi"><span class="vis-kpi-val">{tsr_qs}</span><span class="vis-kpi-label">Sources</span></div>',
+        ]
+        if ec:
+            parts.append(f'<div class="vis-kpi"><span class="vis-kpi-val" style="color:var(--accent-rose)">{ec}</span><span class="vis-kpi-label">Errors</span></div>')
+        kpi_html = f'<div class="vis-kpi-strip">{"".join(parts)}</div>'
+
+    # ---- Hand Profiles ----
+    profiles_html = ""
+    if profiles:
+        cards = []
+        for pid, pi in profiles.items():
+            if not isinstance(pi, dict):
+                continue
+            plabel = _html_text(str(pi.get("label", pi.get("agent_id", pid))))
+            pdesc = _html_text(str(pi.get("description", ""))[:200])
+            pmodel = _html_text(str(pi.get("base_model", "")))
+            padapter = _html_text(str(pi.get("adapter_id", "")))
+            ptask = _html_text(str(pi.get("task_snippet", ""))[:200])
+            pdim = _html_text(str(pi.get("dimension", "")))
+            psys = _html_text(str(pi.get("system_prompt_snippet", ""))[:600])
+            pcaps = pi.get("capabilities", []) or []
+            ptools = pi.get("tools", []) or []
+            pmcps = pi.get("mcp_servers", []) or []
+            pskills = pi.get("skills", []) or []
+
+            tags = []
+            for c in pcaps[:6]:
+                tags.append(f'<span class="vis-tag vis-tag--cap">{_html_text(str(c)[:24])}</span>')
+            for t in ptools[:5]:
+                tags.append(f'<span class="vis-tag vis-tag--tool">&#x1f527; {_html_text(str(t)[:24])}</span>')
+            for m in pmcps[:3]:
+                tags.append(f'<span class="vis-tag vis-tag--mcp">&#x1f50c; {_html_text(str(m)[:24])}</span>')
+            for s in pskills[:3]:
+                tags.append(f'<span class="vis-tag vis-tag--skill">&#x26a1; {_html_text(str(s)[:24])}</span>')
+
+            model_badge = f'<span class="vis-model">{pmodel}</span>' if pmodel and pmodel != "unknown" else ""
+            adapter_badge = f'<span class="vis-model">via {padapter}</span>' if padapter and padapter not in ("brain-inline", "", plabel) else ""
+
+            prompt_html = ""
+            if psys:
+                prompt_html = (
+                    '<details class="vis-prompt"><summary>System prompt excerpt</summary>'
+                    f'<pre class="vis-prompt-body">{psys}</pre></details>'
+                )
+
+            card_lines = [
+                f'<div class="vis-profile-card">',
+                f'<div class="vis-pf-header">',
+                f'<span class="vis-pf-label">{plabel}</span>',
+            ]
+            if model_badge:
+                card_lines.append(model_badge)
+            if adapter_badge:
+                card_lines.append(adapter_badge)
+            if pdim:
+                card_lines.append(f'<span class="vis-pf-dim">{pdim}</span>')
+            card_lines.append('</div>')
+            if pdesc:
+                card_lines.append(f'<div class="vis-pf-desc">{pdesc}</div>')
+            if tags:
+                card_lines.append(f'<div class="vis-pf-tags">{"".join(tags)}</div>')
+            if ptask:
+                card_lines.append(f'<div class="vis-pf-task">{ptask}</div>')
+            if prompt_html:
+                card_lines.append(prompt_html)
+            card_lines.append('</div>')
+            cards.append("\n".join(card_lines))
+
+        profiles_html = '\n'.join([
+            '<section class="vis-section-body">',
+            f'<h2 class="vis-section-title">Hand Profiles ({len(profiles)})</h2>',
+            '<div class="vis-profiles-grid">',
+            "".join(cards),
+            '</div>',
+            '</section>',
+        ])
+
+    # ---- Orchestration DAG ----
+    dag_html = ""
+    if nodes:
+        groups = {"brain": [], "task": [], "hand": [], "artifact": [], "review": []}
+        for n in nodes:
+            t = n.get("type", "source")
+            if t in groups:
+                groups[t].append(n)
+
+        icons = {"brain": "&#x1f9e0;", "task": "&#x2611;", "hand": "&#x270b;", "artifact": "&#x1f4c4;", "review": "&#x1f50d;"}
+
+        def _dag_card(n):
+            nt = n.get("type", "?")
+            nl = _html_text(str(n.get("label", "?")))
+            meta_parts = []
+            if nt == "task" and n.get("task"):
+                meta_parts.append(f'<div class="vis-dag-meta">{_html_text(str(n["task"])[:80])}</div>')
+            if nt == "artifact":
+                c = int((n.get("confidence", 0) or 0) * 100)
+                cl = n.get("claim_count", 0)
+                gp = n.get("gap_count", 0)
+                gap_str = f' <span style="color:var(--accent-amber)">{gp}g</span>' if gp else ""
+                meta_parts.append(f'<div class="vis-dag-meta">conf {c}% &middot; {cl}c{gap_str}</div>')
+            icon = icons.get(nt, "?")
+            return f'<div class="vis-dag-node vis-dag--{nt}"><span class="vis-dag-icon">{icon}</span><span class="vis-dag-label">{nl}</span>{"".join(meta_parts)}</div>'
+
+        cols = [
+            ("Brain", groups["brain"]),
+            ("Tasks", groups["task"]),
+            ("Hands", groups["hand"]),
+            ("Artifacts", groups["artifact"]),
+            ("Review", groups["review"]),
+        ]
+        active_cols = [(l, n) for l, n in cols if n]
+        if active_cols:
+            col_html_parts = []
+            for i, (label, col_nodes) in enumerate(active_cols):
+                cards = "".join(_dag_card(n) for n in col_nodes)
+                col_html_parts.append(f'<div class="vis-dag-col"><div class="vis-dag-col-label">{label} ({len(col_nodes)})</div>{cards}</div>')
+                if i < len(active_cols) - 1:
+                    col_html_parts.append('<div class="vis-dag-arrow">&#x2192;</div>')
+            col_html = "".join(col_html_parts)
+
+            diag_html = ""
+            if diagnostics:
+                diag_items = "".join(
+                    f'<div class="vis-diag-item"><span class="vis-diag-ref">{_html_text(str(d.get("object_ref", "")))}</span>{_html_text(str(d.get("message", "")))}</div>'
+                    for d in diagnostics[:20]
+                )
+                diag_html = f'<details class="vis-diag"><summary>Diagnostics ({len(diagnostics)})</summary>{diag_items}</details>'
+
+            goal_line = ""
+            if orch.get("goal"):
+                goal_line = f'<p class="vis-dag-goal">{_html_text(str(orch["goal"])[:200])}</p>'
+
+            dag_lines = [
+                '<section class="vis-section-body">',
+                '<h2 class="vis-section-title">Orchestration DAG</h2>',
+            ]
+            if goal_line:
+                dag_lines.append(goal_line)
+            dag_lines.append(f'<div class="vis-dag-pipeline">{col_html}</div>')
+            if diag_html:
+                dag_lines.append(diag_html)
+            dag_lines.append('</section>')
+            dag_html = "\n".join(dag_lines)
+
+    # ---- Live State Canvas Placeholder ----
+    live_state_html = ""
+    states = record.get("state_transitions", []) or []
+    bottlenecks = record.get("bottlenecks", []) or []
+    if states or bottlenecks:
+        state_ids = set()
+        for s in states:
+            if isinstance(s, dict) and s.get("state_id"):
+                state_ids.add(s["state_id"])
+        live_state_html = '<section class="vis-live-state-section"><h2 class="vis-section-title">Live State Canvas (' + str(len(state_ids)) + ' states, ' + str(len(bottlenecks)) + ' bottlenecks)</h2><div data-anc="live-state-canvas" data-episode-id="' + episode_id + '" class="vis-canvas-placeholder"><p style="color:var(--ink-3);font-size:12px;text-align:center;padding:20px">State canvas mounts here when browser JS is active</p></div></section>'
+
+    # ---- Checkpoint Review Deck Placeholder ----
+    checkpoint_html = ""
+    vqs = record.get("visual_queries", []) or []
+    if vqs:
+        checkpoint_html = '<section class="vis-checkpoint-section"><h2 class="vis-section-title">Checkpoint Review Deck (' + str(len(vqs)) + ' queries)</h2><div data-anc="checkpoint-review-deck" data-episode-id="' + episode_id + '" class="vis-canvas-placeholder"><p style="color:var(--ink-3);font-size:12px;text-align:center;padding:20px">Review deck mounts here when browser JS is active</p></div></section>'
+
+    # ---- Artifact Quality Metrics ----
+    quality_html = ""
+    artifact_nodes = [n for n in nodes if n.get("type") == "artifact" and n.get("quality_metrics")]
+    if artifact_nodes:
+        def _score_bar(label, val, lo, hi):
+            pct = max(0, min(100, ((val - lo) / max(1, hi - lo)) * 100))
+            color = "var(--accent-lime)" if pct >= 70 else "var(--accent-amber)" if pct >= 40 else "var(--accent-rose)"
+            return f'<div class="vis-score"><span class="vis-score-label">{label}</span><div class="vis-score-bar"><div class="vis-score-fill" style="width:{pct:.0f}%;background:{color}"></div></div><span class="vis-score-val">{val:.1f}</span></div>'
+
+        metric_cards = []
+        for an in artifact_nodes[:12]:
+            qm = an.get("quality_metrics", {})
+            cl = qm.get("claim_count", 0)
+            gp = qm.get("gap_count", 0)
+            sr = qm.get("source_count", 0)
+            sc = qm.get("section_count", 0)
+            hc = qm.get("heading_count", 0)
+            ev = qm.get("evidence_count", 0)
+            wc = qm.get("estimated_words", 0)
+            ch = qm.get("char_length", 0)
+            cs = int(qm.get("confidence_score", 0) or 0)
+
+            freshness_cls = "vis-flag--good" if qm.get("freshness_flag") == "fresh" else ("vis-flag--warn" if qm.get("freshness_flag") == "stale" else "vis-flag--info")
+            consist_cls = "vis-flag--good" if qm.get("consistency_flag") == "clean" else "vis-flag--warn"
+
+            structured_flag = '<span class="vis-flag vis-flag--good">Structured</span>' if qm.get("structured_output") else '<span class="vis-flag vis-flag--info">Free-form</span>'
+
+            gap_color = "var(--accent-rose)" if gp else "var(--accent-lime)"
+
+            card = "\n".join([
+                f'<div class="vis-quality-card">',
+                f'<div class="vis-qc-header">{_html_text(str(an.get("label", "Artifact")))}</div>',
+                '<div class="vis-qc-grid">',
+                f'<div class="vis-qc-stat"><span>Chars</span><strong>{ch:,}</strong></div>',
+                f'<div class="vis-qc-stat"><span>Words</span><strong>{wc:,}</strong></div>',
+                f'<div class="vis-qc-stat"><span>Sections</span><strong>{sc}</strong></div>',
+                f'<div class="vis-qc-stat"><span>Claims</span><strong>{cl}</strong></div>',
+                f'<div class="vis-qc-stat"><span>Gaps</span><strong style="color:{gap_color}">{gp}</strong></div>',
+                f'<div class="vis-qc-stat"><span>Sources</span><strong>{sr}</strong></div>',
+                f'<div class="vis-qc-stat"><span>Evidence</span><strong>{ev}</strong></div>',
+                f'<div class="vis-qc-stat"><span>Conf</span><strong>{cs}%</strong></div>',
+                '</div>',
+                '<div class="vis-qc-scores">',
+                _score_bar("Richness", min(100, (sc * hc / max(1, wc)) * 100), 3, 10),
+                _score_bar("ArgDensity", min(100, (cl / max(1, wc)) * 1000), 5, 20),
+                _score_bar("EvidRatio", min(100, (ev / max(1, cl)) * 100), 50, 200),
+                _score_bar("Structure", 100 if qm.get("structured_output") else (50 if hc > 0 else 20), 40, 80),
+                _score_bar("ConfStab", max(0, 100 - (gp / max(1, cl)) * 100) if cl > 0 else 50, 50, 90),
+                '</div>',
+                '<div class="vis-qc-flags">',
+                f'<span class="vis-flag {freshness_cls}">Fresh: {_html_text(str(qm.get("freshness_flag", "?")))}</span>',
+                f'<span class="vis-flag {consist_cls}">Consis: {_html_text(str(qm.get("consistency_flag", "?")))}</span>',
+                structured_flag,
+                '</div>',
+                '</div>',
+            ])
+            metric_cards.append(card)
+
+        quality_html = "\n".join([
+            '<section class="vis-section-body">',
+            f'<h2 class="vis-section-title">Artifact Quality ({len(artifact_nodes)})</h2>',
+            '<div class="vis-quality-grid">',
+            "".join(metric_cards),
+            '</div>',
+            '</section>',
+        ])
+
+    # ---- Synthesis Guard Section ----
+    guard_html = ""
+    synth_guard = record.get("synthesis_guard_result") or {}
+    if synth_guard and isinstance(synth_guard, dict):
+        constraints = synth_guard.get("constraints", []) or []
+        if constraints:
+            guard_items = []
+            for c in constraints[:10]:
+                ct = _html_text(str(c.get("constraint_type", "?")))
+                cm = _html_text(str(c.get("message", "")))
+                guard_items.append('<div class="vis-guard-item"><span class="vis-guard-type">' + ct + '</span><span class="vis-guard-msg">' + cm + '</span></div>')
+            guard_html = '<section class="vis-section-body"><h2 class="vis-section-title">Synthesis Guard (' + str(len(constraints)) + ')</h2><div class="vis-guard-list">' + "".join(guard_items) + '</div></section>'
+
+    # ---- Hand artifact narratives ----
+    hand_blocks = []
     for hand_id, art in artifacts.items():
         if not isinstance(art, dict):
             continue
@@ -4538,85 +5028,158 @@ def _render_visual_page(record: dict, episode_id: str) -> str:
         gaps = meta.get("gaps", []) or []
         sections = art.get("sections", []) or []
 
-        claims_html = "".join(
-            f'<li>{_html_text(c.get("claim", str(c)) if isinstance(c, dict) else str(c))}</li>'
-            for c in claims[:8]
-        ) or "<li>No key claims</li>"
+        claims_lines = []
+        for c in claims[:8]:
+            text = c.get("claim", str(c)) if isinstance(c, dict) else str(c)
+            claims_lines.append(f"<li>{_html_text(text)}</li>")
+        claims_html = "".join(claims_lines) or "<li>No key claims</li>"
 
-        gaps_html = "".join(
-            f'<li>{_html_text(g.get("description", str(g)) if isinstance(g, dict) else str(g))}</li>'
-            for g in gaps[:5]
-        ) or ""
+        gaps_lines = []
+        for g in gaps[:5]:
+            text = g.get("description", str(g)) if isinstance(g, dict) else str(g)
+            gaps_lines.append(f"<li>{_html_text(text)}</li>")
+        gaps_html = "".join(gaps_lines) or ""
 
-        sections_html = ""
+        sections_parts = []
         for sec in (sections or [])[:6]:
             if not isinstance(sec, dict):
                 continue
             bullets = sec.get("bullets", []) or []
-            bullets_html = "".join(f"<li>{_html_text(str(b))}</li>" for b in bullets[:8])
-            sections_html += (
+            bullet_html = "".join(f"<li>{_html_text(str(b))}</li>" for b in bullets[:8])
+            sections_parts.append(
                 f'<div class="vis-section">'
                 f'<h3>{_html_text(sec.get("title", ""))}</h3>'
                 f'<p class="vis-section-summary">{_html_text(sec.get("summary", ""))}</p>'
-                f'<ul>{bullets_html}</ul>'
+                f'<ul>{bullet_html}</ul>'
                 f'</div>'
             )
+        sections_html = "".join(sections_parts)
 
-        hand_blocks.append(f"""
-        <div class="vis-card">
-          <div class="vis-card-header">
-            <span class="vis-hand-id">{_html_text(hand_id)}</span>
-            <span class="vis-confidence">confidence {confidence:.2f}</span>
-          </div>
-          <div class="vis-narrative">{_html_text(narrative[:3000])}</div>
-          <details class="vis-detail">
-            <summary>Key Claims ({len(claims)})</summary>
-            <ul>{claims_html}</ul>
-          </details>
-          {f'<details class="vis-detail"><summary>Gaps ({len(gaps)})</summary><ul>{gaps_html}</ul></details>' if gaps_html else ''}
-          {sections_html}
-        </div>""")
+        gap_detail = ""
+        if gaps_html:
+            gap_detail = f'<details class="vis-detail"><summary>Gaps ({len(gaps)})</summary><ul>{gaps_html}</ul></details>'
+
+        hand_blocks.append("\n".join([
+            f'<div class="vis-card">',
+            f'<div class="vis-card-header">',
+            f'<span class="vis-hand-id">{_html_text(hand_id)}</span>',
+            f'<span class="vis-confidence">confidence {confidence:.2f}</span>',
+            f'</div>',
+            f'<div class="vis-narrative">{_html_text(narrative[:3000])}</div>',
+            f'<details class="vis-detail"><summary>Key Claims ({len(claims)})</summary><ul>{claims_html}</ul></details>',
+            gap_detail,
+            sections_html,
+            '</div>',
+        ]))
+
+    artifacts_section = "".join(hand_blocks) if hand_blocks else '<div style="text-align:center;padding:40px;color:var(--ink-3)">No hand artifacts</div>'
+
+    # ---- Render ----
+    css = """  :root {
+    --ink: #1a1a2e; --ink-2: #4a4a6a; --ink-3: #8888aa; --ink-4: #bbbbcc;
+    --paper: #f8f7ff; --surface: #fff; --surface-2: #eeeef4;
+    --border: #e8e6f0;
+    --accent-iris: #7A5AF8; --accent-lime: #84CC16; --accent-rose: #F43F5E;
+    --accent-amber: #F59E0B; --accent-sky: #38BDF8;
+    --radius-sm: 8px; --radius-md: 14px;
+    --font-display: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", "Cascadia Code", monospace;
+    --max-w: 1120px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--paper); color: var(--ink); line-height: 1.6; }
+  .vis-header { max-width: var(--max-w); margin: 0 auto; padding: 28px 24px 16px; border-bottom: 1px solid var(--border); }
+  .vis-header h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
+  .vis-meta { font-size: 13px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .vis-pill { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .vis-pill--stance { background: #ede9fe; color: var(--accent-iris); }
+  .vis-pill--confidence { background: #dbeafe; color: #1e40af; }
+  .vis-pill--domain { background: #f3f4f6; color: #6b7280; }
+  .vis-kpi-strip { max-width: var(--max-w); margin: 16px auto 0; padding: 0 24px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .vis-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 18px; text-align: center; min-width: 90px; flex: 1; }
+  .vis-kpi-val { display: block; font-size: 22px; font-weight: 700; font-family: var(--font-display); color: var(--ink); }
+  .vis-kpi-label { display: block; font-size: 10px; color: var(--ink-3); text-transform: uppercase; margin-top: 2px; }
+  .vis-section-body { max-width: var(--max-w); margin: 24px auto 0; padding: 0 24px; }
+  .vis-section-title { font-size: 14px; font-weight: 700; color: var(--ink-2); padding-bottom: 8px; border-bottom: 2px solid var(--border); margin-bottom: 14px; }
+  .vis-profiles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .vis-profile-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
+  .vis-pf-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .vis-pf-label { font-weight: 700; font-size: 14px; color: var(--accent-iris); }
+  .vis-pf-dim { font-size: 10px; background: var(--surface-2); padding: 2px 8px; border-radius: 4px; color: var(--ink-3); }
+  .vis-model { font-size: 10px; background: var(--surface-2); padding: 2px 8px; border-radius: 4px; color: var(--ink-3); font-family: var(--font-mono); }
+  .vis-pf-desc { font-size: 12px; color: var(--ink-2); margin-bottom: 8px; line-height: 1.5; }
+  .vis-pf-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .vis-tag { font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
+  .vis-tag--cap { background: #ede9fe; color: #5b21b6; }
+  .vis-tag--tool { background: #dbeafe; color: #1e40af; }
+  .vis-tag--mcp { background: #fce7f3; color: #9d174d; }
+  .vis-tag--skill { background: #d1fae5; color: #065f46; }
+  .vis-pf-task { font-size: 11px; color: var(--ink-2); padding: 6px 10px; background: var(--surface-2); border-radius: 6px; margin-bottom: 6px; }
+  .vis-prompt { margin-top: 4px; font-size: 11px; }
+  .vis-prompt summary { color: var(--ink-3); cursor: pointer; font-weight: 600; }
+  .vis-prompt-body { font-family: var(--font-mono); font-size: 10px; background: #1a1a2e; color: #e2e8f0; padding: 10px 12px; border-radius: 6px; max-height: 200px; overflow-y: auto; white-space: pre-wrap; margin-top: 4px; line-height: 1.5; }
+  .vis-dag-goal { font-size: 13px; color: var(--ink-2); margin-bottom: 12px; line-height: 1.4; }
+  .vis-dag-pipeline { display: flex; gap: 8px; align-items: flex-start; overflow-x: auto; padding: 4px 0; }
+  .vis-dag-col { min-width: 150px; flex: 1; }
+  .vis-dag-col-label { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-4); margin-bottom: 4px; }
+  .vis-dag-node { border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin: 3px 0; font-size: 11px; display: flex; align-items: center; gap: 6px; background: var(--surface); }
+  .vis-dag-icon { font-size: 14px; flex-shrink: 0; }
+  .vis-dag-label { font-weight: 500; }
+  .vis-dag-meta { font-size: 10px; color: var(--ink-3); margin-top: 2px; }
+  .vis-dag-arrow { display: flex; align-items: center; padding: 0 4px; font-size: 18px; color: var(--ink-4); }
+  .vis-diag { margin-top: 6px; font-size: 10px; }
+  .vis-diag summary { color: var(--ink-3); cursor: pointer; }
+  .vis-diag-item { display: flex; gap: 6px; align-items: center; padding: 2px 0; color: var(--ink-2); }
+  .vis-diag-ref { font-size: 9px; background: var(--surface-2); border-radius: 4px; padding: 1px 5px; font-family: var(--font-mono); }
+  .vis-quality-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .vis-quality-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
+  .vis-qc-header { font-weight: 700; font-size: 13px; color: var(--ink); margin-bottom: 10px; }
+  .vis-qc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+  .vis-qc-stat { text-align: center; padding: 6px 4px; background: var(--surface-2); border-radius: 6px; }
+  .vis-qc-stat span { display: block; font-size: 9px; color: var(--ink-3); text-transform: uppercase; }
+  .vis-qc-stat strong { font-size: 15px; font-family: var(--font-display); }
+  .vis-qc-scores { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .vis-score { display: flex; align-items: center; gap: 8px; font-size: 10px; }
+  .vis-score-label { width: 70px; color: var(--ink-3); text-align: right; flex-shrink: 0; }
+  .vis-score-bar { flex: 1; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+  .vis-score-fill { height: 100%; border-radius: 3px; }
+  .vis-score-val { width: 36px; color: var(--ink-2); font-weight: 600; flex-shrink: 0; }
+  .vis-qc-flags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .vis-flag { font-size: 9px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+  .vis-flag--good { background: #dcfce7; color: #166534; }
+  .vis-flag--warn { background: #fef3c7; color: #92400e; }
+  .vis-flag--info { background: #dbeafe; color: #1e40af; }
+  .vis-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; margin-bottom: 16px; }
+  .vis-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .vis-hand-id { font-weight: 700; font-size: 15px; color: var(--accent-iris); }
+  .vis-confidence { font-size: 12px; color: var(--ink-3); }
+  .vis-narrative { font-size: 14px; line-height: 1.7; white-space: pre-wrap; margin-bottom: 12px; max-width: 80ch; }
+  .vis-detail { margin-top: 12px; }
+  .vis-detail summary { font-size: 13px; font-weight: 600; color: var(--ink-2); cursor: pointer; padding: 6px 0; }
+  .vis-detail ul { padding-left: 20px; font-size: 13px; color: var(--ink-2); }
+  .vis-detail li { margin-bottom: 4px; }
+  .vis-section { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .vis-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .vis-section-summary { font-size: 13px; color: var(--ink-3); margin-bottom: 8px; }
+  .vis-section ul { padding-left: 20px; font-size: 13px; }
+  .vis-section li { margin-bottom: 3px; }
+  .vis-footer { text-align: center; font-size: 11px; color: var(--ink-3); margin-top: 48px; padding: 24px 0; border-top: 1px solid var(--border); }
+  .vis-guard-list { display: flex; flex-direction: column; gap: 6px; }
+  .vis-guard-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--surface-2); border-radius: 6px; font-size: 12px; }
+  .vis-guard-type { font-weight: 700; font-size: 10px; text-transform: uppercase; background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; min-width: 60px; text-align: center; }
+  .vis-live-state-section { max-width: var(--max-w); margin: 24px auto 0; padding: 0 24px; }
+  .vis-checkpoint-section { max-width: var(--max-w); margin: 24px auto 0; padding: 0 24px; }
+  .vis-canvas-placeholder { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius-sm); min-height: 60px; }"""
 
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Loom 鈥?{_html_text(question[:60])}</title>
+<title>Loom - {_html_text(question[:60])}</title>
 <style>
-  :root {{
-    --ink: #1a1a2e; --ink-secondary: #4a4a6a; --ink-muted: #8888aa;
-    --paper: #fafafc; --paper-secondary: #f0f0f5;
-    --accent: #7A5AF8; --accent-soft: rgba(122,90,248,.12);
-    --pastel-lavender: #e8e0ff; --pastel-coral: #ffe0d8;
-    --pastel-teal: #d0f0e8; --pastel-sky: #d8e8ff;
-    --radius-sm: 8px; --radius-md: 14px; --shadow-sm: 0 1px 4px rgba(0,0,0,.06);
-    --font-sans: system-ui,-apple-system,"Segoe UI",sans-serif;
-  }}
-  * {{ box-sizing:border-box;margin:0;padding:0 }}
-  body {{ font-family:var(--font-sans);background:var(--paper);color:var(--ink);max-width:780px;margin:0 auto;padding:24px 20px 60px;line-height:1.6 }}
-  .vis-header {{ margin-bottom:32px }}
-  .vis-header h1 {{ font-size:22px;font-weight:700;margin-bottom:8px }}
-  .vis-meta {{ font-size:13px;color:var(--ink-muted);display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px }}
-  .vis-pill {{ display:inline-block;padding:3px 12px;border-radius:999px;font-size:12px;font-weight:600 }}
-  .vis-pill--stance {{ background:var(--accent-soft);color:var(--accent) }}
-  .vis-pill--confidence {{ background:var(--pastel-sky);color:var(--ink-secondary) }}
-  .vis-pill--domain {{ background:var(--pastel-lavender);color:var(--ink-secondary) }}
-  .vis-card {{ background:var(--paper-secondary);border-radius:var(--radius-md);padding:20px;margin-bottom:20px;box-shadow:var(--shadow-sm) }}
-  .vis-card-header {{ display:flex;justify-content:space-between;align-items:center;margin-bottom:12px }}
-  .vis-hand-id {{ font-weight:700;font-size:15px;color:var(--accent) }}
-  .vis-confidence {{ font-size:12px;color:var(--ink-muted) }}
-  .vis-narrative {{ font-size:14px;line-height:1.7;white-space:pre-wrap;margin-bottom:12px }}
-  .vis-detail {{ margin-top:12px }}
-  .vis-detail summary {{ font-size:13px;font-weight:600;color:var(--ink-secondary);cursor:pointer;padding:6px 0 }}
-  .vis-detail ul {{ padding-left:20px;font-size:13px;color:var(--ink-secondary) }}
-  .vis-detail li {{ margin-bottom:4px }}
-  .vis-section {{ margin-top:16px;padding-top:12px;border-top:1px solid var(--pastel-lavender) }}
-  .vis-section h3 {{ font-size:14px;font-weight:600;margin-bottom:4px }}
-  .vis-section-summary {{ font-size:13px;color:var(--ink-muted);margin-bottom:8px }}
-  .vis-section ul {{ padding-left:20px;font-size:13px }}
-  .vis-section li {{ margin-bottom:3px }}
-  .vis-footer {{ text-align:center;font-size:11px;color:var(--ink-muted);margin-top:48px;padding-top:24px;border-top:1px solid var(--paper-secondary) }}
+{css}
 </style>
 </head>
 <body>
@@ -4627,15 +5190,20 @@ def _render_visual_page(record: dict, episode_id: str) -> str:
     <span class="vis-pill vis-pill--confidence">{confidence_pct}% confidence</span>
     <span class="vis-pill vis-pill--domain">{_html_text(domain)}</span>
     <span>{ts}</span>
-    <span>ep: {_html_text(episode_id)}</span>
+    <span style="font-size:10px;font-family:var(--font-mono);color:var(--ink-4)">ep: {_html_text(episode_id)}</span>
   </div>
 </div>
-{"".join(hand_blocks)}
-<div class="vis-footer">Loom Brain 路 episode {_html_text(episode_id)}</div>
+{kpi_html}
+{profiles_html}
+{dag_html}
+{live_state_html}
+{checkpoint_html}
+{guard_html}
+{quality_html}
+{artifacts_section}
+<div class="vis-footer">Loom Brain &middot; episode {_html_text(episode_id)}</div>
 </body>
 </html>""".rstrip("\n") + "\n"
-
-
 def _render_artifact(artifact: dict, hand_id: str) -> str:
     artifact = _enrich_error_artifact(artifact, hand_id)
     meta = artifact.get("metadata", {})
@@ -4749,7 +5317,151 @@ def _render_artifact(artifact: dict, hand_id: str) -> str:
     return "\n".join(parts)
 
 
+@app.get("/episodes/{episode_id}/workspace")
+async def episode_workspace(episode_id: str):
+    """Return state frame, bottlenecks, visual queries, orchestration snapshot, diagnostics."""
+    detail = _flywheel.load_detail(episode_id)
+    if detail is None:
+        return {"ok": False, "error": f"episode not found: {episode_id}"}
+    snap = detail.get("orchestration_snapshot")
+    if not isinstance(snap, dict) or not snap:
+        snap = build_minimal_orchestration_snapshot(
+            episode_id=episode_id,
+            goal=str(detail.get("question", "")),
+            domain=str(detail.get("domain", "general") or "general"),
+            workflow={},
+            hand_plan={},
+            hand_artifacts=detail.get("hand_artifacts", {}) if isinstance(detail.get("hand_artifacts"), dict) else {},
+        )
+    return {
+        "ok": True,
+        "episode_id": episode_id,
+        "orchestration": snap,
+        "states": detail.get("state_transitions", []),
+        "bottlenecks": detail.get("bottlenecks", []),
+        "visual_queries": detail.get("visual_queries", []),
+        "visual_interactions": detail.get("visual_interactions", []),
+        "quality_summary": snap.get("quality_summary", {}) if isinstance(snap, dict) else {},
+        "diagnostics": snap.get("diagnostics", []) if isinstance(snap, dict) else [],
+        "synthesis_guard": detail.get("synthesis_guard_result", {}) if isinstance(detail) else {},
+    }
+
+
+class VisualInteractionRequest(BaseModel):
+    episode_id: str
+    query_id: str = ""
+    anchor_type: str = ""
+    anchor_id: str = ""
+    gesture: str = "skip"
+    comment: str = ""
+    visual_context: dict = Field(default_factory=dict)
+
+
+@app.post("/episodes/{episode_id}/visual-interactions")
+async def append_visual_interaction(episode_id: str, req: VisualInteractionRequest):
+    """Record a raw visual interaction and return inferred signals."""
+    import time
+    interaction = {
+        "interaction_id": "vi-" + uuid.uuid4().hex[:12],
+        "query_id": req.query_id,
+        "episode_id": episode_id,
+        "anchor_type": req.anchor_type,
+        "anchor_id": req.anchor_id,
+        "gesture": req.gesture,
+        "comment": req.comment,
+        "visual_context": req.visual_context,
+        "inferred_signals": _infer_signals(req.gesture, req.anchor_type, req.anchor_id),
+        "consumed_by": [],
+        "ts": time.time(),
+    }
+    _flywheel.append_visual_interaction(episode_id, interaction)
+    return {"ok": True, "interaction": interaction}
+
+
+@app.post("/episodes/{episode_id}/checkpoint-response")
+async def checkpoint_response(episode_id: str, req: VisualInteractionRequest):
+    """Visual interaction as checkpoint response; also returns intent_lens if applicable."""
+    import time
+    interaction = {
+        "interaction_id": "vi-" + uuid.uuid4().hex[:12],
+        "query_id": req.query_id,
+        "episode_id": episode_id,
+        "anchor_type": req.anchor_type,
+        "anchor_id": req.anchor_id,
+        "gesture": req.gesture,
+        "comment": req.comment,
+        "visual_context": req.visual_context,
+        "inferred_signals": _infer_signals(req.gesture, req.anchor_type, req.anchor_id),
+        "consumed_by": [],
+        "ts": time.time(),
+    }
+    _flywheel.append_visual_interaction(episode_id, interaction)
+
+    intent_lens = {}
+    if req.anchor_id and req.gesture in ("trust", "contest", "expand"):
+        try:
+            from brain_harness.contextual_intent import ScopedFeedback
+            scoped = ScopedFeedback(
+                episode_id=episode_id,
+                raw_signal=req.gesture,
+                comment=req.comment,
+                object_ref=req.anchor_id,
+                object_type=req.anchor_type,
+            )
+            analysis = _contextual_intent_compiler.compile(scoped)
+            intent_lens = analysis.to_dict()
+        except Exception:
+            import traceback
+            traceback.print_exc()
+
+    return {"ok": True, "interaction": interaction, "intent_lens": intent_lens}
+
+
+def _infer_signals(gesture, anchor_type, anchor_id):
+    """Deterministic weak signal inference from gesture + anchor context."""
+    signals = []
+    if gesture == "trust" and anchor_type == "state":
+        signals.append({"type": "evidence_trust", "target": anchor_id, "confidence": 0.8})
+    elif gesture == "contest":
+        signals.append({"type": "evidence_distrust", "target": anchor_id, "confidence": 0.7})
+    elif gesture == "expand":
+        signals.append({"type": "evidence_need", "target": anchor_id, "confidence": 0.9})
+    elif gesture == "pin":
+        signals.append({"type": "high_salience", "target": anchor_id, "confidence": 0.85})
+    elif gesture == "mute":
+        signals.append({"type": "low_salience", "target": anchor_id, "confidence": 0.85})
+    return signals
+
+
+@app.get("/episodes/{episode_id}/experience-graph")
+async def experience_graph(episode_id: str):
+    """Developer/debug view linking state, claim, evidence, gap, task, repair, outcome."""
+    detail = _flywheel.load_detail(episode_id)
+    if detail is None:
+        return {"ok": False, "error": f"episode not found: {episode_id}"}
+    graph = {
+        "episode_id": episode_id,
+        "question": str(detail.get("question", "")),
+        "domain": str(detail.get("domain", "general")),
+        "state_transitions": detail.get("state_transitions", []),
+        "bottlenecks": detail.get("bottlenecks", []),
+        "visual_queries": detail.get("visual_queries", []),
+        "visual_interactions": detail.get("visual_interactions", []),
+        "interaction_consumption": detail.get("interaction_consumption", []),
+        "hand_evaluations": detail.get("hand_evaluations", []),
+        "orchestration_snapshot": detail.get("orchestration_snapshot"),
+    }
+    return {"ok": True, "graph": graph}
+
+
+@app.get("/harness/evolution/candidates")
+async def evolution_candidates():
+    """Stub for controlled self-evolution candidates (empty in MVP)."""
+    return {"ok": True, "candidates": []}
+
+
 class MountRequest(BaseModel):
+
     endpoint: str
     description: str = ""
     timeout_s: float = 90.0

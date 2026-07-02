@@ -1,4 +1,4 @@
-"""Loom Core Agent — Brain-level reasoning and multi-hand orchestration.
+﻿"""Loom Core Agent 鈥?Brain-level reasoning and multi-hand orchestration.
 
 Responsibilities:
   - Resolve workflow (which hands to fire, for which domain)
@@ -25,6 +25,7 @@ try:
     from brain_harness.task_decomposer import TaskDecomposer
     from brain_harness.hand_plan import ExecutionGraph
     from brain_harness.projection import build_projection
+    from brain_harness.visual_interaction import VisualInteractionTrace
     _EPISODE_TRACKING = True
 except ImportError:
     try:
@@ -33,6 +34,7 @@ except ImportError:
         from loom.brain_harness.task_decomposer import TaskDecomposer
         from loom.brain_harness.hand_plan import ExecutionGraph
         from loom.brain_harness.projection import build_projection
+        from loom.brain_harness.visual_interaction import VisualInteractionTrace
         _EPISODE_TRACKING = True
     except ImportError:
         _EPISODE_TRACKING = False
@@ -63,9 +65,9 @@ class LoomCoreAgent:
         return self._running
 
     async def analyze(self, question: str, context: dict) -> dict[str, Any]:
-        """Full Brain pipeline: plan → dispatch → review → synthesize."""
+        """Full Brain pipeline: plan 鈫?dispatch 鈫?review 鈫?synthesize."""
 
-        # ── Episode setup (additive — does not change existing behaviour) ──
+        # 鈹€鈹€ Episode setup (additive 鈥?does not change existing behaviour) 鈹€鈹€
         root: Path | None = getattr(self._harness, "root", None)
         ep: Any = None   # WorkflowEpisode | None
         governor: Any = None  # BudgetGovernor | None
@@ -117,7 +119,28 @@ class LoomCoreAgent:
                     )
             presentation_spec = self._build_presentation_spec(question, wf, state_context)
 
-            # ── Phase 1: Plan — Brain writes rubrics ─────────────────────────
+            # Build environment state frame (if harness supports it)
+            environment_state_frame: dict[str, Any] = {}
+            visual_interactions: list[dict] = []
+            if _EPISODE_TRACKING:
+                try:
+                    from brain_harness.environment_state import EnvironmentStateManager
+                except ImportError:
+                    try:
+                        from loom.brain_harness.environment_state import EnvironmentStateManager
+                    except ImportError:
+                        EnvironmentStateManager = None
+                if EnvironmentStateManager is not None and hasattr(self._harness, "root"):
+                    try:
+                        manager = EnvironmentStateManager()
+                        environment_state_frame = {
+                            "states": [],
+                            "episode_id": ep.episode_id if ep else "",
+                        }
+                    except Exception:
+                        pass
+
+            # 鈹€鈹€ Phase 1: Plan 鈥?Brain writes rubrics 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
             _ep("phase.start", {"phase": "plan"})
             if ep is not None and root is not None:
                 ep.transition(root, "Planning")
@@ -154,9 +177,9 @@ class LoomCoreAgent:
                 "registered_shells": selected_shells,
             })
 
-            # ── Wave 1: LLM-driven task decomposition ─────────────────────────
+            # 鈹€鈹€ Wave 1: LLM-driven task decomposition 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
             # Brain freely creates tasks; `selected_shells` is now an optional hint list
-            # (may be empty — empty means Brain decides freely).
+            # (may be empty 鈥?empty means Brain decides freely).
             hand_plan: Any = None
             if _EPISODE_TRACKING:
                 try:
@@ -199,7 +222,7 @@ class LoomCoreAgent:
                     _ep("plan.decompose_error", {"message": str(exc)})
                     hand_plan = None
 
-            # ── Phase 2: Dispatch — all hands receive full rubric framework ──
+            # 鈹€鈹€ Phase 2: Dispatch 鈥?all hands receive full rubric framework 鈹€鈹€
             if ep is not None and root is not None:
                 ep.transition(root, "Dispatching")
                 ep.hands_dispatched = (
@@ -263,7 +286,7 @@ class LoomCoreAgent:
                     )
                     if repair_hint:
                         task_str += (
-                            f"\n\n⚠️ REPAIR REQUIRED — previous output failed schema validation.\n"
+                            f"\n\n鈿狅笍 REPAIR REQUIRED 鈥?previous output failed schema validation.\n"
                             f"Issue: {repair_hint}\n"
                             "Ensure the output is a JSON object with: "
                             "'narrative' (string), 'metadata.key_claims' (list), 'metadata.confidence' (float)."
@@ -271,7 +294,7 @@ class LoomCoreAgent:
 
                     artifact = await self._hand_runner(run_executor_id, task_str, hand_context)
 
-                    # ── Schema validation ────────────────────────────────────
+                    # 鈹€鈹€ Schema validation 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
                     issues = self._validate_artifact(artifact)
                     if issues:
                         _ep("dispatch.schema_violation", {
@@ -299,7 +322,7 @@ class LoomCoreAgent:
                             _ep("dispatch.repair_failed", {"hand_id": hand_id, "issues": issues})
                             if ep is not None:
                                 ep.quality_gaps.append(
-                                    f"{hand_id}: schema unrecoverable after repair — {'; '.join(issues)}"
+                                    f"{hand_id}: schema unrecoverable after repair 鈥?{'; '.join(issues)}"
                                 )
                     else:
                         _ep("dispatch.artifact", {
@@ -451,11 +474,98 @@ class LoomCoreAgent:
                 })
                 if ep is not None:
                     ep.quality_gaps.append(
-                        f"Budget exceeded ({bex.resource}) before full dispatch — partial results only"
+                        f"Budget exceeded ({bex.resource}) before full dispatch 鈥?partial results only"
                     )
             _ep("phase.end", {"phase": "dispatch", "hand_count": len(hand_artifacts)})
 
-            # ── Phase 3: Review — Brain checks for gaps ─────────────────────
+            # ── Populate environment state frame ──
+            consumed_interaction_ids = []
+            # Extract states from hand artifacts, detect bottlenecks,
+            # and compile visual queries for checkpoint review.
+            if _EPISODE_TRACKING and hand_artifacts:
+                _maybe_EnvStateManager = None
+                _maybe_EnvStateFrame = None
+                try:
+                    from brain_harness.environment_state import (
+                        EnvironmentStateManager as _ESM,
+                        EnvironmentStateFrame as _ESF,
+                    )
+                    _maybe_EnvStateManager = _ESM
+                    _maybe_EnvStateFrame = _ESF
+                except ImportError:
+                    try:
+                        from loom.brain_harness.environment_state import (
+                            EnvironmentStateManager as _ESM,
+                            EnvironmentStateFrame as _ESF,
+                        )
+                        _maybe_EnvStateManager = _ESM
+                        _maybe_EnvStateFrame = _ESF
+                    except ImportError:
+                        pass
+                if _maybe_EnvStateManager is not None and ep is not None:
+                    try:
+                        mgr = _maybe_EnvStateManager()
+                        states = mgr.extract_from_artifacts(
+                            ep.episode_id,
+                            hand_artifacts,
+                        )
+                        frame = mgr.build_frame(ep.episode_id, states)
+                        environment_state_frame = {
+                            "episode_id": frame.episode_id,
+                            "states": [s.to_dict() for s in frame.states],
+                            "active_state_ids": frame.active_state_ids,
+                        }
+                        for s in states:
+                            ep.write_event("state.proposed", s.to_dict())
+
+                        # Detect bottlenecks
+                        _maybe_BD = None
+                        try:
+                            from brain_harness.bottleneck import BottleneckDetector as _BD
+                            _maybe_BD = _BD
+                        except ImportError:
+                            try:
+                                from loom.brain_harness.bottleneck import BottleneckDetector as _BD
+                                _maybe_BD = _BD
+                            except ImportError:
+                                pass
+                        if _maybe_BD is not None and frame.states:
+                            try:
+                                bottlenecks = _maybe_BD.detect(
+                                    frame, hand_artifacts,
+                                )
+                                _frame_bns = [b.to_dict() for b in bottlenecks]
+                                environment_state_frame["bottlenecks"] = _frame_bns
+                                for b in bottlenecks:
+                                    ep.write_event("bottleneck.detected", b.to_dict())
+
+                                # Compile visual queries
+                                _maybe_VQC = None
+                                try:
+                                    from brain_harness.visual_interaction import VisualQueryCompiler as _VQC
+                                    _maybe_VQC = _VQC
+                                except ImportError:
+                                    try:
+                                        from loom.brain_harness.visual_interaction import VisualQueryCompiler as _VQC
+                                        _maybe_VQC = _VQC
+                                    except ImportError:
+                                        pass
+                                if _maybe_VQC is not None:
+                                    queries = _maybe_VQC.compile(
+                                        ep.episode_id, bottlenecks,
+                                    )
+                                    _frame_qs = [q.to_dict() for q in queries]
+                                    environment_state_frame["visual_queries"] = _frame_qs
+                                    consumed_interaction_ids = []
+                                    for q in queries:
+                                        ep.write_event("visual.query_created", q.to_dict())
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
+
+            # 鈹€鈹€ Phase 3: Review 鈥?Brain checks for gaps 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
             if ep is not None and root is not None:
                 ep.transition(root, "Reviewing")
             _ep("phase.start", {"phase": "review"})
@@ -464,13 +574,18 @@ class LoomCoreAgent:
             try:
                 if governor is not None:
                     governor.check_wall_clock()
-                review_result = await self._harness.review(
-                    question=question,
-                    analysis_plan=analysis_plan,
-                    hand_artifacts=hand_artifacts,
-                    client=self._client,
-                    model=self._model,
-                )
+                review_kwargs = {
+                    "question": question,
+                    "analysis_plan": analysis_plan,
+                    "hand_artifacts": hand_artifacts,
+                    "client": self._client,
+                    "model": self._model,
+                }
+                if hasattr(self, "_accepts_kwarg") and self._accepts_kwarg(self._harness.review, "environment_state_frame"):
+                    review_kwargs["environment_state_frame"] = environment_state_frame
+                if hasattr(self, "_accepts_kwarg") and self._accepts_kwarg(self._harness.review, "visual_interactions"):
+                    review_kwargs["visual_interactions"] = visual_interactions
+                review_result = await self._harness.review(**review_kwargs)
             except BudgetExceeded as bex:
                 _ep("budget.exceeded", {
                     "resource": bex.resource,
@@ -480,7 +595,7 @@ class LoomCoreAgent:
                 })
                 if ep is not None:
                     ep.quality_gaps.append(
-                        f"Budget exceeded at review — follow-up skipped"
+                        f"Budget exceeded at review 鈥?follow-up skipped"
                     )
 
             follow_up_tasks = (
@@ -510,10 +625,18 @@ class LoomCoreAgent:
                         meta["executor_id"] = ft.get("executor_id", ft["hand_id"])
                         meta["task_id"] = fkey
                     hand_artifacts[fkey] = artifact
+                LoomCoreAgent._try_record_interaction_consumption(
+                    ep, "review.repair_dispatch", "follow-up repair tasks dispatched",
+                    visual_interactions=visual_interactions,
+                )
 
             _ep("phase.end", {"phase": "review", "follow_up_count": len(follow_up_tasks)})
+            LoomCoreAgent._try_record_interaction_consumption(
+                ep, "BrainHarness.review", "state-aware review completed",
+                visual_interactions=visual_interactions,
+            )
 
-            # ── Phase 4: Synthesize ──────────────────────────────────────────
+            # 鈹€鈹€ Phase 4: Synthesize 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
             if ep is not None and root is not None:
                 ep.transition(root, "Synthesizing")
             _ep("phase.start", {"phase": "synthesize"})
@@ -540,8 +663,12 @@ class LoomCoreAgent:
                 )
 
             _ep("phase.end", {"phase": "synthesize"})
+            LoomCoreAgent._try_record_interaction_consumption(
+                ep, "BrainHarness.synthesize", "synthesis completed with interaction-aware caveats",
+                visual_interactions=visual_interactions,
+            )
 
-            # ── Finish episode ────────────────────────────────────────────────
+            # 鈹€鈹€ Finish episode 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
             if ep is not None and root is not None:
                 if governor is not None:
                     ep.budget_token_used = governor.token_used
@@ -572,10 +699,12 @@ class LoomCoreAgent:
             "intent_reward_report": self._asdict_or_none(reward_report),
             "episode": ep.to_summary() if ep is not None else None,
             "hand_plan": hand_plan.to_dict() if hand_plan is not None else None,
+            "environment_state_frame": environment_state_frame,
+            "consumed_interaction_ids": consumed_interaction_ids,
         }
 
     def suggest(self, query: str) -> Any:
-        """Legacy stub — prefer analyze() for new callers."""
+        """Legacy stub 鈥?prefer analyze() for new callers."""
         return None
 
     @staticmethod
@@ -855,7 +984,7 @@ class LoomCoreAgent:
             "  L2 (expandable analysis): `sections` (each with id/title/summary/bullets). "
             "`metadata.source_notes`: source-by-source notes with tier/freshness.\n"
             "  L1 (structured evidence): `evidence` array with claim, support, source, source_tier, freshness, confidence.\n"
-            "  L0 (raw data): `raw_items` + `raw_sources` — annotated data points collected. Each raw_item must have a populated url field.\n"
+            "  L0 (raw data): `raw_items` + `raw_sources` 鈥?annotated data points collected. Each raw_item must have a populated url field.\n"
             "`metadata.gaps` at any level: missing or stale data that limits confidence.\n\n"
             "Optional: tag claims and evidence with `rubric` dimension name for cross-referencing.\n\n"
             "Brain presentation contract:\n"
@@ -876,6 +1005,31 @@ class LoomCoreAgent:
     @staticmethod
     def _compact_json(value: Any) -> str:
         return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+    @staticmethod
+    def _try_record_interaction_consumption(
+        ep, consumer: str, effect: str,
+        visual_interactions: list[dict] | None = None,
+        interaction_ids: list[str] | None = None,
+    ) -> None:
+        """Record that visual interaction traces were consumed by a harness phase."""
+        if ep is None:
+            return
+        if interaction_ids:
+            for iid in interaction_ids:
+                ep.write_event("interaction.consumed", {
+                    "interaction_id": iid,
+                    "consumer": consumer,
+                    "effect": effect,
+                })
+        elif visual_interactions:
+            for vi in visual_interactions:
+                if isinstance(vi, dict) and vi.get("interaction_id"):
+                    ep.write_event("interaction.consumed", {
+                        "interaction_id": vi["interaction_id"],
+                        "consumer": consumer,
+                        "effect": effect,
+                    })
 
     @staticmethod
     def _hand_task_presentation_contract(

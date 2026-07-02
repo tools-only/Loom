@@ -20,8 +20,10 @@ Stdin format:
 from __future__ import annotations
 import asyncio
 import json
+import re
 import uuid
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 
@@ -36,6 +38,10 @@ class RuntimeHandAdapter:
     def _build_prompt(self, task: dict[str, Any]) -> str:
         system_prompt = task.get("system_prompt", "")
         task_str = task.get("task", "")
+        if task.get("execution_mode") == "agent":
+            return "\n\n".join(
+                part for part in (str(system_prompt).strip(), str(task_str).strip()) if part
+            )
         ctx = task.get("context", {}) or {}
         domain = ctx.get("domain", "general")
         hand_id = task.get("hand_id", "")
@@ -72,26 +78,108 @@ class RuntimeHandAdapter:
 
     async def _invoke_process(self, task: dict[str, Any], run_id: str) -> AsyncIterator[dict[str, Any]]:
         prompt = self._build_prompt(task)
+        cwd = Path(str(task.get("cwd") or task.get("workspace_root") or ".")).expanduser().resolve()
+        cmd = list(self._command)
+        if task.get("dangerous"):
+            cmd.append("--dangerously-skip-permissions")
+        # Strip inherited proxy overrides so the agent reaches its own API endpoint.
+        # cc-switch-like ANTHROPIC_BASE_URL proxies commonly reject or corrupt large
+        # payloads, causing empty agent output and "no run.artifact" failures.
+        clean_env = {
+            **__import__("os").environ,
+            "ANTHROPIC_BASE_URL": "",
+            "ANTHROPIC_AUTH_TOKEN": "",
+        }
         proc = await asyncio.create_subprocess_exec(
-            *self._command,
+            *cmd,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            cwd=str(cwd),
+            env=clean_env,
         )
         stdout, stderr = await proc.communicate(input=prompt.encode("utf-8"))
-        for line in stdout.decode("utf-8", errors="replace").strip().splitlines():
+        stdout_text = stdout.decode("utf-8", errors="replace").strip()
+        stderr_text = stderr.decode("utf-8", errors="replace").strip()
+
+        if task.get("execution_mode") == "agent":
+            if stderr_text:
+                yield {"type": "stderr", "data": stderr_text}
+            failure_text = self._summarize_failure(stdout_text, stderr_text, proc.returncode)
+            if failure_text:
+                yield {"type": "run.error", "run_id": run_id, "message": failure_text}
+                return
+            if not stdout_text:
+                yield {
+                    "type": "run.error",
+                    "run_id": run_id,
+                    "message": "Claude Code agent session completed without a final message",
+                }
+                return
+            yield {"type": "run.message", "run_id": run_id, "text": stdout_text}
+            yield {"type": "run.completed", "run_id": run_id, "exit_code": proc.returncode}
+            return
+
+        emitted_artifact = False
+
+        for line in stdout_text.splitlines():
             line = line.strip()
             if not line:
                 continue
             try:
-                yield json.loads(line)
+                event = json.loads(line)
             except json.JSONDecodeError:
                 yield {"type": "stdout", "data": line}
-        if stderr:
-            text = stderr.decode("utf-8", errors="replace").strip()
-            if text:
-                yield {"type": "stderr", "data": text}
-        yield {"type": "run.completed", "run_id": run_id, "exit_code": proc.returncode}
+                continue
+            if isinstance(event, dict) and event.get("type") == "run.artifact":
+                emitted_artifact = True
+            if isinstance(event, dict):
+                yield event
+            else:
+                yield {"type": "stdout", "data": line}
+
+        if stderr_text:
+            yield {"type": "stderr", "data": stderr_text}
+
+        if emitted_artifact:
+            yield {"type": "run.completed", "run_id": run_id, "exit_code": proc.returncode}
+            return
+
+        failure_text = self._summarize_failure(stdout_text, stderr_text, proc.returncode)
+        if failure_text:
+            yield {"type": "run.error", "run_id": run_id, "message": failure_text}
+            return
+
+        yield {
+            "type": "run.error",
+            "run_id": run_id,
+            "message": "runtime hand completed without a run.artifact",
+        }
+
+    @staticmethod
+    def _summarize_failure(stdout_text: str, stderr_text: str, returncode: int | None) -> str:
+        text = "\n".join(part for part in (stderr_text, stdout_text) if part).strip()
+        if not text:
+            if returncode not in (None, 0):
+                return f"runtime hand exited with code {returncode}"
+            return ""
+
+        markers = (
+            r"API Error:",
+            r"status\.claude\.com",
+            r"server_error",
+            r"\b503\b",
+            r"\b502\b",
+            r"request timed out",
+            r"timed out waiting",
+            r"exceeded the 120s channel deadline",
+        )
+        if returncode not in (None, 0) or any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in markers):
+            first_line = next((line.strip() for line in text.splitlines() if line.strip()), text)
+            if returncode not in (None, 0):
+                return f"runtime hand failed with exit code {returncode}: {first_line[:500]}"
+            return first_line[:500]
+        return ""
 
 
 def create_runtime_hand_provider(base_command: list[str] | None = None) -> dict:

@@ -1,0 +1,24 @@
+{
+  "goal_id": "goal-1781952589570-78ea86",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-20T10:49:49.570471Z",
+  "updated_at": "2026-06-20T10:51:06.291657Z",
+  "status": "open",
+  "title": "请分析为什么 1+1 等于 2，并给出三步解释。",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1781952666288-8cc9206c",
+      "ts": "2026-06-20T10:51:06.288376Z",
+      "stance": "n/a",
+      "confidence": 0.0,
+      "key_drivers": [],
+      "reversal_condition": "当 hand t1/t2/t3 重新执行并返回有效 key_claims 后重新评估"
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1781952666288-8cc9206c"
+  ]
+}

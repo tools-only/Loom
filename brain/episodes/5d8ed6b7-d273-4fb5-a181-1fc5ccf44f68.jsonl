@@ -1,0 +1,20 @@
+{"ts": 1782891736.0483036, "type": "episode.start", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "context_keys": ["goal_id"]}
+{"ts": 1782891750.656483, "type": "phase.start", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "phase": "plan"}
+{"ts": 1782891750.6574833, "type": "state.transition", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "from": "Planning", "to": "Planning"}
+{"ts": 1782891750.6574833, "type": "projection-binding", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "fn": "plan", "state_version": 0, "schema_version": "1.0", "content_id": "sha256:ce0876a6e0ceafc8"}
+{"ts": 1782891759.3774116, "type": "phase.end", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "phase": "plan", "rubric_count": 1, "registered_shells": []}
+{"ts": 1782891759.3794148, "type": "projection-binding", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "fn": "decompose", "state_version": 0, "schema_version": "1.0", "content_id": "sha256:ce0876a6e0ceafc8"}
+{"ts": 1782891767.801227, "type": "plan.tasks_decomposed", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "task_count": 1, "decomposition_source": "fallback", "rationale": "state-driven decomposition"}
+{"ts": 1782891767.8023224, "type": "state.transition", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "from": "Planning", "to": "Dispatching"}
+{"ts": 1782891767.8028386, "type": "phase.start", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "phase": "dispatch", "dispatch_targets": ["runtime-inline-0"]}
+{"ts": 1782891767.8028386, "type": "dispatch.batch", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "task_ids": ["t0"], "priority": 0}
+{"ts": 1782891767.8042357, "type": "dispatch.sent", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "hand_id": "runtime-inline-0", "executor_id": "brain-inline", "dimension": "Brain-generated fallback dimension", "is_repair": false}
+{"ts": 1782891840.8626287, "type": "dispatch.artifact", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "hand_id": "runtime-inline-0", "executor_id": "brain-inline", "is_repair": false}
+{"ts": 1782891840.8636346, "type": "phase.end", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "phase": "dispatch", "hand_count": 1}
+{"ts": 1782891840.8636346, "type": "state.transition", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "from": "Dispatching", "to": "Reviewing"}
+{"ts": 1782891840.8636346, "type": "phase.start", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "phase": "review"}
+{"ts": 1782891848.8561685, "type": "phase.end", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "phase": "review", "follow_up_count": 0}
+{"ts": 1782891848.8571663, "type": "state.transition", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "from": "Reviewing", "to": "Synthesizing"}
+{"ts": 1782891848.858168, "type": "phase.start", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "phase": "synthesize"}
+{"ts": 1782891859.8941035, "type": "phase.end", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "phase": "synthesize"}
+{"ts": 1782891859.8951044, "type": "state.transition", "episode_id": "5d8ed6b7-d273-4fb5-a181-1fc5ccf44f68", "from": "Synthesizing", "to": "Persisted"}

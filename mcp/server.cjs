@@ -1,4 +1,4 @@
-// Anchor Web-UI Service — persistent HTTP + WebSocket daemon.
+﻿// Anchor Web-UI Service 鈥?persistent HTTP + WebSocket daemon.
 //
 // Responsibilities: serve the webview, capture user ops from the browser,
 // relay ops to the CC shim via /ws/agent (push), and broadcast AI-generated
@@ -48,7 +48,7 @@ const express = require(path.join(BRIDGE_NM, 'express'));
 const wsLib   = require(path.join(BRIDGE_NM, 'ws'));
 const { WebSocketServer } = wsLib;
 
-// Trading domain extension — lazy init, gated behind file existence.
+// Trading domain extension 鈥?lazy init, gated behind file existence.
 // Finance logic is being migrated to the Python Core daemon (port 3001).
 // These imports will be removed once the migration is complete.
 let tradingEvents = null, tradingRoutes = null, tradingPolicyGate = null, tradingCanvasRenderer = null;
@@ -76,18 +76,18 @@ const connectorRegistry  = require('./connectors/index.cjs');
 });
 if (!fs.existsSync(TARGET_PATH)) fs.mkdirSync(TARGET_PATH, { recursive: true });
 
-// ── State ─────────────────────────────────────────────────────────────
+// 鈹€鈹€ State 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 let currentHtml = '';
 const surfaceHtml = { fin: '', general: '' };
 const pendingOps = [];            // buffered while agent not connected
 const webviewClients = new Set(); // browser WebSocket connections
 let mainAgentWs = null;          // main CC agent shim (subagent_id = null)
-// processorWs is replaced by processorPool: agentId → { ws, partition, ops }
-const processorPool = new Map();  // agentId → { ws, ops: [...] } — one entry per spawned processor
+// processorWs is replaced by processorPool: agentId 鈫?{ ws, partition, ops }
+const processorPool = new Map();  // agentId 鈫?{ ws, ops: [...] } 鈥?one entry per spawned processor
 let processorSeq = 0;            // increments per spawn; used to generate unique agentIds
 let ccSpawnLock  = false;        // prevent concurrent spawnCCProcessor calls
 const spawningPartitions = new Set(); // partitions currently being spawned (per-partition lock)
-const agentRegistry = new Map();  // agentId → { ws, subagentId, label, connectedAt }
+const agentRegistry = new Map();  // agentId 鈫?{ ws, subagentId, label, connectedAt }
 let loopEnabled = true;
 let shuttingDown = false;
 const SERVER_BOOT_MS = Date.now();
@@ -180,6 +180,8 @@ function renderDynamicVisualPage(visualId) {
 <script>document.addEventListener('DOMContentLoaded',()=>{if(window.AnchorClient)AnchorClient._allowIncomingHtml=true;});</script>
 <script src="/prompt-panel.js"></script>
 <script src="/hand-feedback-widget.js"></script>
+  <script src="/live-state-canvas.js"></script>
+  <script src="/checkpoint-review-deck.js"></script>
 <div id="anchor-execute-all" class="hidden">
   <button class="btn btn--brand execute-all-btn">
     <span class="execute-icon"><i class="ph-bold ph-play"></i></span>
@@ -727,7 +729,7 @@ async function runShutdown(reason) {
   }
 }
 
-// ── WebSocket trace logger ─────────────────────────────────────────────
+// 鈹€鈹€ WebSocket trace logger 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 const TRACE_LOG = path.join(LOGS_DIR, 'ws_trace.log');
 const TRACE_MSGS = [];
 const TRACE_MAX = 500;
@@ -777,14 +779,14 @@ function _tryEmitTiming() {
   };
   broadcastAgentEvent({ type: 'timing', ...payload });
   _curTiming._emitted = true;
-  log(`[timing] hand_agent=${_curTiming.haMs ?? '-'}ms · loom_agent=${_curTiming.loomMs ?? '-'}ms`);
+  log(`[timing] hand_agent=${_curTiming.haMs ?? '-'}ms 路 loom_agent=${_curTiming.loomMs ?? '-'}ms`);
 }
 
-// ── HTTP + WebSocket setup ────────────────────────────────────────────
+// 鈹€鈹€ HTTP + WebSocket setup 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 //
 // Two separate WS servers routed by path:
-//   /ws/agent   — MCP shim persistent connection (push channel)
-//   everything else — browser clients
+//   /ws/agent   鈥?MCP shim persistent connection (push channel)
+//   everything else 鈥?browser clients
 const app = express();
 const httpServer = http.createServer(app);
 httpServer.timeout = 0;
@@ -813,7 +815,7 @@ app.use((req, res, next) => {
   res.status(503).json({ ok: false, error: 'Anchor service is shutting down' });
 });
 
-// ── HTTP routes ───────────────────────────────────────────────────────
+// 鈹€鈹€ HTTP routes 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 // Allow external tools (e.g. bridge/server.js) to push full HTML
 app.post('/html', (req, res) => {
@@ -854,9 +856,9 @@ app.post('/event', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Loom proxies ──────────────────────────────────────────────────────
-// CORE_PORT: Loom Core HTTP daemon (loom_core/__main__.py) — adapter registry, domains
-// BRAIN_PORT: Loom Brain FastAPI (loom/main.py) — /config, /run, /hand/*, /feedback
+// 鈹€鈹€ Loom proxies 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// CORE_PORT: Loom Core HTTP daemon (loom_core/__main__.py) 鈥?adapter registry, domains
+// BRAIN_PORT: Loom Brain FastAPI (loom/main.py) 鈥?/config, /run, /hand/*, /feedback
 const CORE_PORT  = parseInt(process.env.LOOM_CORE_PORT  || '3001');
 const BRAIN_PORT = parseInt(process.env.LOOM_BRAIN_PORT || '3002');
 
@@ -895,25 +897,25 @@ function _makeProxy(port) {
 const _proxyToBrain = _makeProxy(BRAIN_PORT);
 const _proxyToCore  = _makeProxy(CORE_PORT);
 
-// /config, /run, /feedback, /hand/* → Brain FastAPI at port 3002 (direct paths)
+// /config, /run, /feedback, /hand/* 鈫?Brain FastAPI at port 3002 (direct paths)
 app.all('/config',           (req, res) => _proxyToBrain(req, res, '/config'));
 app.all('/run',              (req, res) => _proxyToBrain(req, res, '/run'));
 app.all('/feedback',         (req, res) => _proxyToBrain(req, res, '/feedback'));
 app.all(/^\/hand(\/.*)?$/,   (req, res) => _proxyToBrain(req, res, '/hand' + (req.params[0] || '')));
 
-// /loom/* → Brain FastAPI at port 3002 (strips /loom prefix)
+// /loom/* 鈫?Brain FastAPI at port 3002 (strips /loom prefix)
 app.all(/^\/loom(\/.*)?$/, (req, res) => {
   const brainPath = (req.params[0] || '/') || '/';
   return _proxyToBrain(req, res, brainPath);
 });
 
-// /core/* → Loom Core HTTP daemon at port 3001
+// /core/* 鈫?Loom Core HTTP daemon at port 3001
 app.all(/^\/core(?:\/(.*))?$/, async (req, res) => {
   const corePath = req.params[0] ? '/' + req.params[0] : '/';
   return _proxyToCore(req, res, corePath);
 });
 
-// ── Loom hand-agent invocation (generic, adapter-agnostic) ────────────
+// 鈹€鈹€ Loom hand-agent invocation (generic, adapter-agnostic) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Calls Brain /run before delivering op to CC so CC gets pre-fetched artifact.
 function _callBrainRun(handId, task, context) {
   return new Promise((resolve, reject) => {
@@ -967,7 +969,7 @@ async function _enrichAndDeliverEnvelope(envelope) {
         log(`[loom] Brain /run error for ${handId}: ${result.error}`);
       }
     } catch (e) {
-      log(`[loom] hand invoke failed (${handId}): ${e.message} — proceeding without artifact`);
+      log(`[loom] hand invoke failed (${handId}): ${e.message} 鈥?proceeding without artifact`);
     }
   }
   try {
@@ -993,7 +995,7 @@ app.post('/patch', (req, res) => {
   res.json({ ok: true, cascade_warnings: missed.length });
 });
 
-// ── Connector data query (used by bridge.py get_connector_data) ──────
+// 鈹€鈹€ Connector data query (used by bridge.py get_connector_data) 鈹€鈹€鈹€鈹€鈹€鈹€
 // Returns inbox items for a specific connector source, newest-first.
 // Supports ?ticker=NVDA for per-ticker filtering (e.g. finnhub).
 app.get('/data/:connectorId', (req, res) => {
@@ -1018,7 +1020,7 @@ app.get('/data/:connectorId', (req, res) => {
   res.json({ ok: true, connector_id: connectorId, count: items.length, items });
 });
 
-// ── Inbox routes ─────────────────────────────────────────────────────
+// 鈹€鈹€ Inbox routes 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 app.get('/inbox', (req, res) => {
   const { domain, unread } = req.query;
@@ -1050,7 +1052,7 @@ app.post('/inbox/:id/read', (req, res) => {
   res.json({ ok });
 });
 
-// ── Annotations store ─────────────────────────────────────────────
+// 鈹€鈹€ Annotations store 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 const ANNOTATIONS_FILE = path.join(WORKSPACE_DIR, 'annotations.json');
 
 function _loadAnnotations() {
@@ -1097,7 +1099,7 @@ app.post('/push/manual', (req, res) => {
   res.json({ ok: true, item });
 });
 
-// ── Webhook receiver ─────────────────────────────────────────────────
+// 鈹€鈹€ Webhook receiver 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 const crypto = require('crypto');
 
 app.post('/webhook/:connectorId', (req, res) => {
@@ -1132,7 +1134,7 @@ app.post('/webhook/:connectorId', (req, res) => {
   res.json({ ok: true, item });
 });
 
-// ── Schedule routes ───────────────────────────────────────────────────
+// 鈹€鈹€ Schedule routes 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 app.get('/schedules', (req, res) => {
   res.json({ ok: true, schedules: scheduler.list() });
@@ -1152,20 +1154,20 @@ app.delete('/schedules/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Domain workspace page ─────────────────────────────────────────────
+// 鈹€鈹€ Domain workspace page 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 const DOMAIN_META = {
-  market:    { icon: '📊', label: '市场情报', color: 'aurora' },
-  position:  { icon: '💼', label: '仓位管理', color: 'cool'   },
-  target:    { icon: '🎯', label: '标的跟踪', color: 'warm'   },
-  sentiment: { icon: '🌡️', label: '市场情绪', color: 'flame'  }
+  market:    { icon: '馃搳', label: '甯傚満鎯呮姤', color: 'aurora' },
+  position:  { icon: '馃捈', label: '浠撲綅绠＄悊', color: 'cool'   },
+  target:    { icon: '馃幆', label: '鏍囩殑璺熻釜', color: 'warm'   },
+  sentiment: { icon: '😐', label: '甯傚満鎯呯华', color: 'flame'  }
 };
 
 function buildDomainStubHtml(domain) {
-  const meta  = DOMAIN_META[domain] || { icon: '📄', label: domain, color: 'arctic' };
+  const meta  = DOMAIN_META[domain] || { icon: '馃搫', label: domain, color: 'arctic' };
   const items = inbox.list({ domain });
   const itemsHtml = items.length === 0
-    ? `<p style="color:var(--fg-3);text-align:center;padding:40px 0;">暂无推送内容 · 等待 Agent 推送或手动触发</p>`
+    ? `<p style="color:var(--fg-3);text-align:center;padding:40px 0;">鏆傛棤鎺ㄩ€佸唴瀹?路 绛夊緟 Agent 鎺ㄩ€佹垨鎵嬪姩瑙﹀彂</p>`
     : items.map(item => `
       <div class="anc-section anc-section--gc" data-anc="inbox-item.${item.id}" data-handles="refine,annotate" style="margin-bottom:12px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
@@ -1183,10 +1185,10 @@ function buildDomainStubHtml(domain) {
 <body>
 <section class="anc-section anc-section--gc anc-section--${meta.color}" data-anc="${domain}.header" data-handles="refine,restructure">
   <h2>${meta.icon} ${meta.label}</h2>
-  <p>共 <strong>${items.length}</strong> 条推送 · 点击任意条目进行 AI 精炼</p>
+  <p>鍏?<strong>${items.length}</strong> 鏉℃帹閫?路 鐐瑰嚮浠绘剰鏉＄洰杩涜 AI 绮剧偧</p>
 </section>
 <section class="anc-section anc-section--gc" data-anc="${domain}.feed" data-handles="refine,restructure">
-  <h3>推送流</h3>
+  <h3>鎺ㄩ€佹祦</h3>
   ${itemsHtml}
 </section>
 </body>
@@ -1223,7 +1225,7 @@ app.get('/workspace/domain/:domain', (req, res) => {
   res.json({ ok: true, fileId: file.id });
 });
 
-// ─────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 app.get('/loom-visual/:visualId', (req, res) => {
   const visualId = normalizeVisualId(req.params.visualId);
@@ -1327,7 +1329,7 @@ app.post('/shutdown', (req, res) => {
   }, 50);
 });
 
-// Loop gate — consulted by the Stop hook
+// Loop gate 鈥?consulted by the Stop hook
 app.get('/loop/active', (req, res) => {
   const inBootGrace = (Date.now() - SERVER_BOOT_MS) < LOOP_BOOT_GRACE_MS;
   const active = loopEnabled && !inBootGrace;
@@ -1719,7 +1721,7 @@ app.get('/context-manifest', (req, res) => {
 app.post('/agents/save', express.json(), (req, res) => {
   const { name, description, system_prompt, tools } = req.body || {};
   if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) {
-    return res.status(400).json({ error: 'Invalid name — use only letters, numbers, hyphens, underscores.' });
+    return res.status(400).json({ error: 'Invalid name 鈥?use only letters, numbers, hyphens, underscores.' });
   }
   if (!fs.existsSync(PROJECT_AGENTS)) {
     try { fs.mkdirSync(PROJECT_AGENTS, { recursive: true }); } catch (e) {
@@ -1827,7 +1829,7 @@ app.get('/session/:id/events', (req, res) => {
   }
 });
 
-// ── Browser WebSocket handler ─────────────────────────────────────────
+// 鈹€鈹€ Browser WebSocket handler 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 wssBrowser.on('connection', (ws, req) => {
   ws.loomSurface = normalizeSurface(browserSurfaceFromUrl(req?.url || ''));
@@ -1865,7 +1867,7 @@ wssBrowser.on('connection', (ws, req) => {
         const eid = recordEvent('user.intent', msg.envelope);
         lastUserIntentId = eid;
 
-        // Trading domain extension — record trading-specific events
+        // Trading domain extension 鈥?record trading-specific events
         if (msg.envelope.domain && msg.envelope.domain.namespace === 'trading.private' && tradingEvents) {
           try {
             const tKind = 'trading.' + String(msg.envelope.domain.action || 'unknown').toLowerCase();
@@ -1901,7 +1903,7 @@ wssBrowser.on('connection', (ws, req) => {
         const text = slash ? slash.text : rawText;
         if (!text) { ws.send(JSON.stringify({ type: 'error', message: 'prompt text required' })); return; }
 
-        // Parse \hand prefix — if present, route through Brain enrichment
+        // Parse \hand prefix 鈥?if present, route through Brain enrichment
         const promptText = text;
         const handMatch = promptText.match(/^\\(market|position|target|sentiment)\s+(.*)/s);
         const requestedVisualize = slash && typeof slash.visualize === 'boolean'
@@ -2010,19 +2012,19 @@ wssBrowser.on('connection', (ws, req) => {
   });
 });
 
-// ── Agent WebSocket handler ───────────────────────────────────────────
+// 鈹€鈹€ Agent WebSocket handler 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 //
 // The MCP shim opens one persistent connection here on startup.
 // When an op arrives from a browser, deliverOp() pushes it directly
 // over this channel. The shim calls anchor_await_op(), which resolves
-// the moment the op arrives — no polling required.
+// the moment the op arrives 鈥?no polling required.
 //
-// Commands from shim → server: render, patch, event, get_html
-// Commands from server → shim: op (push)
+// Commands from shim 鈫?server: render, patch, event, get_html
+// Commands from server 鈫?shim: op (push)
 
 wssAgent.on('connection', (ws, req, agentId) => {
-  // ── Spawned processor connection (Option C: per-partition pool) ────────
-  // agentId format: '__proc__<seq>' — unique per spawned processor.
+  // 鈹€鈹€ Spawned processor connection (Option C: per-partition pool) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+  // agentId format: '__proc__<seq>' 鈥?unique per spawned processor.
   // Multiple processors can connect simultaneously; each handles its own op partition.
   if (agentId && agentId.startsWith('__proc__')) {
     const procId = agentId;
@@ -2053,7 +2055,7 @@ wssAgent.on('connection', (ws, req, agentId) => {
     });
 
     ws.on('close', () => {
-      // Mark pool entry as disconnected (don't delete — partition info may still be useful)
+      // Mark pool entry as disconnected (don't delete 鈥?partition info may still be useful)
       const entry = processorPool.get(procId);
       if (entry) entry.ws = null;
       log(`[agent] ${procId} disconnected (pool size: ${processorPool.size})`);
@@ -2122,7 +2124,7 @@ wssAgent.on('connection', (ws, req, agentId) => {
     // The main session is for user-directed commands (anchor_render, etc.) only.
     // If ops are pending and no processor is connected, trigger a spawn.
     if (pendingOps.length > 0) {
-      log('[agent] main agent connected with pending ops — delegating to processor spawn');
+      log('[agent] main agent connected with pending ops 鈥?delegating to processor spawn');
       setTimeout(spawnCCProcessor, 150);
     }
 
@@ -2172,7 +2174,7 @@ function deliverOp(op) {
         break;
       }
     }
-    // No mainAgentWs fallback — keeps op in pendingOps so spawnCCProcessor fires.
+    // No mainAgentWs fallback 鈥?keeps op in pendingOps so spawnCCProcessor fires.
   }
 
   if (!targetWs) {
@@ -2207,7 +2209,7 @@ function handleAgentMessage(ws, msg, agentId) {
     setSurfaceHtml(surface, html);
     broadcast(html, surface);
     if (currentSession) recordEvent('agent.render', { html_size: html.length });
-    log(`[${label}] render ${html.length} bytes → ${webviewClients.size} browser(s)`);
+    log(`[${label}] render ${html.length} bytes 鈫?${webviewClients.size} browser(s)`);
     const clientCount = Array.from(webviewClients).filter(client => normalizeSurface(client.loomSurface) === surface).length;
     wsTrace('send', 'browser', 'html', { html_len: html.length, clients: clientCount, surface });
     // Track render completion for loom agent timing calculation
@@ -2260,7 +2262,7 @@ function handleAgentMessage(ws, msg, agentId) {
     if (currentSession) {
       try { recordEvent(kind, payload, { event_id: event.event_id, parent_event_id: lastUserIntentId }); } catch {}
     }
-    log(`[${label}] event ${kind} → ${sent} browser(s)`);
+    log(`[${label}] event ${kind} 鈫?${sent} browser(s)`);
     wsTrace('send', 'browser', 'agent_event', { kind, sent });
     ack(true, { event_id: event.event_id });
 
@@ -2281,7 +2283,7 @@ function handleAgentMessage(ws, msg, agentId) {
       wsTrace('recv', 'proc:' + procId, 'op_req', { remaining: partition ? partition.ops.length : 0 });
       ws.send(JSON.stringify({ type: 'op', ops: [nextOp], count: 1 }));
     } else {
-      // Partition empty — mark done so deliverOp won't route new ops to this exiting processor
+      // Partition empty 鈥?mark done so deliverOp won't route new ops to this exiting processor
       if (partition) partition.done = true;
       wsTrace('recv', 'proc:' + procId, 'op_req', { remaining: 0, done: true });
       ws.send(JSON.stringify({ type: 'op', ops: [], count: 0 }));
@@ -2289,7 +2291,7 @@ function handleAgentMessage(ws, msg, agentId) {
   }
 }
 
-// ── Broadcast helpers ─────────────────────────────────────────────────
+// 鈹€鈹€ Broadcast helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function broadcast(html, surface = 'fin') {
   const target = normalizeSurface(surface);
@@ -2368,7 +2370,7 @@ function emitPatchCompleteEvents(patches, summary, surface = null) {
   }
 }
 
-// ── DOM utilities ─────────────────────────────────────────────────────
+// 鈹€鈹€ DOM utilities 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -2430,7 +2432,7 @@ function detectMissedCascades(patches, htmlSnapshot) {
   });
   const seen = new Set();
   return missed.filter(e => {
-    const key = e.source + '→' + e.dependent;
+    const key = e.source + ' -> ' + e.dependent;
     if (seen.has(key)) return false;
     seen.add(key); return true;
   });
@@ -2523,14 +2525,14 @@ function notifyPendingChanged() {
   }
 }
 
-// ── Option C: auto-spawn CC processor ────────────────────────────────
+// 鈹€鈹€ Option C: auto-spawn CC processor 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // When a browser op arrives with no processor connected, the server spawns
 // `claude -p <prompt>` as a subprocess. The subprocess starts its own shim
 // (via mcp.json), connects to /ws/agent?agentId=__proc__, drains all pending
 // ops via anchor_get_pending_op, and exits. No loop, no Stop hook needed.
 
 // Build a per-op prompt for `claude -p`. The output is raw HTML written to
-// stdout — no tools needed. Server reads stdout and applies the patch directly.
+// stdout 鈥?no tools needed. Server reads stdout and applies the patch directly.
 function buildOpPrompt(op) {
   const kind      = op.intent?.op || '';
   const target    = op.intent?.target_ref || '';
@@ -2562,13 +2564,13 @@ function stripCodeFence(text) {
   // Extract HTML from a code fence anywhere in the output (CC often adds preamble)
   const m = text.match(/```(?:html)?\s*\n([\s\S]*?)```/);
   if (m) return m[1].trim();
-  // No fence — find first '<' and return from there
+  // No fence 鈥?find first '<' and return from there
   const trimmed = text.trim();
   const lt = trimmed.indexOf('<');
   return lt >= 0 ? trimmed.slice(lt) : trimmed;
 }
 
-// In-memory spawn event log — exposed via GET /debug/spawn-log
+// In-memory spawn event log 鈥?exposed via GET /debug/spawn-log
 const spawnLog = [];
 const SPAWN_LOG_MAX = 50;
 
@@ -2601,7 +2603,7 @@ function buildProcessorPrompt(ops) {
     '4. For op with subagent_id set in context_bundle: call Agent(subagent_type="<subagent_id>", prompt=...) to generate the patch, then call anchor_patch({patches:[...]}).',
     '5. For regular op: generate the modified outerHTML, then call anchor_patch({patches:[...]}).',
     '6. If context_bundle.skill_ids contains pending custom skills or context_bundle.resource_ids contains URLs, inspect those resources as task context before editing.',
-    '7. For initial_render: after the first anchor_render(), call anchor_get_html() to inspect the rendered page, then use anchor_patch() for a UI refinement pass — fix card grid distribution, spacing, alignment, and visual hierarchy.',
+    '7. For initial_render: after the first anchor_render(), call anchor_get_html() to inspect the rendered page, then use anchor_patch() for a UI refinement pass 鈥?fix card grid distribution, spacing, alignment, and visual hierarchy.',
     '',
     'Never call anchor_await_op from this spawned processor.',
     'Preserve data-anc, data-handles, data-deps, and existing CSS classes in patched fragments.',
@@ -2629,7 +2631,7 @@ function buildProcessorPrompt(ops) {
         '---',
       ];
     }),
-    // 容灾: hand agent unavailable, fall back to skill invocation
+    // 瀹圭伨: hand agent unavailable, fall back to skill invocation
     // This runs when loom_hand is set but loom_artifact is missing (timeout/error)
     ...ops.flatMap(op => {
       const handId   = op.context_bundle?.loom_hand;
@@ -2644,7 +2646,7 @@ function buildProcessorPrompt(ops) {
       const skillPath = SKILL_PATHS[handId];
       if (!skillPath) return [];
       return [
-        `--- HAND AGENT UNAVAILABLE (hand=${handId}) — FALLBACK TO SKILL ---`,
+        `--- HAND AGENT UNAVAILABLE (hand=${handId}) 鈥?FALLBACK TO SKILL ---`,
         `The remote hand agent for "${handId}" failed. You MUST:`,
         `1. Read the hand skill file using Read tool: Read(file_path="${skillPath}")`,
         `2. Follow the skill instructions to generate the analysis (use web_fetch/search for current data as needed).`,
@@ -2677,7 +2679,7 @@ function spawnCCProcessor() {
   const allOps = pendingOps.slice();
   if (allOps.length === 0) return;
 
-  // Separate ops by subagent_id — each subagent_id gets its own processor partition
+  // Separate ops by subagent_id 鈥?each subagent_id gets its own processor partition
   const subagentOps = allOps.filter(op => op.context_bundle?.subagent_id);
   const regularOps  = allOps.filter(op => !op.context_bundle?.subagent_id);
 
@@ -2706,14 +2708,14 @@ function spawnCCProcessor() {
   const partitions = [];
 
   if (idleCount === 0) {
-    // No idle processor — need to spawn. Create one partition per subagent_id + one for regular ops.
+    // No idle processor 鈥?need to spawn. Create one partition per subagent_id + one for regular ops.
     if (regularOps.length > 0) partitions.push({ id: 'regular', ops: regularOps });
     for (const subagentId of subagentIds) {
       const ops = allOps.filter(op => op.context_bundle?.subagent_id === subagentId);
       if (ops.length > 0) partitions.push({ id: subagentId, ops });
     }
   } else {
-    // At least one idle processor exists — new ops will be picked up via deliverOp routing
+    // At least one idle processor exists 鈥?new ops will be picked up via deliverOp routing
     log(`[spawn] pool has ${idleCount} idle processor(s), queueing ${allOps.length} op(s) for existing pool`);
     return;
   }
@@ -2752,7 +2754,7 @@ function spawnProcessorPartition(partitionId, ops, onDone) {
   promptFile = path.join(ROOT, 'output', `proc-${Date.now()}.txt`);
   try { fs.writeFileSync(promptFile, prompt, 'utf8'); } catch {}
   spawnBin  = 'bash';
-  // $0 = promptFile, $1 = claudeBin — avoids all shell quoting issues with spaces/special chars
+  // $0 = promptFile, $1 = claudeBin 鈥?avoids all shell quoting issues with spaces/special chars
   spawnArgs = ['-c', 'p=$(cat "$0"); "$1" -p "$p" --dangerously-skip-permissions < /dev/null', promptFile, claudeBin];
 
   let child;
@@ -2764,7 +2766,7 @@ function spawnProcessorPartition(partitionId, ops, onDone) {
       stdio: 'pipe',
       windowsHide: true
     });
-    // Register this processor in the pool — ws will be set when it connects
+    // Register this processor in the pool 鈥?ws will be set when it connects
     processorPool.set(procId, { ws: null, partition: partitionId, ops, surface: opSurface(op) });
   } catch (e) {
     log('[spawn] failed to start CC: ' + e.message);
@@ -2852,13 +2854,13 @@ function formatOpAsPrompt(op) {
   return `## Anchor User Action\n\n**Operation**: \`${op.op}\`\n**Target**: \`${op.target}\`${sel}\n**Instruction**: ${instruction}\n\n### Current HTML\n\`\`\`html\n${currentHtml}\n\`\`\`\n\n### Instructions\n\n1. Generate the modified HTML fragment for \`${op.target}\`.\n2. Call \`anchor_patch({patches:[{anchor_id:"${op.target}",html_fragment:"<new complete outerHTML>"}]})\`.\n3. Call \`anchor_await_op()\` to wait for the next user action.\n`;
 }
 
-// ── Push infrastructure init ──────────────────────────────────────────
+// 鈹€鈹€ Push infrastructure init 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 inbox.load();
 pushBroker = new PushBroker({ inbox, pendingOps, notifyPendingChanged, broadcastBrowserMessage });
 scheduler.init(pushBroker);
 connectorRegistry.loadAll(pushBroker, scheduler);
 
-// ── File watcher ──────────────────────────────────────────────────────
+// 鈹€鈹€ File watcher 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function watchHtmlFile() {
   let lastMtime = 0;
@@ -2914,7 +2916,7 @@ function maybeAutoOpenBrowser() {
   }, 800);
 }
 
-// ── Session management ────────────────────────────────────────────────
+// 鈹€鈹€ Session management 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 const MANIFEST_FLUSH_INTERVAL = 10;
 
@@ -3012,7 +3014,7 @@ function generateEventId() {
   return 'evt_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
 }
 
-// ── Envelope validation ───────────────────────────────────────────────
+// 鈹€鈹€ Envelope validation 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function loadEnvelopeSchema() {
   const schemaPath = path.join(SCHEMAS_DIR, 'intent-envelope.json');
@@ -3139,7 +3141,7 @@ function formatEnvelopeAsPrompt(envelope) {
   const rs = envelope.render_state || {};
   const MAX_HTML = 15000;
 
-  // ── Canvas co-design mode ──────────────────────────────────────
+  // 鈹€鈹€ Canvas co-design mode 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   if (bundle.context_mode === 'canvas') {
     const snap = canvasState.getSnapshot();
     const stateCtx = snap.cards.length > 0
@@ -3167,7 +3169,7 @@ function formatEnvelopeAsPrompt(envelope) {
       ).join('\n') + '\n';
     })();
     const groupInstruction = isGroup && targetRefs.length > 0
-      ? '\n**Mode: GROUP** — patch these ' + targetRefs.length + ' card(s): `' + targetRefs.join('`, `') + '`\n' +
+      ? '\n**Mode: GROUP** 鈥?patch these ' + targetRefs.length + ' card(s): `' + targetRefs.join('`, `') + '`\n' +
         'Call `anchor_patch({patches:[...]})` with one entry per selected card. Preserve their `data-anc-x/y/rot/scale` unless the instruction explicitly requests movement.\n'
       : '';
     return [
@@ -3201,7 +3203,7 @@ function formatEnvelopeAsPrompt(envelope) {
       '',
       '**Placement**: 4-column grid, step (360px, 280px) starting at (80,80). No overlap.',
       '**For initial_render / global ops**: Generate all cards, wrap in a full HTML document, and call `anchor_render(html)`.',
-      '**For refine/patch ops on existing cards**: Call `anchor_patch({patches:[...]})` — preserve user-set data-anc-x/y/rot/scale unless instruction explicitly asks to move.',
+      '**For refine/patch ops on existing cards**: Call `anchor_patch({patches:[...]})` 鈥?preserve user-set data-anc-x/y/rot/scale unless instruction explicitly asks to move.',
       '**To create a new card**: call `anchor_patch` with a new unique anchor_id not already in Canvas State.',
       '**To propose a layout rearrangement**: call `anchor_emit_event("layout_suggest", {suggestion_id, moves:[{anchor_id,x,y},...]})`; do NOT directly patch positions.',
       '',
@@ -3275,7 +3277,7 @@ function formatEnvelopeAsPrompt(envelope) {
   out += `**Op**: \`${intent.op || '(unknown)'}\` on \`${intent.target_ref || '(none)'}\`\n`;
   if (intent.instruction) out += `**Instruction**: ${intent.instruction}\n`;
   out += '\n';
-  if (sel && sel.text) out += `**Selection**: "${sel.text.substring(0, 200)}"${sel.text.length > 200 ? '…' : ''}\n\n`;
+  if (sel && sel.text) out += `**Selection**: "${sel.text.substring(0, 200)}"${sel.text.length > 200 ? '...' : ''}\n\n`;
   const mem = bundle.memory_ids || [];
   const skl = bundle.skill_ids || [];
   const res = bundle.resource_ids || [];
@@ -3317,7 +3319,7 @@ function formatEnvelopeAsPrompt(envelope) {
     }
   } else {
     out += '### Current HTML\n```html\n' + currentHtml.substring(0, MAX_HTML);
-    if (currentHtml.length > MAX_HTML) out += '\n… (truncated)';
+    if (currentHtml.length > MAX_HTML) out += '\n鈥?(truncated)';
     out += '\n```\n\n';
   }
 
@@ -3331,7 +3333,7 @@ function formatEnvelopeAsPrompt(envelope) {
   return out;
 }
 
-// ── Manifest loaders ──────────────────────────────────────────────────
+// 鈹€鈹€ Manifest loaders 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 const USER_CLAUDE    = 'C:\\Users\\qi\\.claude';
 const USER_MEMORY    = path.join(USER_CLAUDE, 'memory');
@@ -3474,7 +3476,7 @@ function loadResourcesManifest() {
   return items;
 }
 
-// ── Logging ───────────────────────────────────────────────────────────
+// 鈹€鈹€ Logging 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function logOp(op) {
   try {
@@ -3483,7 +3485,7 @@ function logOp(op) {
   } catch (e) { log('logOp failed: ' + e.message); }
 }
 
-// ── Bootstrap ─────────────────────────────────────────────────────────
+// 鈹€鈹€ Bootstrap 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 process.on('SIGINT', () => {
   if (shuttingDown) return;
@@ -3520,7 +3522,7 @@ httpServer.listen(PORT, () => {
   initSession();
   loadEnvelopeSchema();
 
-  // Trading domain extension — initialize if available (migration to Python Core)
+  // Trading domain extension 鈥?initialize if available (migration to Python Core)
   if (tradingEvents) {
     try {
       tradingEvents.initialize({

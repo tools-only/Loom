@@ -93,6 +93,25 @@
     .save-msg.ok { color: #10b981; }
     .save-msg.err { color: #dc2626; }
     .cfg-note { font-size: 12px; color: #6b7280; line-height: 1.6; padding: 12px 14px; background: #f9fafb; border-radius: 8px; border: 1px solid #f3f4f6; }
+    /* 猸旓笓 Episodes 猸旓笓 */
+    .ep-list { display: flex; flex-direction: column; gap: 8px; }
+    .ep-card { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); cursor: pointer; transition: all 0.15s; border: 1.5px solid #e5e7eb; }
+    .ep-card:hover { border-color: #7A5AF8; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(122,90,248,0.12); }
+    .ep-card.selected { border-color: #7A5AF8; background: #faf8ff; }
+    .ep-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .ep-id { font-family: monospace; font-size: 12px; color: #7A5AF8; font-weight: 700; }
+    .ep-date { font-size: 11px; color: #9ca3af; }
+    .ep-goal { font-size: 13px; color: #374151; margin-bottom: 6px; line-height: 1.5; max-height: 40px; overflow: hidden; }
+    .ep-meta { display: flex; gap: 12px; font-size: 11px; color: #6b7280; }
+    .ep-reward { font-weight: 700; }
+    .ep-reward.high { color: #10b981; }
+    .ep-reward.mid { color: #f59e0b; }
+    .ep-reward.low { color: #ef4444; }
+    .ep-detail { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-top: 16px; }
+    .orch-block { margin-bottom: 16px; }
+    .orch-block h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 8px; }
+    .orch-step { padding: 8px 12px; background: #f9fafb; border-radius: 6px; margin-bottom: 4px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+    .orch-step .step-num { width: 24px; height: 24px; border-radius: 50%; background: #ede9fe; color: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
     .cfg-note strong { color: #374151; }
   </style>
 </head>
@@ -104,6 +123,8 @@
 
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-btn-analyze" onclick="switchTab('analyze')">📊 分析</button>
+    <button class="tab-btn" id="tab-btn-episodes" onclick="switchTab('episodes')">馃摉 鏃跺簭</button>
+    <button class="tab-btn" id="tab-btn-plan" onclick="switchTab('plan')">馃搻 缂栨帾</button>
     <button class="tab-btn" id="tab-btn-config" onclick="switchTab('config')">⚙ 配置</button>
   </div>
 
@@ -206,6 +227,37 @@
         </div>
       </div>
 
+
+      <!-- Episodes sidebar -->
+      <div id="sidebar-episodes" style="display:none">
+        <div>
+          <div class="section-title">绛涢€?/div>
+          <div class="form-group">
+            <select id="ep-filter" onchange="loadEpisodes()">
+              <option value="all">鍏ㄩ儴</option>
+              <option value="rewarded">宸茬粡濂栧姳 (reward > 0.6)</option>
+              <option value="recent">鏈€杩?澶?/option>
+            </select>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="cfg-note">
+          <strong>鏃跺簭璇存槑</strong><br>
+          鐐瑰嚮鏃跺簭鏌ョ湅璇︾粏鐨勭紪鎺掑拰 Hand 鍒嗘瀽缁撴灉
+        </div>
+      </div>
+
+      <!-- Plan sidebar -->
+      <div id="sidebar-plan" style="display:none">
+        <div>
+          <div class="section-title">蹇€熼摼鎺?/div>
+          <div class="links">
+            <a class="link-chip" href="/intent-stream" target="_blank">Intent Stream</a>
+            <a class="link-chip" href="/intent-harness/data" target="_blank">绛栫暐 JSON</a>
+            <a class="link-chip" href="/review" target="_blank">鏃ュ織璇勫垎</a>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Main -->
@@ -356,7 +408,28 @@
         </div>
 
       </div><!-- /main-config -->
-    </div><!-- /main -->
+  
+      <!-- Episodes main -->
+      <div id="main-episodes" style="display:none">
+        <div class="empty-state">
+          <div class="big-icon">馃摉</div>
+          <p>姝ｅ湪鍔犺浇鏃跺簭...</p>
+        </div>
+      </div>
+
+      <!-- Plan main -->
+      <div id="main-plan" style="display:none">
+        <div class="empty-state">
+          <div class="big-icon">馃搻</div>
+          <p>閫夋嫨涓€涓椂搴忔煡鐪嬬紪鎺掕鍒?/p>
+          <div class="form-group" style="max-width:400px;margin:16px auto 0">
+            <input id="plan-episode-id" type="text" placeholder="绉樿创 episode_id">
+            <button class="btn-primary" onclick="loadPlanForEpisode()" style="margin-top:8px">鏌ョ湅缂栨帾</button>
+          </div>
+          <div id="plan-content"></div>
+        </div>
+      </div>
+  </div><!-- /main -->
   </div><!-- /layout -->
 
   <script>
@@ -372,7 +445,7 @@
     const BRAIN_URL = 'http://localhost:3002';
 
     function switchTab(tab) {
-      ['analyze', 'config'].forEach(t => {
+      ['analyze', 'config', 'episodes', 'plan'].forEach(t => {
         document.getElementById('tab-btn-' + t)?.classList.toggle('active', t === tab);
         const sidebar = document.getElementById('sidebar-' + t);
         const main = document.getElementById('main-' + t);
@@ -380,6 +453,8 @@
         if (main) main.style.display = t === tab ? '' : 'none';
       });
       if (tab === 'config') loadConfig();
+      if (tab === 'episodes') loadEpisodes();
+      if (tab === 'plan') loadPlan();
     }
 
     async function fetchJson(url, options = {}) {
@@ -500,7 +575,7 @@
       }
 
       try {
-        const data = await fetchJson('/loom/run', {
+        const data = await fetchJson('/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ hand_id: handId, task, context }),
@@ -622,6 +697,116 @@
     function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
     function esc(s) {
       return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+
+    async function loadEpisodes() {
+      const main = document.getElementById('main-episodes');
+      if (!main) return;
+      main.innerHTML = '<div class="loading-card"><div class="spinner"></div><p>Loading episodes...</p></div>';
+      try {
+        const data = await fetchJson(`${BRAIN_URL}/flywheel`, { signal: AbortSignal.timeout(10000) });
+        const filter = getVal('ep-filter') || 'all';
+        let records = data.records || [];
+        if (filter === 'rewarded') records = records.filter(r => (r.reward_score || 0) > 0.6);
+        if (filter === 'recent') records = records.slice(0, Math.min(records.length, 20));
+        if (!records.length) {
+          main.innerHTML = '<div class="empty-state"><div class="big-icon">馃搷</div><p>娌℃湁绛涢€夌粨鏋?/p></div>';
+          return;
+        }
+        let html = '<div class="ep-list">';
+        for (const r of records) {
+          const reward = r.reward_score || 0;
+          const rClass = reward >= 0.65 ? 'high' : (reward >= 0.5 ? 'mid' : 'low');
+          html += ['<div class="ep-card" onclick="showEpisode(\'', r.episode_id, '\')">',
+            '<div class="ep-header">',
+              '<span class="ep-id">', esc(r.episode_id.slice(0,24)), '...</span>',
+              '<span class="ep-date">', esc((r.ts||'').slice(0,16).replace('T',' ')), '</span>',
+            '</div>',
+            '<div class="ep-meta">',
+              '<span>鎵?', r.hand_count || 0, ' hand</span>',
+              '<span>stance: ', esc(r.stance || 'n/a'), '</span>',
+              '<span class="ep-reward ', rClass, '">', (reward*100).toFixed(0), '%</span>',
+            '</div>',
+          '</div>'].join('');
+        }
+        html += '</div>';
+        main.innerHTML = html;
+      } catch (e) {
+        main.innerHTML = '<div class="error-card"><h3>Failed to load episodes</h3><p>' + esc(e.message) + '</p></div>';
+      }
+    }
+
+    async function showEpisode(episodeId) {
+      const main = document.getElementById('main-episodes');
+      if (!main) return;
+      // highlight selected card
+      document.querySelectorAll('.ep-card').forEach(c => c.classList.remove('selected'));
+      const cards = document.querySelectorAll('.ep-card');
+      for (const c of cards) {
+        if (c.querySelector('.ep-id')?.textContent?.includes(episodeId.slice(0,20))) {
+          c.classList.add('selected');
+          break;
+        }
+      }
+      main.insertAdjacentHTML('beforeend', '<div id="ep-detail" class="ep-detail"><div class="loading-card"><div class="spinner"></div><p>Loading orchestration...</p></div></div>');
+      try {
+        const orch = await fetchJson(`${BRAIN_URL}/orchestration/${episodeId}`, { signal: AbortSignal.timeout(10000) });
+        const detailEl = document.getElementById('ep-detail');
+        if (!detailEl) return;
+        const steps = orch.steps || [];
+        const hands = orch.hands || [];
+        let h = '<h3>缂栨帾璇︽儏</h3>';
+        h += '<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">';
+        for (const hd of hands) h += '<span class="badge badge-purple">' + esc(hd) + '</span>';
+        h += '</div>';
+        h += '<div class="orch-block" style="margin-top:16px"><h4>鎵ц姝ラ</h4>';
+        for (let i=0; i<steps.length; i++) {
+          const s = steps[i];
+          h += '<div class="orch-step"><span class="step-num">' + (i+1) + '</span><span>' + esc(typeof s === 'string' ? s : (s.label || s.task || JSON.stringify(s))) + '</span></div>';
+        }
+        h += '</div>';
+        if (orch.goal) {
+          h += '<div class="orch-block"><h4>鐩爣</h4><p style="font-size:13px;color:#374151">' + esc(typeof orch.goal === 'string' ? orch.goal : orch.goal.title || '') + '</p></div>';
+        }
+        detailEl.innerHTML = h;
+      } catch (e) {
+        const detailEl = document.getElementById('ep-detail');
+        if (detailEl) detailEl.innerHTML = '<div class="error-card"><h3>Failed to load orchestration</h3><p>' + esc(e.message) + '</p></div>';
+      }
+    }
+
+    function loadPlan() {
+      const main = document.getElementById('main-plan');
+      if (!main) return;
+      // Already has default content with input
+    }
+
+    async function loadPlanForEpisode() {
+      const epId = getVal('plan-episode-id');
+      if (!epId) return;
+      const container = document.getElementById('plan-content');
+      if (!container) return;
+      container.innerHTML = '<div class="loading-card"><div class="spinner"></div><p>Loading plan...</p></div>';
+      try {
+        const orch = await fetchJson(`${BRAIN_URL}/orchestration/${epId}`, { signal: AbortSignal.timeout(10000) });
+        const steps = orch.steps || [];
+        const hands = orch.hands || [];
+        let h = '<div class="result-card" style="margin-top:16px">';
+        h += '<div class="result-header"><h2>缂栨帾璁″垝</h2><span class="badge badge-green">' + steps.length + ' steps</span></div>';
+        h += '<div class="orch-block"><h4>娑夊強 Hand</h4><div style="display:flex;gap:6px;flex-wrap:wrap">';
+        for (const hd of hands) h += '<span class="badge badge-purple">' + esc(hd) + '</span>';
+        h += '</div></div>';
+        h += '<div class="orch-block"><h4>鎵ц姝ラ</h4>';
+        for (let i=0; i<steps.length; i++) {
+          const s = steps[i];
+          h += '<div class="orch-step"><span class="step-num">' + (i+1) + '</span><span>' + esc(typeof s === 'string' ? s : (s.label || s.task || JSON.stringify(s))) + '</span></div>';
+        }
+        h += '</div></div>';
+        container.innerHTML = h;
+      } catch (e) {
+        container.innerHTML = '<div class="error-card" style="margin-top:16px"><h3>Failed to load plan</h3><p>' + esc(e.message) + '</p></div>';
+      }
     }
 
     checkStatus();

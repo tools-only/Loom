@@ -115,8 +115,9 @@ class TaskDecomposer:
             "- Decide how many tasks are needed: usually 1-6, up to 8 for complex goals.\n"
             "- Each task focuses on ONE generated analytical dimension, not the full question.\n"
             "- Create a generated hand_id for each task, e.g. runtime-thermal-risk-0.\n"
-            "- executor_id defaults to \"brain-inline\" (the inline runtime executor). Only set it\n"
-            "  to a registered shell ID above when that shell is genuinely required.\n"
+            "- executor_id defaults to \"codex\". Codex runs the hand as a real agent with native\n"
+            "  web search, file ops, and tools. Only use \"brain-inline\" when the hand is pure\n"
+            "  reasoning/synthesis/formatting that requires ZERO external information.\n"
             "- system_prompt: 2-5 sentences defining the hand agent's role contract\n"
             "  (e.g. \"You are a thermal management analysis expert. Assess cooling capacity, "
             "thermal headroom, and reliability risks. Cite measurements where available.\").\n"
@@ -124,15 +125,21 @@ class TaskDecomposer:
             "  [\"market_data\"], [\"filings\"]. Empty list [] is fine if no special capability is needed.\n"
             "- Higher priority numbers dispatch first; same priority tasks run in parallel. "
             "Use depends_on only for true dependencies.\n\n"
+            "- When state references are available, populate state-aware fields:\n"
+            "  state_slice (relevant state ids), target_state_ids, target_gap_ids,\n"
+            "  rubric_ids, state_intent (use|establish|verify|refresh|resolve),\n"
+            "  evidence_requirements (what sources/citations are needed).\n\n"
             "Output ONLY valid JSON, no explanation:\n"
             '{"rationale":"why this decomposition fits the goal/state","tasks":['
             '{"task_id":"t1","hand_id":"runtime-generated-agent",'
-            '"executor_id":"brain-inline","dimension":"generated dimension name",'
+            '"executor_id":"codex","dimension":"generated dimension name",'
             '"task":"specific 1-3 sentence instruction",'
             '"system_prompt":"You are a ... expert. Assess ... and cite ...",'
             '"capabilities":[],'
             '"rubrics":[{"dimension":"same/generated dimension","requirements":"what to cover"}],'
-            '"priority":0,"depends_on":[]}'
+            '"priority":0,"depends_on":[],'
+            '"state_slice":["S1"],"target_state_ids":["S1"],"target_gap_ids":["G1"],'
+            '"rubric_ids":["R_coverage"],"state_intent":"use","evidence_requirements":["cite source"]}'
             "]}"
         )
 
@@ -176,6 +183,12 @@ class TaskDecomposer:
                     depends_on=list(item.get("depends_on") or []),
                     system_prompt=system_prompt,
                     capabilities=capabilities,
+                    state_slice=list(item.get("state_slice") or []),
+                    target_state_ids=list(item.get("target_state_ids") or []),
+                    target_gap_ids=list(item.get("target_gap_ids") or []),
+                    rubric_ids=list(item.get("rubric_ids") or []),
+                    state_intent=str(item.get("state_intent") or "use"),
+                    evidence_requirements=list(item.get("evidence_requirements") or []),
                 )
             )
 

@@ -97,7 +97,6 @@ def create_brain_inline_provider(
     capabilities: list[str] | None = None,
     hw_capabilities: dict[str, bool] | None = None,
     label: str | None = None,
-    max_tokens: int = 2400,
 ) -> dict[str, Any]:
     """Factory for the Brain-inline adapter.
 
@@ -121,8 +120,6 @@ def create_brain_inline_provider(
         Optional hardware capability map.
     label : str | None
         Human-readable label.
-    max_tokens : int
-        ``max_tokens`` argument forwarded to ``client.messages.create``.
     """
     caps = capabilities or ["brain.inline", "runtime.generated"]
     hw_caps = hw_capabilities or dict(_SDK_HW_CAPABILITIES)
@@ -140,7 +137,6 @@ def create_brain_inline_provider(
 
         resp = await client.messages.create(
             model=model,
-            max_tokens=max_tokens,
             system=sys_prompt,
             tools=[],
             messages=[{"role": "user", "content": user_msg}],

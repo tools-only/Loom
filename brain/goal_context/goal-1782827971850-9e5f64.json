@@ -1,0 +1,26 @@
+{
+  "goal_id": "goal-1782827971850-9e5f64",
+  "goal_type": "ad_hoc",
+  "created_at": "2026-06-30T13:59:31.850366Z",
+  "updated_at": "2026-06-30T14:00:56.847646Z",
+  "status": "open",
+  "title": "Test: is this working?",
+  "context_summary": "",
+  "key_findings": [],
+  "synthesis_history": [
+    {
+      "episode_id": "ep-1782828056845-8f55b13e",
+      "ts": "2026-06-30T14:00:56.845642Z",
+      "stance": "operational",
+      "confidence": 0.95,
+      "key_drivers": [
+        "Loom system is operational and responding to user requests"
+      ],
+      "reversal_condition": "If subsequent user requests fail or multiple hand errors occur, re-evaluate system health."
+    }
+  ],
+  "contradiction_log": [],
+  "episode_ids": [
+    "ep-1782828056845-8f55b13e"
+  ]
+}
